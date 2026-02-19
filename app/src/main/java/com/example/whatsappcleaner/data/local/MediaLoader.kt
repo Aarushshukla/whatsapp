@@ -1,4 +1,4 @@
-package com.example.whatsappcleaner.data
+package com.example.whatsappcleaner.data.local
 
 import android.content.ContentResolver
 import android.content.Context
@@ -18,36 +18,23 @@ data class SimpleMediaItem(
 
 class MediaLoader(private val context: Context) {
 
-    // --- 1. GENERAL LOADER (Used by HomeViewModel) ---
-    // Loads all WhatsApp images or videos
     fun loadWhatsAppMedia(mediaType: String): List<SimpleMediaItem> {
-        // Query from 1970 to Now (All files)
         return queryMediaStore(mediaType, 0, System.currentTimeMillis())
     }
 
-    // --- 2. TODAY LOADER (Used by WhatsCleanAppRoot) ---
-    // Loads files from the last 24 hours
     fun loadTodayWhatsAppMedia(): List<SimpleMediaItem> {
         val oneDayAgo = System.currentTimeMillis() - (24 * 60 * 60 * 1000)
         return loadWhatsAppMediaInRange(oneDayAgo, System.currentTimeMillis())
     }
 
-    // --- 3. RANGE LOADER (Fixes your current error) ---
-    // Loads both images and videos within a specific time range
     fun loadWhatsAppMediaInRange(fromMillis: Long, toMillis: Long): List<SimpleMediaItem> {
         val images = queryMediaStore("image", fromMillis, toMillis)
         val videos = queryMediaStore("video", fromMillis, toMillis)
-
-        // Combine and sort by newest first
         return (images + videos).sortedByDescending { it.addedMillis }
     }
 
-    // --- INTERNAL HELPER FUNCTION ---
-    // This does the actual work so we don't repeat code
     private fun queryMediaStore(mediaType: String, minDate: Long, maxDate: Long): List<SimpleMediaItem> {
         val resolver: ContentResolver = context.contentResolver
-
-        // Select correct table (Images or Video)
         val collection = if (mediaType == "video") {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q)
                 MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
@@ -69,12 +56,10 @@ class MediaLoader(private val context: Context) {
             MediaStore.MediaColumns.MIME_TYPE
         )
 
-        // Filter: WhatsApp path AND Date Range
         val selection = "${MediaStore.MediaColumns.RELATIVE_PATH} LIKE ? AND " +
                 "${MediaStore.MediaColumns.DATE_ADDED} >= ? AND " +
                 "${MediaStore.MediaColumns.DATE_ADDED} <= ?"
 
-        // Convert millis to seconds for MediaStore
         val selectionArgs = arrayOf(
             "%WhatsApp%",
             (minDate / 1000).toString(),
@@ -105,7 +90,6 @@ class MediaLoader(private val context: Context) {
                     val dateAddedSec = cursor.getLong(dateCol)
                     val relativePath = cursor.getString(pathCol) ?: ""
                     val mimeType = cursor.getString(mimeCol)
-
                     val uri = Uri.withAppendedPath(collection, id.toString())
 
                     items.add(

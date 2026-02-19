@@ -2,19 +2,21 @@ package com.example.whatsappcleaner.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// --- Professional WhatsApp Palette ---
-// We use these specific names so Theme.kt can find them.
+// --- The "Legit" Professional Palette ---
 
-val WhatsAppGreen = Color(0xFF008069)      // Dark Teal (Top Bar) - Matches WhatsApp
-val WhatsAppLightGreen = Color(0xFF25D366) // Bright Green (Buttons/Icons)
-val BackgroundLight = Color(0xFFF0F2F5)    // Light Grey (Background) - Easy on eyes
-val CardWhite = Color(0xFFFFFFFF)          // Pure White (Cards)
-val TextDark = Color(0xFF111B21)           // Almost Black (Main Text)
-val TextGrey = Color(0xFF54656F)           // Grey (Secondary Text)
-val ErrorRed = Color(0xFFD32F2F)           // Red (Delete Buttons only)
+// 60% Neutral (Backgrounds)
+val PrimaryBackground = Color(0xFFF8FAFC) // Slate-50 (Modern Grey-White)
+val SurfaceWhite      = Color(0xFFFFFFFF) // Pure White (Cards)
 
-// (Optional) You can keep your old colors if you ever want to switch back,
-// but the app will use the ones above for the new design.
-val TealPrimary = Color(0xFF006D77)
-val TealSecondary = Color(0xFF00B894)
-val BgLight = Color(0xFFF5F7FA)
+// 30% Brand (Identity)
+val BrandNavy         = Color(0xFF0F172A) // Slate-900 (Headers/Menu)
+val BrandSecondary    = Color(0xFF334155) // Slate-700 (Sub-text)
+
+// 10% Accents (Action)
+val AccentBlue        = Color(0xFF3B82F6) // Royal Blue (Primary Buttons)
+val AccentGreen       = Color(0xFF10B981) // Emerald (Success/Safe)
+val AccentError       = Color(0xFFEF4444) // Red (Destructive)
+
+// Text
+val TextMain          = Color(0xFF1E293B) // High Contrast
+val TextSecondary     = Color(0xFF64748B) // Medium Contrast

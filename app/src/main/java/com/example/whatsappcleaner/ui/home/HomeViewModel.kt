@@ -1,22 +1,23 @@
-package com.example.whatsappcleaner
+package com.example.whatsappcleaner.ui.home
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.whatsappcleaner.data.MediaLoader
-import com.example.whatsappcleaner.data.SimpleMediaItem
-import com.example.whatsappcleaner.data.formatSize
-import com.example.whatsappcleaner.ui.home.MediaFilter
-import com.example.whatsappcleaner.ui.home.SuggestionType
+import com.example.whatsappcleaner.data.local.MediaLoader
+import com.example.whatsappcleaner.data.local.SimpleMediaItem
+import com.example.whatsappcleaner.data.local.formatSize
+// --- NEW IMPORTS ---
+import com.example.whatsappcleaner.data.ReminderFreq
+import com.example.whatsappcleaner.data.ReminderTime
+// -------------------
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-// --- NEW CLASS NAMES (To avoid "Redeclaration" error) ---
-data class ReminderFreq(val label: String, val days: Int)
-data class ReminderTime(val label: String, val hour: Int, val minute: Int)
+// REMOVED: data class ReminderFreq... (Moved to TimeModels.kt)
+// REMOVED: data class ReminderTime... (Moved to TimeModels.kt)
 
 data class HomeUiState(
     val allItems: List<SimpleMediaItem> = emptyList(),
@@ -51,11 +52,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     fun updatePermissionStatus(granted: Boolean) {
         _uiState.update { it.copy(permissionGranted = granted) }
-        if (granted) {
-            refreshMedia()
-        } else {
-            _uiState.update { it.copy(summaryInfo = "Permission needed to scan files.") }
-        }
+        if (granted) refreshMedia()
+        else _uiState.update { it.copy(summaryInfo = "Permission needed to scan.") }
     }
 
     fun refreshMedia() {
@@ -67,11 +65,11 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             val allItems = (images + videos).sortedByDescending { it.addedMillis }
 
             val totalSize = allItems.sumOf { it.sizeKb.toLong() * 1024 }
-            val count = allItems.size
-            val summary = "Found $count files (${formatSize(totalSize)})"
+            val summary = "Found ${allItems.size} files (${formatSize(totalSize)})"
 
             val today = System.currentTimeMillis() - 86400000
             val largeItems = allItems.filter { it.addedMillis > today && it.sizeKb > 5000 }
+            val screenshots = allItems.filter { it.addedMillis > today && it.name.startsWith("Screenshot", true) }
 
             _uiState.update {
                 it.copy(
@@ -79,7 +77,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     filteredItems = filterList(allItems, it.currentFilter, it.activeSuggestion),
                     summaryInfo = summary,
                     largeTodayCount = largeItems.size,
-                    largeTodaySizeText = formatSize(largeItems.sumOf { i -> i.sizeKb.toLong() * 1024 })
+                    largeTodaySizeText = formatSize(largeItems.sumOf { i -> i.sizeKb.toLong() * 1024 }),
+                    screenshotTodayCount = screenshots.size,
+                    screenshotTodaySizeText = formatSize(screenshots.sumOf { i -> i.sizeKb.toLong() * 1024 })
                 )
             }
         }
@@ -108,20 +108,19 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         filter: MediaFilter,
         suggestion: SuggestionType
     ): List<SimpleMediaItem> {
-        var result = items
-
-        result = when (filter) {
-            MediaFilter.IMAGES -> result.filter { it.mimeType?.startsWith("image") == true }
-            MediaFilter.VIDEOS -> result.filter { it.mimeType?.startsWith("video") == true }
-            MediaFilter.OTHER -> result.filter {
-                it.mimeType?.startsWith("image") != true && it.mimeType?.startsWith("video") != true
-            }
-            MediaFilter.ALL -> result
+        var result = when (filter) {
+            MediaFilter.IMAGES -> items.filter { it.mimeType?.startsWith("image") == true }
+            MediaFilter.VIDEOS -> items.filter { it.mimeType?.startsWith("video") == true }
+            MediaFilter.OTHER -> items.filter { it.mimeType?.startsWith("image") != true && it.mimeType?.startsWith("video") != true }
+            MediaFilter.ALL -> items
         }
 
         if (suggestion == SuggestionType.LARGE_TODAY) {
             val today = System.currentTimeMillis() - 86400000
             result = result.filter { it.addedMillis > today && it.sizeKb > 5000 }
+        } else if (suggestion == SuggestionType.SCREENSHOTS_TODAY) {
+            val today = System.currentTimeMillis() - 86400000
+            result = result.filter { it.addedMillis > today && it.name.startsWith("Screenshot", true) }
         }
 
         return result

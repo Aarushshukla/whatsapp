@@ -14,8 +14,11 @@ import androidx.activity.viewModels
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.core.content.ContextCompat
+import com.example.whatsappcleaner.ui.theme.WhatsCleanTheme
 import com.example.whatsappcleaner.ui.home.SimpleHomeScreen
-import com.example.whatsappcleaner.ui.theme.WhatsCleanTheme // IMPORTED CORRECTLY
+// --- FIX: Add this import ---
+import com.example.whatsappcleaner.ui.home.HomeViewModel
+// ----------------------------
 
 class MainActivity : ComponentActivity() {
 
@@ -29,18 +32,15 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
         checkPermissions()
 
         setContent {
-            // USES THE NAME FROM YOUR THEME FILE
             WhatsCleanTheme {
                 val state by viewModel.uiState.collectAsState()
 
                 SimpleHomeScreen(
                     items = state.filteredItems,
                     onRefreshClick = { viewModel.refreshMedia() },
-                    // permissionInfo line REMOVED completely
                     summaryInfo = state.summaryInfo,
                     currentFilter = state.currentFilter,
                     onFilterChange = { viewModel.setFilter(it) },
@@ -91,9 +91,7 @@ class MainActivity : ComponentActivity() {
         }
         try {
             startActivity(intent)
-        } catch (e: Exception) {
-            // Handle error
-        }
+        } catch (e: Exception) { }
     }
 
     private fun openSystemStorage() {
