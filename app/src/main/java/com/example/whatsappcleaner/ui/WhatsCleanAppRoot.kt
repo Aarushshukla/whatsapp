@@ -12,6 +12,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.work.*
 import com.example.whatsappcleaner.data.local.UserPrefs
 import com.example.whatsappcleaner.data.local.MediaLoader
+import com.example.whatsappcleaner.data.local.loadTodayWhatsAppMediaCompat
 import com.example.whatsappcleaner.data.local.SimpleMediaItem
 import com.example.whatsappcleaner.data.local.formatSize
 // --- FIXED IMPORTS ---
@@ -71,7 +72,7 @@ fun WhatsCleanAppRoot() {
             fun reload() {
                 if (!hasPermission) return
                 val loader = MediaLoader(context)
-                val todayItems = loader.loadTodayWhatsAppMedia()
+                val todayItems = loader.loadTodayWhatsAppMediaCompat()
                 items = todayItems
 
                 val large = todayItems.filter { it.sizeKb.toLong() * 1024L >= 50L * 1024L * 1024L }
