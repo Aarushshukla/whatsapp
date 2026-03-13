@@ -71,9 +71,7 @@ fun WhatsCleanAppRoot() {
             fun reload() {
                 if (!hasPermission) return
                 val loader = MediaLoader(context)
-                val now = System.currentTimeMillis()
-                val oneDayAgo = now - (24 * 60 * 60 * 1000)
-                val todayItems = loader.loadWhatsAppMediaInRange(oneDayAgo, now)
+                val todayItems = loader.loadTodayWhatsAppMedia()
                 items = todayItems
 
                 val large = todayItems.filter { it.sizeKb.toLong() * 1024L >= 50L * 1024L * 1024L }
