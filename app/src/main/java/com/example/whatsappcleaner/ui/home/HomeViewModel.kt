@@ -6,18 +6,22 @@ import androidx.lifecycle.viewModelScope
 import com.example.whatsappcleaner.data.local.MediaLoader
 import com.example.whatsappcleaner.data.local.SimpleMediaItem
 import com.example.whatsappcleaner.data.local.formatSize
+// --- NEW IMPORTS ---
 import com.example.whatsappcleaner.data.ReminderFreq
 import com.example.whatsappcleaner.data.ReminderTime
+// -------------------
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.util.Calendar
+
+// REMOVED: data class ReminderFreq... (Moved to TimeModels.kt)
+// REMOVED: data class ReminderTime... (Moved to TimeModels.kt)
 
 data class HomeUiState(
-    val todayItems: List<SimpleMediaItem> = emptyList(),
-    val olderItems: List<SimpleMediaItem> = emptyList(),
+    val allItems: List<SimpleMediaItem> = emptyList(),
+    val filteredItems: List<SimpleMediaItem> = emptyList(),
     val summaryInfo: String = "Loading...",
     val permissionGranted: Boolean = false,
     val currentFilter: MediaFilter = MediaFilter.ALL,
@@ -32,81 +36,105 @@ data class HomeUiState(
     val timeOptions: List<ReminderTime> = generateTimeOptions()
 )
 
-fun generateTimeOptions(): List<ReminderTime> = (0..23).map { ReminderTime("%02d:00".format(it), it, 0) }
+fun generateTimeOptions(): List<ReminderTime> {
+    return (0..23).map { hour ->
+        val label = "%02d:00".format(hour)
+        ReminderTime(label, hour, 0)
+    }
+}
 
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     private val mediaLoader = MediaLoader(application)
+
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
-    // Store original list to apply filters without reloading
-    private var allRawItems: List<SimpleMediaItem> = emptyList()
-
     fun updatePermissionStatus(granted: Boolean) {
         _uiState.update { it.copy(permissionGranted = granted) }
-        if (granted) refreshMedia() else _uiState.update { it.copy(summaryInfo = "Permission needed to scan.") }
+        if (granted) refreshMedia()
+        else _uiState.update { it.copy(summaryInfo = "Permission needed to scan.") }
     }
 
     fun refreshMedia() {
         viewModelScope.launch {
-            _uiState.update { it.copy(summaryInfo = "Scanning Entire Gallery...") }
+            _uiState.update { it.copy(summaryInfo = "Scanning...") }
 
-            val images = mediaLoader.loadAllDeviceMedia("image")
-            val videos = mediaLoader.loadAllDeviceMedia("video")
-            allRawItems = (images + videos).sortedByDescending { it.addedMillis }
+            val images = mediaLoader.loadWhatsAppMedia("image")
+            val videos = mediaLoader.loadWhatsAppMedia("video")
+            val allItems = (images + videos).sortedByDescending { it.addedMillis }
 
-            applyFiltersAndBifurcate()
+            val totalSize = allItems.sumOf { it.sizeKb.toLong() * 1024 }
+            val summary = "Found ${allItems.size} files (${formatSize(totalSize)})"
+
+            val today = System.currentTimeMillis() - 86400000
+            val largeItems = allItems.filter { it.addedMillis > today && it.sizeKb > 5000 }
+            val screenshots = allItems.filter { it.addedMillis > today && it.name.startsWith("Screenshot", true) }
+
+            _uiState.update {
+                it.copy(
+                    allItems = allItems,
+                    filteredItems = filterList(allItems, it.currentFilter, it.activeSuggestion),
+                    summaryInfo = summary,
+                    largeTodayCount = largeItems.size,
+                    largeTodaySizeText = formatSize(largeItems.sumOf { i -> i.sizeKb.toLong() * 1024 }),
+                    screenshotTodayCount = screenshots.size,
+                    screenshotTodaySizeText = formatSize(screenshots.sumOf { i -> i.sizeKb.toLong() * 1024 })
+                )
+            }
         }
     }
 
     fun setFilter(filter: MediaFilter) {
-        _uiState.update { it.copy(currentFilter = filter) }
-        applyFiltersAndBifurcate()
-    }
-
-    fun setSuggestion(suggestion: SuggestionType) {
-        _uiState.update { it.copy(activeSuggestion = suggestion) }
-        applyFiltersAndBifurcate()
-    }
-
-    private fun applyFiltersAndBifurcate() {
-        val state = _uiState.value
-
-        // 1. Apply user filters
-        val filtered = when (state.currentFilter) {
-            MediaFilter.IMAGES -> allRawItems.filter { it.mimeType?.startsWith("image", true) == true || it.name.endsWith(".jpg", true) || it.name.endsWith(".png", true) }
-            MediaFilter.VIDEOS -> allRawItems.filter { it.mimeType?.startsWith("video", true) == true || it.name.endsWith(".mp4", true) }
-            MediaFilter.OTHER -> allRawItems.filter { it.mimeType?.startsWith("image", true) != true && it.mimeType?.startsWith("video", true) != true && !it.name.endsWith(".mp4", true) }
-            MediaFilter.ALL -> allRawItems
-        }
-
-        // 2. Get Start of Today in Milliseconds
-        val calendar = Calendar.getInstance().apply {
-            set(Calendar.HOUR_OF_DAY, 0)
-            set(Calendar.MINUTE, 0)
-            set(Calendar.SECOND, 0)
-            set(Calendar.MILLISECOND, 0)
-        }
-        val startOfToday = calendar.timeInMillis
-
-        // 3. Bifurcate (Split the list)
-        val todayList = filtered.filter { it.addedMillis >= startOfToday }
-        val olderList = filtered.filter { it.addedMillis < startOfToday }
-
-        val totalSize = filtered.sumOf { it.sizeKb.toLong() * 1024 }
-        val summary = "Found ${filtered.size} files (${formatSize(totalSize)})"
-
         _uiState.update {
             it.copy(
-                todayItems = todayList,
-                olderItems = olderList,
-                summaryInfo = summary
+                currentFilter = filter,
+                filteredItems = filterList(it.allItems, filter, it.activeSuggestion)
             )
         }
     }
 
-    fun toggleReminders(enabled: Boolean) = _uiState.update { it.copy(remindersEnabled = enabled) }
-    fun setFrequency(option: ReminderFreq) = _uiState.update { it.copy(selectedFrequency = option) }
-    fun setTime(option: ReminderTime) = _uiState.update { it.copy(selectedTime = option) }
+    fun setSuggestion(suggestion: SuggestionType) {
+        _uiState.update {
+            it.copy(
+                activeSuggestion = suggestion,
+                filteredItems = filterList(it.allItems, it.currentFilter, suggestion)
+            )
+        }
+    }
+
+    private fun filterList(
+        items: List<SimpleMediaItem>,
+        filter: MediaFilter,
+        suggestion: SuggestionType
+    ): List<SimpleMediaItem> {
+        var result = when (filter) {
+            MediaFilter.IMAGES -> items.filter { it.mimeType?.startsWith("image") == true }
+            MediaFilter.VIDEOS -> items.filter { it.mimeType?.startsWith("video") == true }
+            MediaFilter.OTHER -> items.filter { it.mimeType?.startsWith("image") != true && it.mimeType?.startsWith("video") != true }
+            MediaFilter.ALL -> items
+        }
+
+        if (suggestion == SuggestionType.LARGE_TODAY) {
+            val today = System.currentTimeMillis() - 86400000
+            result = result.filter { it.addedMillis > today && it.sizeKb > 5000 }
+        } else if (suggestion == SuggestionType.SCREENSHOTS_TODAY) {
+            val today = System.currentTimeMillis() - 86400000
+            result = result.filter { it.addedMillis > today && it.name.startsWith("Screenshot", true) }
+        }
+
+        return result
+    }
+
+    fun toggleReminders(enabled: Boolean) {
+        _uiState.update { it.copy(remindersEnabled = enabled) }
+    }
+
+    fun setFrequency(option: ReminderFreq) {
+        _uiState.update { it.copy(selectedFrequency = option) }
+    }
+
+    fun setTime(option: ReminderTime) {
+        _uiState.update { it.copy(selectedTime = option) }
+    }
 }
