@@ -18,33 +18,19 @@ data class SimpleMediaItem(
 
 class MediaLoader(private val context: Context) {
 
-    fun loadWhatsAppMedia(mediaType: String): List<SimpleMediaItem> {
+    // Loads ALL device media for a specific type
+    fun loadAllDeviceMedia(mediaType: String): List<SimpleMediaItem> {
         return queryMediaStore(mediaType, 0, System.currentTimeMillis())
-    }
-
-    fun loadTodayWhatsAppMedia(): List<SimpleMediaItem> {
-        val oneDayAgo = System.currentTimeMillis() - (24 * 60 * 60 * 1000)
-        return loadWhatsAppMediaInRange(oneDayAgo, System.currentTimeMillis())
-    }
-
-    fun loadWhatsAppMediaInRange(fromMillis: Long, toMillis: Long): List<SimpleMediaItem> {
-        val images = queryMediaStore("image", fromMillis, toMillis)
-        val videos = queryMediaStore("video", fromMillis, toMillis)
-        return (images + videos).sortedByDescending { it.addedMillis }
     }
 
     private fun queryMediaStore(mediaType: String, minDate: Long, maxDate: Long): List<SimpleMediaItem> {
         val resolver: ContentResolver = context.contentResolver
         val collection = if (mediaType == "video") {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q)
-                MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
-            else
-                MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
+            else MediaStore.Video.Media.EXTERNAL_CONTENT_URI
         } else {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q)
-                MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
-            else
-                MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
+            else MediaStore.Images.Media.EXTERNAL_CONTENT_URI
         }
 
         val projection = arrayOf(
@@ -56,26 +42,14 @@ class MediaLoader(private val context: Context) {
             MediaStore.MediaColumns.MIME_TYPE
         )
 
-        val selection = "${MediaStore.MediaColumns.RELATIVE_PATH} LIKE ? AND " +
-                "${MediaStore.MediaColumns.DATE_ADDED} >= ? AND " +
-                "${MediaStore.MediaColumns.DATE_ADDED} <= ?"
-
-        val selectionArgs = arrayOf(
-            "%WhatsApp%",
-            (minDate / 1000).toString(),
-            (maxDate / 1000).toString()
-        )
+        // NO WHATSAPP RESTRICTION - Fetches everything on the device
+        val selection = "${MediaStore.MediaColumns.DATE_ADDED} >= ? AND ${MediaStore.MediaColumns.DATE_ADDED} <= ?"
+        val selectionArgs = arrayOf((minDate / 1000).toString(), (maxDate / 1000).toString())
 
         val items = mutableListOf<SimpleMediaItem>()
 
         try {
-            resolver.query(
-                collection,
-                projection,
-                selection,
-                selectionArgs,
-                "${MediaStore.MediaColumns.DATE_ADDED} DESC"
-            )?.use { cursor ->
+            resolver.query(collection, projection, selection, selectionArgs, "${MediaStore.MediaColumns.DATE_ADDED} DESC")?.use { cursor ->
                 val idCol = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns._ID)
                 val nameCol = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.DISPLAY_NAME)
                 val sizeCol = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.SIZE)
@@ -94,12 +68,8 @@ class MediaLoader(private val context: Context) {
 
                     items.add(
                         SimpleMediaItem(
-                            uri = uri,
-                            name = displayName,
-                            sizeKb = (sizeBytes / 1024).toInt(),
-                            path = relativePath,
-                            addedMillis = dateAddedSec * 1000,
-                            mimeType = mimeType
+                            uri = uri, name = displayName, sizeKb = (sizeBytes / 1024).toInt(),
+                            path = relativePath, addedMillis = dateAddedSec * 1000, mimeType = mimeType
                         )
                     )
                 }

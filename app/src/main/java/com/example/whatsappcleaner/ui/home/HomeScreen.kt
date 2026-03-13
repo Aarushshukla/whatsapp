@@ -14,16 +14,22 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
-import com.airbnb.lottie.compose.*
-import com.example.whatsappcleaner.R
-// --- FIXED IMPORTS ---
+
+// Coil Imports for real thumbnails
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import coil.decode.VideoFrameDecoder
+
 import com.example.whatsappcleaner.data.ReminderFreq
 import com.example.whatsappcleaner.data.ReminderTime
 import com.example.whatsappcleaner.data.local.SimpleMediaItem
 import com.example.whatsappcleaner.data.local.formatSize
-// --------------------
+
 import com.example.whatsappcleaner.ui.theme.*
 import com.example.whatsappcleaner.ui.components.*
 import com.example.whatsappcleaner.ui.navigation.AppDrawer
@@ -34,7 +40,8 @@ enum class SuggestionType { NONE, LARGE_TODAY, SCREENSHOTS_TODAY }
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SimpleHomeScreen(
-    items: List<SimpleMediaItem>,
+    todayItems: List<SimpleMediaItem>,
+    olderItems: List<SimpleMediaItem>,
     onRefreshClick: () -> Unit,
     summaryInfo: String,
     currentFilter: MediaFilter,
@@ -60,9 +67,7 @@ fun SimpleHomeScreen(
     var selected by remember { mutableStateOf<Set<String>>(emptySet()) }
     var showReviewDialog by remember { mutableStateOf(false) }
 
-    // Lottie Animation
-    val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.loading_anim))
-    val progress by animateLottieCompositionAsState(composition, iterations = LottieConstants.IterateForever)
+    val allDisplayedItems = todayItems + olderItems
 
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -71,10 +76,10 @@ fun SimpleHomeScreen(
         Scaffold(
             topBar = {
                 CenterAlignedTopAppBar(
-                    title = { Text("Dashboard", style = MaterialTheme.typography.titleLarge, color = BrandNavy) },
+                    title = { Text("Gallery Overview", style = MaterialTheme.typography.titleLarge, color = BrandNavy) },
                     navigationIcon = {
                         IconButton(onClick = { scope.launch { drawerState.open() } }) {
-                            Icon(Icons.Default.Menu, "Menu", tint = BrandNavy)
+                            Icon(Icons.Default.Menu, contentDescription = "Menu", tint = BrandNavy)
                         }
                     },
                     colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = PrimaryBackground)
@@ -82,22 +87,22 @@ fun SimpleHomeScreen(
             },
             containerColor = PrimaryBackground
         ) { padding ->
-            Column(
-                modifier = Modifier.padding(padding).padding(horizontal = 16.dp).fillMaxSize()
-            ) {
-                // 1. Stats Card
+            Column(modifier = Modifier.padding(padding).padding(horizontal = 16.dp).fillMaxSize()) {
+
                 LegitCard {
                     Column(Modifier.padding(20.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.PieChart, null, tint = AccentBlue)
+                            Icon(Icons.Default.PieChart, contentDescription = null, tint = AccentBlue)
                             Spacer(Modifier.width(8.dp))
-                            Text("Storage Overview", style = MaterialTheme.typography.titleMedium, color = BrandNavy)
+                            Text("Storage Status", style = MaterialTheme.typography.titleMedium, color = BrandNavy)
                         }
                         Spacer(Modifier.height(12.dp))
-                        Text(summaryInfo.replace("|", "\n"), style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+                        Text(summaryInfo, style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+
                         Spacer(Modifier.height(16.dp))
-                        Divider(color = Color.LightGray.copy(0.2f))
+                        Divider(color = Color.LightGray.copy(alpha = 0.2f))
                         Spacer(Modifier.height(12.dp))
+
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                             Text("Daily Reminders", style = MaterialTheme.typography.bodyMedium, color = TextMain)
                             Switch(
@@ -108,37 +113,53 @@ fun SimpleHomeScreen(
                         }
                     }
                 }
+
                 Spacer(Modifier.height(16.dp))
 
-                // 2. Filters
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip("All", MediaFilter.ALL, currentFilter, onFilterChange)
                     FilterChip("Images", MediaFilter.IMAGES, currentFilter, onFilterChange)
                     FilterChip("Videos", MediaFilter.VIDEOS, currentFilter, onFilterChange)
                 }
+
                 Spacer(Modifier.height(16.dp))
 
-                // 3. List
-                if (items.isEmpty()) {
+                if (todayItems.isEmpty() && olderItems.isEmpty()) {
                     Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        if (composition != null) {
-                            LottieAnimation(composition, { progress }, modifier = Modifier.size(200.dp))
-                        } else {
-                            FriendlyState(Icons.Default.CheckCircle, "All Clean", "No files found.")
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(Icons.Default.CheckCircle, "Empty", tint = AccentGreen, modifier = Modifier.size(72.dp))
+                            Spacer(Modifier.height(16.dp))
+                            Text("All Clean!", style = MaterialTheme.typography.headlineSmall, color = BrandNavy)
+                            Spacer(Modifier.height(8.dp))
+                            Text("No files found.", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
                         }
                     }
                 } else {
                     LazyColumn(Modifier.weight(1f)) {
-                        items(items) { item ->
-                            val isSelected = selected.contains(item.uri.toString())
-                            MediaRow(item, isSelected) {
-                                selected = if (isSelected) selected - item.uri.toString() else selected + item.uri.toString()
+                        // --- TODAY BIFURCATION HEADER ---
+                        if (todayItems.isNotEmpty()) {
+                            item {
+                                Text("Added Today", style = MaterialTheme.typography.titleMedium, color = AccentBlue, fontWeight = FontWeight.Bold, modifier = Modifier.padding(vertical = 8.dp))
+                            }
+                            items(todayItems) { item ->
+                                val isSelected = selected.contains(item.uri.toString())
+                                MediaRow(item, isSelected) { selected = if (isSelected) selected - item.uri.toString() else selected + item.uri.toString() }
+                            }
+                        }
+
+                        // --- OLDER BIFURCATION HEADER ---
+                        if (olderItems.isNotEmpty()) {
+                            item {
+                                Text("Existing Media", style = MaterialTheme.typography.titleMedium, color = TextSecondary, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 16.dp, bottom = 8.dp))
+                            }
+                            items(olderItems) { item ->
+                                val isSelected = selected.contains(item.uri.toString())
+                                MediaRow(item, isSelected) { selected = if (isSelected) selected - item.uri.toString() else selected + item.uri.toString() }
                             }
                         }
                     }
                 }
 
-                // 4. Buttons
                 Spacer(Modifier.height(16.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     LegitButton("Refresh", onRefreshClick, Modifier.weight(1f))
@@ -150,11 +171,11 @@ fun SimpleHomeScreen(
     }
 
     if (showReviewDialog) {
-        val selectedItems = items.filter { selected.contains(it.uri.toString()) }
+        val selectedItemsList = allDisplayedItems.filter { selected.contains(it.uri.toString()) }
         ReviewDialog(
-            items = selectedItems,
+            items = selectedItemsList,
             onDismiss = { showReviewDialog = false },
-            onOpenNext = { index -> if (index in selectedItems.indices) onOpenInSystem(selectedItems[index]) },
+            onOpenNext = { index -> if (index in selectedItemsList.indices) onOpenInSystem(selectedItemsList[index]) },
             onRefresh = { showReviewDialog = false; onRefreshClick(); selected = emptySet() }
         )
     }
@@ -180,22 +201,78 @@ fun FilterChip(label: String, value: MediaFilter, current: MediaFilter, onChange
 
 @Composable
 fun MediaRow(item: SimpleMediaItem, selected: Boolean, onClick: () -> Unit) {
+    val context = LocalContext.current
+
+    val isVideo = item.mimeType?.startsWith("video", ignoreCase = true) == true ||
+            item.name.endsWith(".mp4", ignoreCase = true)
+
+    val isImage = item.mimeType?.startsWith("image", ignoreCase = true) == true ||
+            item.name.endsWith(".jpg", ignoreCase = true) ||
+            item.name.endsWith(".jpeg", ignoreCase = true) ||
+            item.name.endsWith(".png", ignoreCase = true)
+
+    val imageRequest = ImageRequest.Builder(context)
+        .data(item.uri)
+        .crossfade(true)
+        .apply {
+            if (isVideo) {
+                decoderFactory(VideoFrameDecoder.Factory())
+            }
+        }
+        .build()
+
     Row(
         modifier = Modifier
-            .fillMaxWidth().padding(vertical = 4.dp)
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
             .clip(RoundedCornerShape(12.dp))
-            .background(if (selected) AccentBlue.copy(0.1f) else SurfaceWhite)
-            .clickable(onClick = onClick).padding(12.dp),
+            .background(if (selected) AccentBlue.copy(alpha = 0.1f) else SurfaceWhite)
+            .clickable(onClick = onClick)
+            .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
-            modifier = Modifier.size(40.dp).background(if (selected) AccentBlue else Color(0xFFE2E8F0), RoundedCornerShape(10.dp)),
+            modifier = Modifier
+                .size(48.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(Color(0xFFE2E8F0)),
             contentAlignment = Alignment.Center
         ) {
-            if(selected) Icon(Icons.Default.Check, null, tint = Color.White)
-            else Icon(Icons.Default.InsertDriveFile, null, tint = TextSecondary)
+            if (isImage || isVideo) {
+                AsyncImage(
+                    model = imageRequest,
+                    contentDescription = "Media Thumbnail",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+                if (isVideo) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.3f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.PlayArrow, contentDescription = "Play", tint = Color.White, modifier = Modifier.size(24.dp))
+                    }
+                }
+            } else {
+                Icon(Icons.Default.InsertDriveFile, contentDescription = null, tint = TextSecondary)
+            }
+
+            if (selected) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(AccentBlue.copy(alpha = 0.8f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Default.Check, contentDescription = "Selected", tint = Color.White)
+                }
+            }
         }
+
         Spacer(Modifier.width(12.dp))
+
         Column(Modifier.weight(1f)) {
             Text(item.name, style = MaterialTheme.typography.titleSmall, maxLines = 1, color = TextMain)
             Text(formatSize(item.sizeKb.toLong() * 1024L), style = MaterialTheme.typography.bodySmall, color = TextSecondary)
