@@ -113,7 +113,7 @@ fun WhatsCleanAppRoot() {
             }
 
             SimpleHomeScreen(
-                items = finalItems,
+                finalItems,
                 onRefreshClick = { reload() },
                 summaryInfo = summaryInfo,
                 currentFilter = filter,
