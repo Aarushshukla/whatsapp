@@ -58,4 +58,5 @@ dependencies {
 
 
     implementation("androidx.work:work-runtime-ktx:2.9.0")
+    implementation("org.tensorflow:tensorflow-lite:2.14.0")
 }

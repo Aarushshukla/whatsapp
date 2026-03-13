@@ -4,7 +4,11 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.whatsappcleaner.data.local.MediaLoader
+import com.example.whatsappcleaner.data.local.PhoneRealityAnalyzer
+import com.example.whatsappcleaner.data.local.PhoneRealityReport
 import com.example.whatsappcleaner.data.local.SimpleMediaItem
+import com.example.whatsappcleaner.data.local.SmartJunkAnalyzer
+import com.example.whatsappcleaner.data.local.SmartJunkResult
 import com.example.whatsappcleaner.data.local.formatSize
 // --- NEW IMPORTS ---
 import com.example.whatsappcleaner.data.ReminderFreq
@@ -33,7 +37,10 @@ data class HomeUiState(
     val remindersEnabled: Boolean = false,
     val selectedFrequency: ReminderFreq = ReminderFreq("Every day", 1),
     val selectedTime: ReminderTime = ReminderTime("09:00", 9, 0),
-    val timeOptions: List<ReminderTime> = generateTimeOptions()
+    val timeOptions: List<ReminderTime> = generateTimeOptions(),
+    val smartJunkResult: SmartJunkResult = SmartJunkResult(),
+    val phoneRealityReport: PhoneRealityReport = PhoneRealityReport(),
+    val isAnalyzing: Boolean = false
 )
 
 fun generateTimeOptions(): List<ReminderTime> {
@@ -46,6 +53,8 @@ fun generateTimeOptions(): List<ReminderTime> {
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     private val mediaLoader = MediaLoader(application)
+    private val smartJunkAnalyzer = SmartJunkAnalyzer(application.contentResolver)
+    private val phoneRealityAnalyzer = PhoneRealityAnalyzer()
 
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
@@ -71,6 +80,12 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             val largeItems = allItems.filter { it.addedMillis > today && it.sizeKb > 5000 }
             val screenshots = allItems.filter { it.addedMillis > today && it.name.startsWith("Screenshot", true) }
 
+            val smartResult = smartJunkAnalyzer.analyze(allItems)
+            val realityReport = phoneRealityAnalyzer.analyze(
+                items = allItems,
+                cleaningStreak = 0
+            )
+
             _uiState.update {
                 it.copy(
                     allItems = allItems,
@@ -79,7 +94,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     largeTodayCount = largeItems.size,
                     largeTodaySizeText = formatSize(largeItems.sumOf { i -> i.sizeKb.toLong() * 1024 }),
                     screenshotTodayCount = screenshots.size,
-                    screenshotTodaySizeText = formatSize(screenshots.sumOf { i -> i.sizeKb.toLong() * 1024 })
+                    screenshotTodaySizeText = formatSize(screenshots.sumOf { i -> i.sizeKb.toLong() * 1024 }),
+                    smartJunkResult = smartResult,
+                    phoneRealityReport = realityReport
                 )
             }
         }
@@ -124,6 +141,20 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         return result
+    }
+
+
+    fun analyzeSmartJunk() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isAnalyzing = true) }
+            val result = smartJunkAnalyzer.analyze(_uiState.value.allItems)
+            _uiState.update { it.copy(smartJunkResult = result, isAnalyzing = false) }
+        }
+    }
+
+    fun generatePhoneRealityReport() {
+        val report = phoneRealityAnalyzer.analyze(items = _uiState.value.allItems, cleaningStreak = 0)
+        _uiState.update { it.copy(phoneRealityReport = report) }
     }
 
     fun toggleReminders(enabled: Boolean) {
