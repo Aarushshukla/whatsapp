@@ -14,11 +14,9 @@ import androidx.activity.viewModels
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.core.content.ContextCompat
+import com.example.whatsappcleaner.ui.home.HomeViewModel
 import com.example.whatsappcleaner.ui.theme.WhatsCleanTheme
 import com.example.whatsappcleaner.ui.home.SimpleHomeScreen
-// --- FIX: Add this import ---
-import com.example.whatsappcleaner.ui.home.HomeViewModel
-// ----------------------------
 
 class MainActivity : ComponentActivity() {
 
@@ -37,9 +35,10 @@ class MainActivity : ComponentActivity() {
         setContent {
             WhatsCleanTheme {
                 val state by viewModel.uiState.collectAsState()
+                val todayItems = state.filteredItems
 
                 SimpleHomeScreen(
-                    items = state.filteredItems,
+                    items = todayItems,
                     onRefreshClick = { viewModel.refreshMedia() },
                     summaryInfo = state.summaryInfo,
                     currentFilter = state.currentFilter,
