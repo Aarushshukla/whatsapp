@@ -152,7 +152,7 @@ fun SimpleHomeScreen(
     if (showReviewDialog) {
         val selectedItems = items.filter { selected.contains(it.uri.toString()) }
         ReviewDialog(
-            items = selectedItems,
+            selectedItems,
             onDismiss = { showReviewDialog = false },
             onOpenNext = { index -> if (index in selectedItems.indices) onOpenInSystem(selectedItems[index]) },
             onRefresh = { showReviewDialog = false; onRefreshClick(); selected = emptySet() }
