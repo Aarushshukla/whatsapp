@@ -12,6 +12,7 @@ import com.example.whatsappcleaner.R
 import com.example.whatsappcleaner.data.local.UserPrefs
 import com.example.whatsappcleaner.data.local.formatSize
 import com.example.whatsappcleaner.data.local.MediaLoader
+import com.example.whatsappcleaner.data.local.loadTodayWhatsAppMediaCompat
 import kotlin.random.Random
 
 class ReminderWorker(
@@ -22,7 +23,7 @@ class ReminderWorker(
     override suspend fun doWork(): Result {
         val context = applicationContext
         val loader = MediaLoader(context)
-        val todayItems = loader.loadTodayWhatsAppMedia()
+        val todayItems = loader.loadTodayWhatsAppMediaCompat()
         val todayBytes = todayItems.sumOf { it.sizeKb.toLong() * 1024L }
 
         if (todayItems.isEmpty()) return Result.success()
