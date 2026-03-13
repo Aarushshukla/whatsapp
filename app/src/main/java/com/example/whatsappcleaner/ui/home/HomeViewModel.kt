@@ -60,8 +60,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _uiState.update { it.copy(summaryInfo = "Scanning...") }
 
-            val images = mediaLoader.loadWhatsAppMedia("image")
-            val videos = mediaLoader.loadWhatsAppMedia("video")
+            val images = mediaLoader.queryMediaStore("image", 0L, System.currentTimeMillis())
+            val videos = mediaLoader.queryMediaStore("video", 0L, System.currentTimeMillis())
             val allItems = (images + videos).sortedByDescending { it.addedMillis }
 
             val totalSize = allItems.sumOf { it.sizeKb.toLong() * 1024 }

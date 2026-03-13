@@ -22,10 +22,10 @@ fun MediaLoader.loadTodayWhatsAppMediaCompat(nowMillis: Long = System.currentTim
         return rangedItems
     }
 
-    val images = loadWhatsAppMedia("image")
-    val videos = loadWhatsAppMedia("video")
 
-    return (images + videos)
+    val allMedia = queryMediaStore("all", oneDayAgo, nowMillis)
+
+    return allMedia
         .filter { it.addedMillis in oneDayAgo..nowMillis }
         .sortedByDescending { it.addedMillis }
 }

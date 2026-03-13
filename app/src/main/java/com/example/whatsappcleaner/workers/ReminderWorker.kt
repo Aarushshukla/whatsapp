@@ -22,7 +22,8 @@ class ReminderWorker(
     override suspend fun doWork(): Result {
         val context = applicationContext
         val loader = MediaLoader(context)
-        val todayItems = loader.loadTodayWhatsAppMedia()
+        val now = System.currentTimeMillis()
+        val todayItems = loader.queryMediaStore("all", now - 86400000L, now)
         val todayBytes = todayItems.sumOf { it.sizeKb.toLong() * 1024L }
 
         if (todayItems.isEmpty()) return Result.success()

@@ -23,7 +23,7 @@ class MediaLoader(private val context: Context) {
         return queryMediaStore(mediaType, 0, System.currentTimeMillis())
     }
 
-    private fun queryMediaStore(mediaType: String, minDate: Long, maxDate: Long): List<SimpleMediaItem> {
+    fun queryMediaStore(mediaType: String, minDate: Long, maxDate: Long): List<SimpleMediaItem> {
         val resolver: ContentResolver = context.contentResolver
         val collection = if (mediaType == "video") {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
