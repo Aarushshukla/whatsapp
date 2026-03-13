@@ -16,7 +16,9 @@ import androidx.compose.runtime.getValue
 import androidx.core.content.ContextCompat
 import com.example.whatsappcleaner.ui.theme.WhatsCleanTheme
 import com.example.whatsappcleaner.ui.home.SimpleHomeScreen
+// --- FIX: Add this import ---
 import com.example.whatsappcleaner.ui.home.HomeViewModel
+// ----------------------------
 
 class MainActivity : ComponentActivity() {
 
@@ -37,8 +39,7 @@ class MainActivity : ComponentActivity() {
                 val state by viewModel.uiState.collectAsState()
 
                 SimpleHomeScreen(
-                    todayItems = state.todayItems,
-                    olderItems = state.olderItems,
+                    items = state.filteredItems,
                     onRefreshClick = { viewModel.refreshMedia() },
                     summaryInfo = state.summaryInfo,
                     currentFilter = state.currentFilter,
