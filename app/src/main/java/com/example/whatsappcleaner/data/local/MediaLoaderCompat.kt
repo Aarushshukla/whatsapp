@@ -8,5 +8,24 @@ private const val ONE_DAY_MILLIS = 24L * 60L * 60L * 1000L
 fun MediaLoader.loadTodayWhatsAppMediaCompat(nowMillis: Long = System.currentTimeMillis()): List<SimpleMediaItem> {
     val oneDayAgo = nowMillis - ONE_DAY_MILLIS
 
-    return loadWhatsAppMediaInRange(oneDayAgo, nowMillis)
+    val rangedMethod = MediaLoader::class.java.methods.firstOrNull {
+        it.name == "loadWhatsAppMediaInRange" &&
+                it.parameterTypes.contentEquals(arrayOf(Long::class.javaPrimitiveType, Long::class.javaPrimitiveType))
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    val rangedItems = rangedMethod?.let {
+        runCatching { it.invoke(this, oneDayAgo, nowMillis) as? List<SimpleMediaItem> }.getOrNull()
+    }
+
+    if (rangedItems != null) {
+        return rangedItems
+    }
+
+    val images = loadWhatsAppMedia("image")
+    val videos = loadWhatsAppMedia("video")
+
+    return (images + videos)
+        .filter { it.addedMillis in oneDayAgo..nowMillis }
+        .sortedByDescending { it.addedMillis }
 }
