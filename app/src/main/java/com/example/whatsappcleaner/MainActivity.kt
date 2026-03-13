@@ -38,7 +38,7 @@ class MainActivity : ComponentActivity() {
                 val todayItems = state.filteredItems
 
                 SimpleHomeScreen(
-                    items = todayItems,
+                    todayItems,
                     onRefreshClick = { viewModel.refreshMedia() },
                     summaryInfo = state.summaryInfo,
                     currentFilter = state.currentFilter,
