@@ -8,34 +8,31 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Button
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.example.whatsappcleaner.data.local.PhoneRealityReport
+import com.example.whatsappcleaner.ai.StorageReport
 import com.example.whatsappcleaner.data.local.formatSize
-import com.example.whatsappcleaner.ui.components.LegitCard
+import com.example.whatsappcleaner.ui.components.StorageHeatMap
 
 @Composable
 fun PhoneRealityReportScreen(
-    report: PhoneRealityReport,
-    onShareReport: () -> Unit,
+    report: StorageReport,
+    imagesCount: Int,
+    videosCount: Int,
     modifier: Modifier = Modifier
 ) {
     val entries = listOf(
-        "Total Photos" to report.totalPhotos.toString(),
-        "Total Videos" to report.totalVideos.toString(),
-        "Total Screenshots" to report.totalScreenshots.toString(),
-        "Total Memes" to report.totalMemes.toString(),
-        "Duplicate Files" to report.duplicateFiles.toString(),
-        "Total Storage Used" to formatSize(report.totalStorageUsedBytes),
-        "Largest File" to formatSize(report.largestFileSizeBytes),
-        "Oldest Photo" to report.oldestPhotoDate,
-        "Files Deleted Today" to report.filesDeletedToday.toString(),
-        "Storage Freed Today" to formatSize(report.storageFreedTodayBytes),
-        "Cleaning Streak" to "${report.cleaningStreak} days"
+        "Total Files" to report.totalFiles.toString(),
+        "Storage Used" to formatSize(report.totalSize),
+        "Memes" to report.memeCount.toString(),
+        "Duplicates" to report.duplicateCount.toString(),
+        "Spam Media" to report.spamCount.toString(),
+        "Files older than 6 months" to report.oldFiles.toString()
     )
 
     Column(modifier = modifier.fillMaxSize()) {
@@ -51,22 +48,32 @@ fun PhoneRealityReportScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             items(entries) { (title, value) ->
-                LegitCard(modifier = Modifier.fillMaxWidth()) {
+                Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(text = title, style = MaterialTheme.typography.labelLarge)
                         Text(text = value, style = MaterialTheme.typography.titleMedium)
                     }
                 }
             }
-        }
-
-        Button(
-            onClick = onShareReport,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-        ) {
-            Text("Share My Phone Report")
+            item {
+                Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("Storage Heatmap", style = MaterialTheme.typography.titleMedium)
+                        StorageHeatMap(
+                            imagesPct = percentage(imagesCount, report.totalFiles),
+                            videosPct = percentage(videosCount, report.totalFiles),
+                            memesPct = percentage(report.memeCount, report.totalFiles),
+                            duplicatesPct = percentage(report.duplicateCount, report.totalFiles),
+                            spamPct = percentage(report.spamCount, report.totalFiles)
+                        )
+                    }
+                }
+            }
         }
     }
+}
+
+private fun percentage(value: Int, total: Int): Float {
+    if (total <= 0) return 0f
+    return value.toFloat() / total.toFloat()
 }

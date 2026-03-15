@@ -3,21 +3,22 @@ package com.example.whatsappcleaner.ui.home
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.whatsappcleaner.ai.ImageCategory
+import com.example.whatsappcleaner.ai.MemeClassifier
+import com.example.whatsappcleaner.ai.PhoneRealityAnalyzer
+import com.example.whatsappcleaner.ai.SpamMediaAnalyzer
+import com.example.whatsappcleaner.ai.StorageReport
+import com.example.whatsappcleaner.ai.SmartJunkAnalyzer
 import com.example.whatsappcleaner.data.local.MediaLoader
 import com.example.whatsappcleaner.data.local.SimpleMediaItem
 import com.example.whatsappcleaner.data.local.formatSize
-// --- NEW IMPORTS ---
 import com.example.whatsappcleaner.data.ReminderFreq
 import com.example.whatsappcleaner.data.ReminderTime
-// -------------------
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-
-// REMOVED: data class ReminderFreq... (Moved to TimeModels.kt)
-// REMOVED: data class ReminderTime... (Moved to TimeModels.kt)
 
 data class HomeUiState(
     val allItems: List<SimpleMediaItem> = emptyList(),
@@ -33,7 +34,19 @@ data class HomeUiState(
     val remindersEnabled: Boolean = false,
     val selectedFrequency: ReminderFreq = ReminderFreq("Every day", 1),
     val selectedTime: ReminderTime = ReminderTime("09:00", 9, 0),
-    val timeOptions: List<ReminderTime> = generateTimeOptions()
+    val timeOptions: List<ReminderTime> = generateTimeOptions(),
+    val memeCount: Int = 0,
+    val memeItems: List<SimpleMediaItem> = emptyList(),
+    val junkCount: Int = 0,
+    val duplicateCount: Int = 0,
+    val spamCount: Int = 0,
+    val totalFiles: Int = 0,
+    val totalSize: Long = 0L,
+    val duplicateItems: List<SimpleMediaItem> = emptyList(),
+    val spamItems: List<SimpleMediaItem> = emptyList(),
+    val largeFileItems: List<SimpleMediaItem> = emptyList(),
+    val sentFileItems: List<SimpleMediaItem> = emptyList(),
+    val report: StorageReport = StorageReport(0, 0, 0, 0, 0, 0)
 )
 
 fun generateTimeOptions(): List<ReminderTime> {
@@ -46,6 +59,9 @@ fun generateTimeOptions(): List<ReminderTime> {
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     private val mediaLoader = MediaLoader(application)
+    private val smartJunkAnalyzer = SmartJunkAnalyzer()
+    private val spamMediaAnalyzer = SpamMediaAnalyzer()
+    private val phoneRealityAnalyzer = PhoneRealityAnalyzer()
 
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
@@ -64,6 +80,17 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             val videos = mediaLoader.queryMediaStore("video", 0L, System.currentTimeMillis())
             val allItems = (images + videos).sortedByDescending { it.addedMillis }
 
+            val memeClassifier = MemeClassifier(getApplication())
+            val memes = allItems.filter { item ->
+                isMeme(item, memeClassifier)
+            }
+            memeClassifier.close()
+
+            val junkBreakdown = smartJunkAnalyzer.buildBreakdown(allItems)
+            val junkItems = smartJunkAnalyzer.findJunk(allItems)
+            val spamItems = spamMediaAnalyzer.findSpamMedia(allItems)
+            val baseReport = phoneRealityAnalyzer.generateReport(allItems)
+
             val totalSize = allItems.sumOf { it.sizeKb.toLong() * 1024 }
             val summary = "Found ${allItems.size} files (${formatSize(totalSize)})"
 
@@ -79,10 +106,35 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     largeTodayCount = largeItems.size,
                     largeTodaySizeText = formatSize(largeItems.sumOf { i -> i.sizeKb.toLong() * 1024 }),
                     screenshotTodayCount = screenshots.size,
-                    screenshotTodaySizeText = formatSize(screenshots.sumOf { i -> i.sizeKb.toLong() * 1024 })
+                    screenshotTodaySizeText = formatSize(screenshots.sumOf { i -> i.sizeKb.toLong() * 1024 }),
+                    memeCount = memes.size,
+                    memeItems = memes,
+                    junkCount = junkItems.size,
+                    duplicateCount = junkBreakdown.duplicates.size,
+                    spamCount = spamItems.size,
+                    totalFiles = allItems.size,
+                    totalSize = totalSize,
+                    duplicateItems = junkBreakdown.duplicates,
+                    spamItems = spamItems,
+                    largeFileItems = junkBreakdown.largeFiles,
+                    sentFileItems = junkBreakdown.sentFiles,
+                    report = baseReport.copy(
+                        memeCount = memes.size,
+                        duplicateCount = junkBreakdown.duplicates.size,
+                        spamCount = spamItems.size
+                    )
                 )
             }
         }
+    }
+
+    private suspend fun isMeme(item: SimpleMediaItem, classifier: MemeClassifier): Boolean {
+        val likelyByName = item.name.contains("meme", ignoreCase = true) || item.path.contains("meme", ignoreCase = true)
+        if (item.mimeType?.startsWith("image") != true) {
+            return likelyByName
+        }
+        val classification = classifier.classify(item.uri)
+        return classification.category == ImageCategory.MEME || likelyByName
     }
 
     fun setFilter(filter: MediaFilter) {

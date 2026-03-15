@@ -52,6 +52,12 @@ fun SimpleHomeScreen(
     allTimeOptions: List<ReminderTime>,
     onTimeChange: (ReminderTime) -> Unit,
     onRemindersToggle: (Boolean) -> Unit,
+    memeCount: Int,
+    spamCount: Int,
+    junkCount: Int,
+    duplicateCount: Int,
+    onNavigateToSmartClean: () -> Unit,
+    onNavigateToPhoneReality: () -> Unit,
     onOpenInSystem: (SimpleMediaItem) -> Unit,
     onOpenSystemStorage: () -> Unit
 ) {
@@ -109,6 +115,15 @@ fun SimpleHomeScreen(
                     }
                 }
                 Spacer(Modifier.height(16.dp))
+                DashboardCards(
+                    memeCount = memeCount,
+                    spamCount = spamCount,
+                    junkCount = junkCount,
+                    duplicateCount = duplicateCount,
+                    onNavigateToSmartClean = onNavigateToSmartClean,
+                    onNavigateToPhoneReality = onNavigateToPhoneReality
+                )
+                Spacer(Modifier.height(16.dp))
 
                 // 2. Filters
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -157,6 +172,54 @@ fun SimpleHomeScreen(
             onOpenNext = { index -> if (index in selectedItems.indices) onOpenInSystem(selectedItems[index]) },
             onRefresh = { showReviewDialog = false; onRefreshClick(); selected = emptySet() }
         )
+    }
+}
+
+
+@Composable
+private fun DashboardCards(
+    memeCount: Int,
+    spamCount: Int,
+    junkCount: Int,
+    duplicateCount: Int,
+    onNavigateToSmartClean: () -> Unit,
+    onNavigateToPhoneReality: () -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        DashboardCard("Smart Clean", "Remove junk and duplicate files", Icons.Default.AutoDelete, onNavigateToSmartClean)
+        DashboardCard("Phone Reality", "See what fills your storage", Icons.Default.Analytics, onNavigateToPhoneReality)
+        DashboardCard("Meme Detector", "Detected $memeCount memes", Icons.Default.Image, {})
+        DashboardCard("Spam Media", "Potential spam files: $spamCount", Icons.Default.Warning, {})
+    }
+}
+
+@Composable
+private fun DashboardCard(
+    title: String,
+    subtitle: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(icon, contentDescription = title, tint = AccentBlue)
+            Spacer(Modifier.width(12.dp))
+            Column {
+                Text(title, style = MaterialTheme.typography.titleMedium, color = BrandNavy)
+                Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+                if (title == "Smart Clean") {
+                    Text("$junkCount junk candidates • $duplicateCount duplicates", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                }
+            }
+        }
     }
 }
 
