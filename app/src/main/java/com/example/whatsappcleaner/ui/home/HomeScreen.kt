@@ -186,7 +186,13 @@ private fun DashboardCards(
     onNavigateToPhoneReality: () -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        DashboardCard("Smart Clean", "Remove junk and duplicate files", Icons.Default.AutoDelete, onNavigateToSmartClean)
+        DashboardCard(
+            title = "Smart Clean",
+            subtitle = "Remove junk and duplicate files",
+            icon = Icons.Default.AutoDelete,
+            onClick = onNavigateToSmartClean,
+            extraInfo = "$junkCount junk candidates • $duplicateCount duplicates"
+        )
         DashboardCard("Phone Reality", "See what fills your storage", Icons.Default.Analytics, onNavigateToPhoneReality)
         DashboardCard("Meme Detector", "Detected $memeCount memes", Icons.Default.Image, {})
         DashboardCard("Spam Media", "Potential spam files: $spamCount", Icons.Default.Warning, {})
@@ -198,7 +204,8 @@ private fun DashboardCard(
     title: String,
     subtitle: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    extraInfo: String? = null
 ) {
     Card(
         modifier = Modifier
@@ -215,9 +222,7 @@ private fun DashboardCard(
             Column {
                 Text(title, style = MaterialTheme.typography.titleMedium, color = BrandNavy)
                 Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
-                if (title == "Smart Clean") {
-                    Text("$junkCount junk candidates • $duplicateCount duplicates", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
-                }
+                extraInfo?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = TextSecondary) }
             }
         }
     }
