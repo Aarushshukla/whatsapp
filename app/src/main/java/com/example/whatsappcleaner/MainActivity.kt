@@ -16,7 +16,7 @@ import androidx.compose.runtime.getValue
 import androidx.core.content.ContextCompat
 import com.example.whatsappcleaner.ui.home.HomeViewModel
 import com.example.whatsappcleaner.ui.theme.WhatsCleanTheme
-import com.example.whatsappcleaner.ui.home.SimpleHomeScreen
+import com.example.whatsappcleaner.ui.WhatsCleanAppRoot
 
 class MainActivity : ComponentActivity() {
 
@@ -35,25 +35,12 @@ class MainActivity : ComponentActivity() {
         setContent {
             WhatsCleanTheme {
                 val state by viewModel.uiState.collectAsState()
-                val todayItems = state.filteredItems
-
-                SimpleHomeScreen(
-                    items = todayItems,
+                WhatsCleanAppRoot(
+                    state = state,
                     onRefreshClick = { viewModel.refreshMedia() },
-                    summaryInfo = state.summaryInfo,
-                    currentFilter = state.currentFilter,
                     onFilterChange = { viewModel.setFilter(it) },
-                    largeTodayCount = state.largeTodayCount,
-                    largeTodaySizeText = state.largeTodaySizeText,
-                    screenshotTodayCount = state.screenshotTodayCount,
-                    screenshotTodaySizeText = state.screenshotTodaySizeText,
-                    activeSuggestion = state.activeSuggestion,
                     onSuggestionChange = { viewModel.setSuggestion(it) },
-                    remindersEnabled = state.remindersEnabled,
-                    selectedFrequency = state.selectedFrequency,
                     onFrequencyChange = { viewModel.setFrequency(it) },
-                    selectedTime = state.selectedTime,
-                    allTimeOptions = state.timeOptions,
                     onTimeChange = { viewModel.setTime(it) },
                     onRemindersToggle = { viewModel.toggleReminders(it) },
                     onOpenInSystem = { item -> openFileInSystem(item.uri) },
