@@ -14,9 +14,9 @@ import androidx.activity.viewModels
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.core.content.ContextCompat
+import com.example.whatsappcleaner.ui.WhatsCleanAppRoot
 import com.example.whatsappcleaner.ui.home.HomeViewModel
 import com.example.whatsappcleaner.ui.theme.WhatsCleanTheme
-import com.example.whatsappcleaner.ui.WhatsCleanAppRoot
 
 class MainActivity : ComponentActivity() {
 
@@ -24,13 +24,16 @@ class MainActivity : ComponentActivity() {
 
     private val requestPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
-            val granted = permissions.entries.all { it.value }
+            val granted = permissions.all { it.value }
             viewModel.updatePermissionStatus(granted)
+            if (granted) {
+                viewModel.refreshMedia()
+            }
         }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        checkPermissions()
+        syncPermissionState()
 
         setContent {
             WhatsCleanTheme {
@@ -44,30 +47,35 @@ class MainActivity : ComponentActivity() {
                     onTimeChange = { viewModel.setTime(it) },
                     onRemindersToggle = { viewModel.toggleReminders(it) },
                     onOpenInSystem = { item -> openFileInSystem(item.uri) },
-                    onOpenSystemStorage = { openSystemStorage() }
+                    onOpenSystemStorage = { openSystemStorage() },
+                    onRequestPermission = { requestStoragePermissions() }
                 )
             }
         }
     }
 
-    private fun checkPermissions() {
-        val permissions = mutableListOf<String>()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            permissions.add(Manifest.permission.READ_MEDIA_IMAGES)
-            permissions.add(Manifest.permission.READ_MEDIA_VIDEO)
-            permissions.add(Manifest.permission.POST_NOTIFICATIONS)
-        } else {
-            permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE)
-        }
+    override fun onResume() {
+        super.onResume()
+        syncPermissionState()
+    }
 
-        val allGranted = permissions.all {
+    private fun requiredPermissions(): Array<String> {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            arrayOf(Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_MEDIA_VIDEO)
+        } else {
+            arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
+        }
+    }
+
+    private fun syncPermissionState() {
+        val granted = requiredPermissions().all {
             ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED
         }
+        viewModel.updatePermissionStatus(granted)
+    }
 
-        if (!allGranted) {
-            requestPermissionLauncher.launch(permissions.toTypedArray())
-        }
-        viewModel.updatePermissionStatus(allGranted)
+    private fun requestStoragePermissions() {
+        requestPermissionLauncher.launch(requiredPermissions())
     }
 
     private fun openFileInSystem(uri: Uri) {
@@ -75,17 +83,12 @@ class MainActivity : ComponentActivity() {
             setDataAndType(uri, "*/*")
             flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
         }
-        try {
-            startActivity(intent)
-        } catch (e: Exception) { }
+        startActivity(intent)
     }
 
     private fun openSystemStorage() {
         val intent = Intent(Settings.ACTION_INTERNAL_STORAGE_SETTINGS)
-        try {
-            startActivity(intent)
-        } catch (e: Exception) {
-            startActivity(Intent(Settings.ACTION_SETTINGS))
-        }
+        runCatching { startActivity(intent) }
+            .onFailure { startActivity(Intent(Settings.ACTION_SETTINGS)) }
     }
 }

@@ -1,14 +1,9 @@
 package com.example.whatsappcleaner.ui.home
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -23,6 +18,8 @@ fun SmartCleanScreen(
     spamItems: List<SimpleMediaItem>,
     largeFileItems: List<SimpleMediaItem>,
     sentFiles: List<SimpleMediaItem>,
+    onOpenInSystem: (SimpleMediaItem) -> Unit,
+    onNext: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val groups = listOf(
@@ -33,28 +30,23 @@ fun SmartCleanScreen(
     )
 
     Column(modifier = modifier.fillMaxSize()) {
-        Text(
-            text = "Smart Clean",
-            style = MaterialTheme.typography.headlineSmall,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
-        )
-
-        LazyColumn(
-            modifier = Modifier.weight(1f),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
+        Text("Smart Clean", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(16.dp))
+        LazyColumn(modifier = Modifier.weight(1f), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             items(groups) { (title, items) ->
-                Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
+                Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(title, style = MaterialTheme.typography.titleMedium)
                         Text("${items.size} files", style = MaterialTheme.typography.bodyLarge)
-                        items.take(3).forEach {
-                            Text("• ${it.name}", style = MaterialTheme.typography.bodySmall)
+                        items.take(3).forEach { item ->
+                            Text("• ${item.name}", modifier = Modifier.padding(top = 4.dp))
+                        }
+                        items.firstOrNull()?.let { first ->
+                            Button(onClick = { onOpenInSystem(first) }, modifier = Modifier.padding(top = 8.dp)) { Text("Open sample") }
                         }
                     }
                 }
             }
         }
+        Button(onClick = onNext, modifier = Modifier.fillMaxWidth().padding(16.dp)) { Text("Next: Phone Reality") }
     }
 }
