@@ -1,14 +1,9 @@
 package com.example.whatsappcleaner.ui.home
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -24,6 +19,7 @@ fun PhoneRealityReportScreen(
     report: StorageReport,
     imagesCount: Int,
     videosCount: Int,
+    onNext: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val entries = listOf(
@@ -36,19 +32,10 @@ fun PhoneRealityReportScreen(
     )
 
     Column(modifier = modifier.fillMaxSize()) {
-        Text(
-            text = "Phone Reality Report",
-            style = MaterialTheme.typography.headlineSmall,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
-        )
-
-        LazyColumn(
-            modifier = Modifier.weight(1f),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
+        Text("Phone Reality Report", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(16.dp))
+        LazyColumn(modifier = Modifier.weight(1f), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             items(entries) { (title, value) ->
-                Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
+                Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(text = title, style = MaterialTheme.typography.labelLarge)
                         Text(text = value, style = MaterialTheme.typography.titleMedium)
@@ -56,7 +43,7 @@ fun PhoneRealityReportScreen(
                 }
             }
             item {
-                Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
+                Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text("Storage Heatmap", style = MaterialTheme.typography.titleMedium)
                         StorageHeatMap(
@@ -70,10 +57,8 @@ fun PhoneRealityReportScreen(
                 }
             }
         }
+        Button(onClick = onNext, modifier = Modifier.fillMaxWidth().padding(16.dp)) { Text("Next: Meme Analyzer") }
     }
 }
 
-private fun percentage(value: Int, total: Int): Float {
-    if (total <= 0) return 0f
-    return value.toFloat() / total.toFloat()
-}
+private fun percentage(value: Int, total: Int): Float = if (total <= 0) 0f else value.toFloat() / total.toFloat()

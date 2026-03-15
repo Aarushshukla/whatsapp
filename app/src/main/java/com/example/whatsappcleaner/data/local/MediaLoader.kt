@@ -18,10 +18,8 @@ data class SimpleMediaItem(
 
 class MediaLoader(private val context: Context) {
 
-    // Loads ALL device media for a specific type
-    fun loadAllDeviceMedia(mediaType: String): List<SimpleMediaItem> {
-        return queryMediaStore(mediaType, 0, System.currentTimeMillis())
-    }
+    fun loadAllDeviceMedia(mediaType: String): List<SimpleMediaItem> =
+        queryMediaStore(mediaType = mediaType, minDate = 0L, maxDate = System.currentTimeMillis())
 
     fun queryMediaStore(mediaType: String, minDate: Long, maxDate: Long): List<SimpleMediaItem> {
         val resolver: ContentResolver = context.contentResolver
@@ -42,14 +40,18 @@ class MediaLoader(private val context: Context) {
             MediaStore.MediaColumns.MIME_TYPE
         )
 
-        // NO WHATSAPP RESTRICTION - Fetches everything on the device
-        val selection = "${MediaStore.MediaColumns.DATE_ADDED} >= ? AND ${MediaStore.MediaColumns.DATE_ADDED} <= ?"
+        val selection = "${MediaStore.MediaColumns.DATE_ADDED} BETWEEN ? AND ?"
         val selectionArgs = arrayOf((minDate / 1000).toString(), (maxDate / 1000).toString())
 
         val items = mutableListOf<SimpleMediaItem>()
-
         try {
-            resolver.query(collection, projection, selection, selectionArgs, "${MediaStore.MediaColumns.DATE_ADDED} DESC")?.use { cursor ->
+            resolver.query(
+                collection,
+                projection,
+                selection,
+                selectionArgs,
+                "${MediaStore.MediaColumns.DATE_ADDED} DESC"
+            )?.use { cursor ->
                 val idCol = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns._ID)
                 val nameCol = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.DISPLAY_NAME)
                 val sizeCol = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.SIZE)
@@ -65,17 +67,20 @@ class MediaLoader(private val context: Context) {
                     val relativePath = cursor.getString(pathCol) ?: ""
                     val mimeType = cursor.getString(mimeCol)
                     val uri = Uri.withAppendedPath(collection, id.toString())
-
                     items.add(
                         SimpleMediaItem(
-                            uri = uri, name = displayName, sizeKb = (sizeBytes / 1024).toInt(),
-                            path = relativePath, addedMillis = dateAddedSec * 1000, mimeType = mimeType
+                            uri = uri,
+                            name = displayName,
+                            sizeKb = (sizeBytes / 1024).toInt(),
+                            path = relativePath,
+                            addedMillis = dateAddedSec * 1000,
+                            mimeType = mimeType
                         )
                     )
                 }
             }
-        } catch (e: Exception) {
-            Log.e("MediaLoader", "Error loading media", e)
+        } catch (error: Exception) {
+            Log.e("MediaLoader", "Error loading $mediaType media", error)
         }
         return items
     }

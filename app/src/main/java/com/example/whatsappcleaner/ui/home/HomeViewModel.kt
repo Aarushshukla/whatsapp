@@ -9,11 +9,11 @@ import com.example.whatsappcleaner.ai.PhoneRealityAnalyzer
 import com.example.whatsappcleaner.ai.SpamMediaAnalyzer
 import com.example.whatsappcleaner.ai.StorageReport
 import com.example.whatsappcleaner.ai.SmartJunkAnalyzer
+import com.example.whatsappcleaner.data.ReminderFreq
+import com.example.whatsappcleaner.data.ReminderTime
 import com.example.whatsappcleaner.data.local.MediaLoader
 import com.example.whatsappcleaner.data.local.SimpleMediaItem
 import com.example.whatsappcleaner.data.local.formatSize
-import com.example.whatsappcleaner.data.ReminderFreq
-import com.example.whatsappcleaner.data.ReminderTime
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -25,6 +25,7 @@ data class HomeUiState(
     val filteredItems: List<SimpleMediaItem> = emptyList(),
     val summaryInfo: String = "Loading...",
     val permissionGranted: Boolean = false,
+    val isLoading: Boolean = false,
     val currentFilter: MediaFilter = MediaFilter.ALL,
     val activeSuggestion: SuggestionType = SuggestionType.NONE,
     val largeTodayCount: Int = 0,
@@ -49,11 +50,8 @@ data class HomeUiState(
     val report: StorageReport = StorageReport(0, 0, 0, 0, 0, 0)
 )
 
-fun generateTimeOptions(): List<ReminderTime> {
-    return (0..23).map { hour ->
-        val label = "%02d:00".format(hour)
-        ReminderTime(label, hour, 0)
-    }
+fun generateTimeOptions(): List<ReminderTime> = (0..23).map { hour ->
+    ReminderTime("%02d:00".format(hour), hour, 0)
 }
 
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
@@ -68,125 +66,108 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     fun updatePermissionStatus(granted: Boolean) {
         _uiState.update { it.copy(permissionGranted = granted) }
-        if (granted) refreshMedia()
-        else _uiState.update { it.copy(summaryInfo = "Permission needed to scan.") }
+        if (granted) refreshMedia() else _uiState.update { it.copy(summaryInfo = "Permission needed to scan.", isLoading = false) }
     }
 
     fun refreshMedia() {
+        if (!_uiState.value.permissionGranted) return
         viewModelScope.launch {
-            _uiState.update { it.copy(summaryInfo = "Scanning...") }
+            _uiState.update { it.copy(summaryInfo = "Scanning...", isLoading = true) }
+            try {
+                val images = mediaLoader.loadAllDeviceMedia("image")
+                val videos = mediaLoader.loadAllDeviceMedia("video")
+                val allItems = (images + videos).sortedByDescending { it.addedMillis }
 
-            val images = mediaLoader.queryMediaStore("image", 0L, System.currentTimeMillis())
-            val videos = mediaLoader.queryMediaStore("video", 0L, System.currentTimeMillis())
-            val allItems = (images + videos).sortedByDescending { it.addedMillis }
+                val memeClassifier = MemeClassifier(getApplication())
+                val memes = allItems.filter { item -> isMeme(item, memeClassifier) }
+                memeClassifier.close()
 
-            val memeClassifier = MemeClassifier(getApplication())
-            val memes = allItems.filter { item ->
-                isMeme(item, memeClassifier)
-            }
-            memeClassifier.close()
+                val junkBreakdown = smartJunkAnalyzer.buildBreakdown(allItems)
+                val junkItems = smartJunkAnalyzer.findJunk(allItems)
+                val spamItems = spamMediaAnalyzer.findSpamMedia(allItems)
+                val baseReport = phoneRealityAnalyzer.generateReport(allItems)
 
-            val junkBreakdown = smartJunkAnalyzer.buildBreakdown(allItems)
-            val junkItems = smartJunkAnalyzer.findJunk(allItems)
-            val spamItems = spamMediaAnalyzer.findSpamMedia(allItems)
-            val baseReport = phoneRealityAnalyzer.generateReport(allItems)
+                val totalSize = allItems.sumOf { it.sizeKb.toLong() * 1024 }
+                val summary = if (allItems.isEmpty()) {
+                    "No media found."
+                } else {
+                    "Found ${allItems.size} files (${formatSize(totalSize)})"
+                }
 
-            val totalSize = allItems.sumOf { it.sizeKb.toLong() * 1024 }
-            val summary = "Found ${allItems.size} files (${formatSize(totalSize)})"
+                val today = System.currentTimeMillis() - 86400000
+                val largeItems = allItems.filter { it.addedMillis > today && it.sizeKb > 5000 }
+                val screenshots = allItems.filter { it.addedMillis > today && it.name.startsWith("Screenshot", true) }
 
-            val today = System.currentTimeMillis() - 86400000
-            val largeItems = allItems.filter { it.addedMillis > today && it.sizeKb > 5000 }
-            val screenshots = allItems.filter { it.addedMillis > today && it.name.startsWith("Screenshot", true) }
-
-            _uiState.update {
-                it.copy(
-                    allItems = allItems,
-                    filteredItems = filterList(allItems, it.currentFilter, it.activeSuggestion),
-                    summaryInfo = summary,
-                    largeTodayCount = largeItems.size,
-                    largeTodaySizeText = formatSize(largeItems.sumOf { i -> i.sizeKb.toLong() * 1024 }),
-                    screenshotTodayCount = screenshots.size,
-                    screenshotTodaySizeText = formatSize(screenshots.sumOf { i -> i.sizeKb.toLong() * 1024 }),
-                    memeCount = memes.size,
-                    memeItems = memes,
-                    junkCount = junkItems.size,
-                    duplicateCount = junkBreakdown.duplicates.size,
-                    spamCount = spamItems.size,
-                    totalFiles = allItems.size,
-                    totalSize = totalSize,
-                    duplicateItems = junkBreakdown.duplicates,
-                    spamItems = spamItems,
-                    largeFileItems = junkBreakdown.largeFiles,
-                    sentFileItems = junkBreakdown.sentFiles,
-                    report = baseReport.copy(
+                _uiState.update {
+                    it.copy(
+                        allItems = allItems,
+                        filteredItems = filterList(allItems, it.currentFilter, it.activeSuggestion),
+                        summaryInfo = summary,
+                        isLoading = false,
+                        largeTodayCount = largeItems.size,
+                        largeTodaySizeText = formatSize(largeItems.sumOf { i -> i.sizeKb.toLong() * 1024 }),
+                        screenshotTodayCount = screenshots.size,
+                        screenshotTodaySizeText = formatSize(screenshots.sumOf { i -> i.sizeKb.toLong() * 1024 }),
                         memeCount = memes.size,
+                        memeItems = memes,
+                        junkCount = junkItems.size,
                         duplicateCount = junkBreakdown.duplicates.size,
-                        spamCount = spamItems.size
+                        spamCount = spamItems.size,
+                        totalFiles = allItems.size,
+                        totalSize = totalSize,
+                        duplicateItems = junkBreakdown.duplicates,
+                        spamItems = spamItems,
+                        largeFileItems = junkBreakdown.largeFiles,
+                        sentFileItems = junkBreakdown.sentFiles,
+                        report = baseReport.copy(
+                            memeCount = memes.size,
+                            duplicateCount = junkBreakdown.duplicates.size,
+                            spamCount = spamItems.size
+                        )
                     )
-                )
+                }
+            } catch (error: Exception) {
+                _uiState.update { it.copy(summaryInfo = "Scan failed: ${error.message ?: "Unknown error"}", isLoading = false) }
             }
         }
     }
 
     private suspend fun isMeme(item: SimpleMediaItem, classifier: MemeClassifier): Boolean {
         val likelyByName = item.name.contains("meme", ignoreCase = true) || item.path.contains("meme", ignoreCase = true)
-        if (item.mimeType?.startsWith("image") != true) {
-            return likelyByName
-        }
+        if (item.mimeType?.startsWith("image") != true) return likelyByName
         val classification = classifier.classify(item.uri)
         return classification.category == ImageCategory.MEME || likelyByName
     }
 
     fun setFilter(filter: MediaFilter) {
         _uiState.update {
-            it.copy(
-                currentFilter = filter,
-                filteredItems = filterList(it.allItems, filter, it.activeSuggestion)
-            )
+            it.copy(currentFilter = filter, filteredItems = filterList(it.allItems, filter, it.activeSuggestion))
         }
     }
 
     fun setSuggestion(suggestion: SuggestionType) {
         _uiState.update {
-            it.copy(
-                activeSuggestion = suggestion,
-                filteredItems = filterList(it.allItems, it.currentFilter, suggestion)
-            )
+            it.copy(activeSuggestion = suggestion, filteredItems = filterList(it.allItems, it.currentFilter, suggestion))
         }
     }
 
-    private fun filterList(
-        items: List<SimpleMediaItem>,
-        filter: MediaFilter,
-        suggestion: SuggestionType
-    ): List<SimpleMediaItem> {
+    private fun filterList(items: List<SimpleMediaItem>, filter: MediaFilter, suggestion: SuggestionType): List<SimpleMediaItem> {
         var result = when (filter) {
             MediaFilter.IMAGES -> items.filter { it.mimeType?.startsWith("image") == true }
             MediaFilter.VIDEOS -> items.filter { it.mimeType?.startsWith("video") == true }
             MediaFilter.OTHER -> items.filter { it.mimeType?.startsWith("image") != true && it.mimeType?.startsWith("video") != true }
             MediaFilter.ALL -> items
         }
-
-        if (suggestion == SuggestionType.LARGE_TODAY) {
-            val today = System.currentTimeMillis() - 86400000
-            result = result.filter { it.addedMillis > today && it.sizeKb > 5000 }
-        } else if (suggestion == SuggestionType.SCREENSHOTS_TODAY) {
-            val today = System.currentTimeMillis() - 86400000
-            result = result.filter { it.addedMillis > today && it.name.startsWith("Screenshot", true) }
+        val today = System.currentTimeMillis() - 86400000
+        result = when (suggestion) {
+            SuggestionType.LARGE_TODAY -> result.filter { it.addedMillis > today && it.sizeKb > 5000 }
+            SuggestionType.SCREENSHOTS_TODAY -> result.filter { it.addedMillis > today && it.name.startsWith("Screenshot", true) }
+            SuggestionType.NONE -> result
         }
-
         return result
     }
 
-    fun toggleReminders(enabled: Boolean) {
-        _uiState.update { it.copy(remindersEnabled = enabled) }
-    }
-
-    fun setFrequency(option: ReminderFreq) {
-        _uiState.update { it.copy(selectedFrequency = option) }
-    }
-
-    fun setTime(option: ReminderTime) {
-        _uiState.update { it.copy(selectedTime = option) }
-    }
+    fun toggleReminders(enabled: Boolean) { _uiState.update { it.copy(remindersEnabled = enabled) } }
+    fun setFrequency(option: ReminderFreq) { _uiState.update { it.copy(selectedFrequency = option) } }
+    fun setTime(option: ReminderTime) { _uiState.update { it.copy(selectedTime = option) } }
 }
