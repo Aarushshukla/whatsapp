@@ -75,25 +75,25 @@ fun WhatsCleanAppRoot(
         modifier = modifier,
         enterTransition = {
             slideIntoContainer(
-                toward = AnimatedContentTransitionScope.SlideDirection.Start,
+                towards = AnimatedContentTransitionScope.SlideDirection.Start,
                 animationSpec = tween(450)
             ) + fadeIn(animationSpec = tween(450))
         },
         exitTransition = {
             slideOutOfContainer(
-                toward = AnimatedContentTransitionScope.SlideDirection.Start,
+                towards = AnimatedContentTransitionScope.SlideDirection.Start,
                 animationSpec = tween(450)
             ) + fadeOut(animationSpec = tween(450))
         },
         popEnterTransition = {
             slideIntoContainer(
-                toward = AnimatedContentTransitionScope.SlideDirection.End,
+                towards = AnimatedContentTransitionScope.SlideDirection.End,
                 animationSpec = tween(450)
             ) + fadeIn(animationSpec = tween(450))
         },
         popExitTransition = {
             slideOutOfContainer(
-                toward = AnimatedContentTransitionScope.SlideDirection.End,
+                towards = AnimatedContentTransitionScope.SlideDirection.End,
                 animationSpec = tween(450)
             ) + fadeOut(animationSpec = tween(450))
         }
