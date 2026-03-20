@@ -13,6 +13,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.core.tween
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -65,7 +69,35 @@ fun WhatsCleanAppRoot(
         return
     }
 
-    NavHost(navController = navController, startDestination = Routes.Home, modifier = modifier) {
+    NavHost(
+        navController = navController,
+        startDestination = Routes.Home,
+        modifier = modifier,
+        enterTransition = {
+            slideIntoContainer(
+                toward = AnimatedContentTransitionScope.SlideDirection.Start,
+                animationSpec = tween(450)
+            ) + fadeIn(animationSpec = tween(450))
+        },
+        exitTransition = {
+            slideOutOfContainer(
+                toward = AnimatedContentTransitionScope.SlideDirection.Start,
+                animationSpec = tween(450)
+            ) + fadeOut(animationSpec = tween(450))
+        },
+        popEnterTransition = {
+            slideIntoContainer(
+                toward = AnimatedContentTransitionScope.SlideDirection.End,
+                animationSpec = tween(450)
+            ) + fadeIn(animationSpec = tween(450))
+        },
+        popExitTransition = {
+            slideOutOfContainer(
+                toward = AnimatedContentTransitionScope.SlideDirection.End,
+                animationSpec = tween(450)
+            ) + fadeOut(animationSpec = tween(450))
+        }
+    ) {
         composable(Routes.Home) {
             SimpleHomeScreen(
                 items = state.filteredItems,

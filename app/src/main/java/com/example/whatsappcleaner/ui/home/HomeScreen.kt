@@ -5,8 +5,20 @@
 
 package com.example.whatsappcleaner.ui.home
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -34,13 +46,16 @@ import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Mood
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.Mood
-import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -48,8 +63,6 @@ import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
@@ -63,6 +76,7 @@ import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -72,6 +86,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -100,6 +115,7 @@ import com.example.whatsappcleaner.ui.theme.SurfaceMuted
 import com.example.whatsappcleaner.ui.theme.SurfaceWhite
 import com.example.whatsappcleaner.ui.theme.TextMain
 import com.example.whatsappcleaner.ui.theme.TextSecondary
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
@@ -143,19 +159,32 @@ fun SimpleHomeScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     var selected by rememberSaveable { mutableStateOf(setOf<String>()) }
     var pendingDelete by remember { mutableStateOf<SimpleMediaItem?>(null) }
+    var successMessage by remember { mutableStateOf<String?>(null) }
+    var hiddenItemIds by rememberSaveable { mutableStateOf(setOf<String>()) }
+
+    LaunchedEffect(successMessage) {
+        if (successMessage != null) {
+            delay(1800)
+            successMessage = null
+        }
+    }
+
+    val remainingVisibleItems = items.count { it.uri.toString() !in hiddenItemIds }
 
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
-            ModalDrawerSheet { AppDrawer { destination ->
-                scope.launch { drawerState.close() }
-                when (destination) {
-                    "home" -> Unit
-                    "smart_clean" -> onNavigateToSmartClean()
-                    "analytics_screen" -> onNavigateToAnalytics()
-                    else -> onNavigateToPhoneReality()
+            ModalDrawerSheet {
+                AppDrawer { destination ->
+                    scope.launch { drawerState.close() }
+                    when (destination) {
+                        "home" -> Unit
+                        "smart_clean" -> onNavigateToSmartClean()
+                        "analytics_screen" -> onNavigateToAnalytics()
+                        else -> onNavigateToPhoneReality()
+                    }
                 }
-            } }
+            }
         }
     ) {
         Scaffold(
@@ -184,6 +213,9 @@ fun SimpleHomeScreen(
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
+                item {
+                    AnimatedSuccessBanner(message = successMessage)
+                }
                 item {
                     PremiumHeaderCard(
                         summaryInfo = summaryInfo,
@@ -234,7 +266,7 @@ fun SimpleHomeScreen(
                 }
                 if (isLoading) {
                     items(4) { LoadingCard() }
-                } else if (items.isEmpty()) {
+                } else if (remainingVisibleItems == 0) {
                     item {
                         LegitCard {
                             FriendlyState(
@@ -247,18 +279,27 @@ fun SimpleHomeScreen(
                 } else {
                     items(items, key = { it.uri.toString() }) { item ->
                         val isSelected = selected.contains(item.uri.toString())
-                        MediaSwipeRow(
-                            item = item,
-                            selected = isSelected,
-                            onClick = {
-                                selected = if (isSelected) selected - item.uri.toString() else selected + item.uri.toString()
-                            },
-                            onDelete = { pendingDelete = item },
-                            onKeep = {
-                                scope.launch { snackbarHostState.showSnackbar("Kept ${item.name}") }
-                            },
-                            onOpen = { onOpenInSystem(item) }
-                        )
+                        AnimatedVisibility(
+                            visible = item.uri.toString() !in hiddenItemIds,
+                            enter = fadeIn(animationSpec = tween(420)) + slideInVertically(
+                                animationSpec = tween(420),
+                                initialOffsetY = { it / 3 }
+                            ),
+                            exit = fadeOut(animationSpec = tween(320)) + shrinkVertically(animationSpec = tween(320))
+                        ) {
+                            MediaSwipeRow(
+                                item = item,
+                                selected = isSelected,
+                                onClick = {
+                                    selected = if (isSelected) selected - item.uri.toString() else selected + item.uri.toString()
+                                },
+                                onDelete = { pendingDelete = item },
+                                onKeep = {
+                                    scope.launch { snackbarHostState.showSnackbar("Kept ${item.name}") }
+                                },
+                                onOpen = { onOpenInSystem(item) }
+                            )
+                        }
                     }
                 }
                 item {
@@ -284,11 +325,16 @@ fun SimpleHomeScreen(
                             text = "Review (${selected.size})",
                             icon = Icons.Default.Visibility,
                             onClick = {
-                                val first = items.firstOrNull { it.uri.toString() in selected }
-                                if (first != null) onOpenInSystem(first) else onNavigateToMediaViewer()
+                                val first = items.firstOrNull { it.uri.toString() in selected && it.uri.toString() !in hiddenItemIds }
+                                if (first != null) {
+                                    successMessage = "🎉 Review ready!"
+                                    onOpenInSystem(first)
+                                } else {
+                                    onNavigateToMediaViewer()
+                                }
                             },
                             modifier = Modifier.weight(1f),
-                            enabled = selected.isNotEmpty() || items.isNotEmpty()
+                            enabled = selected.isNotEmpty() || remainingVisibleItems > 0
                         )
                     }
                 }
@@ -307,6 +353,9 @@ fun SimpleHomeScreen(
                     text = "Open delete flow",
                     onClick = {
                         pendingDelete = null
+                        hiddenItemIds = hiddenItemIds + item.uri.toString()
+                        selected = selected - item.uri.toString()
+                        successMessage = "🎉 ${formatSize(item.sizeKb.toLong() * 1024L)} ready to clear!"
                         onOpenInSystem(item)
                         scope.launch { snackbarHostState.showSnackbar("Opened ${item.name} for safe deletion") }
                     }
@@ -322,6 +371,36 @@ fun SimpleHomeScreen(
 }
 
 @Composable
+private fun AnimatedSuccessBanner(message: String?) {
+    AnimatedVisibility(
+        visible = message != null,
+        enter = fadeIn(animationSpec = tween(360)) + scaleIn(animationSpec = tween(360), initialScale = 0.82f),
+        exit = fadeOut(animationSpec = tween(280)) + scaleOut(animationSpec = tween(280), targetScale = 0.9f)
+    ) {
+        if (message != null) {
+            LegitCard {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(AccentGreen.copy(alpha = 0.12f))
+                        .padding(horizontal = 18.dp, vertical = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Icon(Icons.Default.CheckCircle, contentDescription = null, tint = AccentGreen)
+                    Text(
+                        text = message,
+                        color = AccentGreen,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun ActionButton(
     text: String,
     icon: ImageVector,
@@ -329,9 +408,18 @@ private fun ActionButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.95f else 1f,
+        animationSpec = tween(durationMillis = 320),
+        label = "action_scale"
+    )
+
     Button(
         onClick = onClick,
         enabled = enabled,
+        interactionSource = interactionSource,
         shape = RoundedCornerShape(16.dp),
         colors = ButtonDefaults.buttonColors(
             containerColor = Color(0xFF3B82F6),
@@ -339,9 +427,11 @@ private fun ActionButton(
             disabledContainerColor = Color(0xFF3B82F6).copy(alpha = 0.45f),
             disabledContentColor = Color.White.copy(alpha = 0.85f)
         ),
-        elevation = ButtonDefaults.buttonElevation(defaultElevation = 5.dp, pressedElevation = 2.dp),
+        elevation = ButtonDefaults.buttonElevation(defaultElevation = 5.dp, pressedElevation = 1.dp),
         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
-        modifier = modifier.height(56.dp)
+        modifier = modifier
+            .height(56.dp)
+            .scale(scale)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -375,6 +465,7 @@ private fun PremiumHeaderCard(
     val totalTarget = (largeTodayCount + screenshotTodayCount).coerceAtLeast(1)
     val resolved = screenshotTodayCount.coerceAtMost(totalTarget)
     val ringProgress = resolved.toFloat() / totalTarget.toFloat()
+    val usagePercent = (ringProgress * 100).toInt()
     val brush = Brush.horizontalGradient(listOf(AccentBlue.copy(alpha = 0.22f), AccentPurple.copy(alpha = 0.18f)))
 
     LegitCard {
@@ -391,8 +482,9 @@ private fun PremiumHeaderCard(
                     Spacer(Modifier.height(8.dp))
                     Text("Large today: $largeTodayCount • $largeTodaySizeText", color = TextMain, style = MaterialTheme.typography.bodyMedium)
                     Text("Screenshots today: $screenshotTodayCount • $screenshotTodaySizeText", color = TextSecondary, style = MaterialTheme.typography.bodyMedium)
+                    Text("$usagePercent% storage used", color = AccentBlue, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                 }
-                StorageRing(progress = ringProgress, label = "${(ringProgress * 100).toInt()}%", subtitle = "storage health")
+                StorageRing(progress = ringProgress, label = "$usagePercent%", subtitle = "storage used")
             }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
                 MiniMetricCard("🔥 6 day", "clean streak")
@@ -476,15 +568,18 @@ private fun InsightGrid(
         Text("📦 Insight cards", style = MaterialTheme.typography.titleLarge, color = TextMain)
         DashboardCardRow(
             DashboardCardModel("Smart Clean", "$junkCount junk • $duplicateCount duplicates", Icons.Default.AutoDelete, onNavigateToSmartClean),
-            DashboardCardModel("Phone Reality", "Storage truth, streaks, usage", Icons.Default.Analytics, onNavigateToPhoneReality)
+            DashboardCardModel("Phone Reality", "Storage truth, streaks, usage", Icons.Default.Analytics, onNavigateToPhoneReality),
+            rowIndex = 0
         )
         DashboardCardRow(
             DashboardCardModel("Meme Detector", "$memeCount memes detected", Icons.Default.Mood, onNavigateToMemeAnalyzer),
-            DashboardCardModel("Junk Files", "$junkCount review-worthy files", Icons.Default.CleaningServices, onNavigateToJunk)
+            DashboardCardModel("Junk Files", "$junkCount review-worthy files", Icons.Default.CleaningServices, onNavigateToJunk),
+            rowIndex = 1
         )
         DashboardCardRow(
             DashboardCardModel("Storage Analytics", "Visual usage and trends", Icons.Default.AutoAwesome, onNavigateToAnalytics),
-            DashboardCardModel("Spam Media", "$spamCount possible spam items", Icons.Default.Shield, onNavigateToSpam)
+            DashboardCardModel("Spam Media", "$spamCount possible spam items", Icons.Default.Shield, onNavigateToSpam),
+            rowIndex = 2
         )
     }
 }
@@ -492,28 +587,67 @@ private fun InsightGrid(
 private data class DashboardCardModel(val title: String, val subtitle: String, val icon: ImageVector, val onClick: () -> Unit)
 
 @Composable
-private fun DashboardCardRow(first: DashboardCardModel, second: DashboardCardModel) {
+private fun DashboardCardRow(first: DashboardCardModel, second: DashboardCardModel, rowIndex: Int) {
     Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-        DashboardCard(first, Modifier.weight(1f))
-        DashboardCard(second, Modifier.weight(1f))
+        DashboardCard(first, Modifier.weight(1f), rowIndex * 2)
+        DashboardCard(second, Modifier.weight(1f), rowIndex * 2 + 1)
     }
 }
 
 @Composable
-private fun DashboardCard(model: DashboardCardModel, modifier: Modifier = Modifier) {
-    LegitCard(modifier = modifier.clickable(onClick = model.onClick)) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Box(
-                modifier = Modifier
-                    .size(42.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(AccentBlue.copy(alpha = 0.16f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(model.icon, contentDescription = null, tint = AccentBlue)
+private fun DashboardCard(model: DashboardCardModel, modifier: Modifier = Modifier, animationIndex: Int) {
+    var visible by remember { mutableStateOf(false) }
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.97f else 1f,
+        animationSpec = tween(320),
+        label = "dashboard_scale"
+    )
+    val elevation by animateDpAsState(
+        targetValue = if (isPressed) 10.dp else 3.dp,
+        animationSpec = tween(320),
+        label = "dashboard_elevation"
+    )
+
+    LaunchedEffect(Unit) {
+        delay((animationIndex * 90).toLong())
+        visible = true
+    }
+
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(animationSpec = tween(420)) + slideInVertically(
+            animationSpec = tween(420),
+            initialOffsetY = { it / 2 }
+        )
+    ) {
+        androidx.compose.material3.Card(
+            colors = CardDefaults.cardColors(containerColor = SurfaceWhite),
+            elevation = CardDefaults.cardElevation(defaultElevation = elevation),
+            shape = RoundedCornerShape(22.dp),
+            modifier = modifier
+                .fillMaxWidth()
+                .scale(scale)
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = null,
+                    onClick = model.onClick
+                )
+        ) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Box(
+                    modifier = Modifier
+                        .size(42.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(AccentBlue.copy(alpha = 0.16f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(model.icon, contentDescription = null, tint = AccentBlue)
+                }
+                Text(model.title, color = TextMain, style = MaterialTheme.typography.titleMedium)
+                Text(model.subtitle, color = TextSecondary, style = MaterialTheme.typography.bodySmall)
             }
-            Text(model.title, color = TextMain, style = MaterialTheme.typography.titleMedium)
-            Text(model.subtitle, color = TextSecondary, style = MaterialTheme.typography.bodySmall)
         }
     }
 }
