@@ -131,7 +131,10 @@ fun WhatsCleanAppRoot(
                 screenshotTodayCount = state.screenshotTodayCount,
                 screenshotTodaySizeText = state.screenshotTodaySizeText,
                 activeSuggestion = state.activeSuggestion,
-                onSuggestionChange = onSuggestionChange
+                onSuggestionChange = onSuggestionChange,
+                totalFiles = state.totalFiles,
+                totalSize = state.totalSize,
+                oldFilesCount = state.report.oldFiles
             )
         }
 

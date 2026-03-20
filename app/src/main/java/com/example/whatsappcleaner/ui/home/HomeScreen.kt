@@ -6,7 +6,6 @@
 package com.example.whatsappcleaner.ui.home
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -15,6 +14,7 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -27,13 +27,21 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items as gridItems
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Analytics
@@ -43,6 +51,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CleaningServices
 import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.Menu
@@ -53,10 +62,8 @@ import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -90,9 +97,13 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import coil.request.videoFrameMillis
 import com.example.whatsappcleaner.data.ReminderFreq
 import com.example.whatsappcleaner.data.ReminderTime
 import com.example.whatsappcleaner.data.local.SimpleMediaItem
@@ -118,7 +129,7 @@ import com.example.whatsappcleaner.ui.theme.TextSecondary
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun SimpleHomeScreen(
     items: List<SimpleMediaItem>,
@@ -152,7 +163,10 @@ fun SimpleHomeScreen(
     screenshotTodayCount: Int,
     screenshotTodaySizeText: String,
     activeSuggestion: SuggestionType,
-    onSuggestionChange: (SuggestionType) -> Unit
+    onSuggestionChange: (SuggestionType) -> Unit,
+    totalFiles: Int,
+    totalSize: Long,
+    oldFilesCount: Int
 ) {
     val drawerState = androidx.compose.material3.rememberDrawerState(initialValue = androidx.compose.material3.DrawerValue.Closed)
     val scope = rememberCoroutineScope()
@@ -160,7 +174,6 @@ fun SimpleHomeScreen(
     var selected by rememberSaveable { mutableStateOf(setOf<String>()) }
     var pendingDelete by remember { mutableStateOf<SimpleMediaItem?>(null) }
     var successMessage by remember { mutableStateOf<String?>(null) }
-    var hiddenItemIds by rememberSaveable { mutableStateOf(setOf<String>()) }
 
     LaunchedEffect(successMessage) {
         if (successMessage != null) {
@@ -169,7 +182,8 @@ fun SimpleHomeScreen(
         }
     }
 
-    val remainingVisibleItems = items.count { it.uri.toString() !in hiddenItemIds }
+    val reviewCount = largeTodayCount + screenshotTodayCount + duplicateCount + spamCount
+    val storageProgress = if (totalFiles == 0) 0f else reviewCount.toFloat() / totalFiles.toFloat()
 
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -188,69 +202,89 @@ fun SimpleHomeScreen(
         }
     ) {
         Scaffold(
-            topBar = {
-                CenterAlignedTopAppBar(
-                    title = {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("WhatsApp Cleaner", color = BrandNavy)
-                            Text("Premium storage care", color = TextSecondary, style = MaterialTheme.typography.labelMedium)
-                        }
-                    },
-                    navigationIcon = {
-                        IconButton(onClick = { scope.launch { drawerState.open() } }) {
-                            Icon(Icons.Default.Menu, contentDescription = "Menu", tint = BrandNavy)
-                        }
-                    }
-                )
-            },
             containerColor = PrimaryBackground,
             snackbarHost = { SnackbarHost(snackbarHostState) }
         ) { padding ->
-            LazyColumn(
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(2),
                 modifier = Modifier
                     .padding(padding)
                     .fillMaxSize(),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+                contentPadding = PaddingValues(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                item {
-                    AnimatedSuccessBanner(message = successMessage)
-                }
-                item {
-                    PremiumHeaderCard(
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    DashboardHeader(
                         summaryInfo = summaryInfo,
                         remindersEnabled = remindersEnabled,
                         onRemindersToggle = onRemindersToggle,
+                        selectedFrequency = selectedFrequency,
+                        selectedTime = selectedTime,
+                        onMenuClick = { scope.launch { drawerState.open() } },
+                        onRefreshClick = onRefreshClick,
+                        onStorageClick = onOpenSystemStorage,
+                        onInsightsClick = onNavigateToPhoneReality
+                    )
+                }
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    AnimatedSuccessBanner(message = successMessage)
+                }
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    StorageOverviewCard(
+                        totalFiles = totalFiles,
+                        totalSize = totalSize,
                         largeTodayCount = largeTodayCount,
                         largeTodaySizeText = largeTodaySizeText,
                         screenshotTodayCount = screenshotTodayCount,
                         screenshotTodaySizeText = screenshotTodaySizeText,
-                        selectedFrequency = selectedFrequency,
-                        selectedTime = selectedTime
+                        oldFilesCount = oldFilesCount,
+                        progress = storageProgress,
+                        onClick = onNavigateToAnalytics
                     )
                 }
-                item {
+                item(span = { GridItemSpan(maxLineSpan) }) {
                     GradientHeroButton(
-                        text = "⚡ Smart Clean Now",
+                        text = "Smart Clean Now",
                         onClick = onNavigateToSmartClean,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        icon = Icons.Default.AutoAwesome
                     )
                 }
-                item {
-                    InsightGrid(
-                        memeCount = memeCount,
-                        spamCount = spamCount,
-                        junkCount = junkCount,
-                        duplicateCount = duplicateCount,
-                        onNavigateToSmartClean = onNavigateToSmartClean,
-                        onNavigateToPhoneReality = onNavigateToPhoneReality,
-                        onNavigateToMemeAnalyzer = onNavigateToMemeAnalyzer,
-                        onNavigateToJunk = onNavigateToJunk,
-                        onNavigateToAnalytics = onNavigateToAnalytics,
-                        onNavigateToSpam = onNavigateToSpam
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    SectionTitle(title = "Insights", subtitle = "Tap any card to drill into the data.")
+                }
+                gridItems(
+                    items = listOf(
+                        InsightCardModel("Duplicates", "$duplicateCount review items", Icons.Default.AutoDelete, AccentBlue, onNavigateToSmartClean),
+                        InsightCardModel("Spam Shield", "$spamCount suspicious files", Icons.Default.Shield, AccentPurple, onNavigateToSpam),
+                        InsightCardModel("Meme Radar", "$memeCount memes detected", Icons.Default.Mood, AccentGreen, onNavigateToMemeAnalyzer),
+                        InsightCardModel("Reality Check", "$junkCount junk • $oldFilesCount old", Icons.Default.Analytics, AccentBlue, onNavigateToPhoneReality)
+                    )
+                ) { model ->
+                    InsightCard(model = model)
+                }
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    QuickActionRow(
+                        selectedCount = selected.size,
+                        onReviewClick = {
+                            val firstSelected = items.firstOrNull { it.uri.toString() in selected }
+                            when {
+                                firstSelected != null -> {
+                                    successMessage = "Review ready"
+                                    onOpenInSystem(firstSelected)
+                                }
+
+                                items.isNotEmpty() -> onNavigateToMediaViewer()
+                                else -> Unit
+                            }
+                        },
+                        onJunkClick = onNavigateToJunk,
+                        onStorageClick = onOpenSystemStorage,
+                        onAnalyticsClick = onNavigateToAnalytics
                     )
                 }
-                item {
+                item(span = { GridItemSpan(maxLineSpan) }) {
                     SuggestionStrip(
                         activeSuggestion = activeSuggestion,
                         largeTodayCount = largeTodayCount,
@@ -258,87 +292,46 @@ fun SimpleHomeScreen(
                         onSuggestionChange = onSuggestionChange
                     )
                 }
-                item {
-                    Text("📂 Browse media", style = MaterialTheme.typography.titleLarge, color = TextMain)
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    SectionTitle(title = "Browse media", subtitle = "Filter the live scan and review what matters now.")
                 }
-                item {
+                item(span = { GridItemSpan(maxLineSpan) }) {
                     FilterTabs(currentFilter = currentFilter, onFilterChange = onFilterChange)
                 }
+
                 if (isLoading) {
-                    items(4) { LoadingCard() }
-                } else if (remainingVisibleItems == 0) {
-                    item {
+                    gridItems(6) { MediaGridShimmer() }
+                } else if (items.isEmpty()) {
+                    item(span = { GridItemSpan(maxLineSpan) }) {
                         LegitCard {
                             FriendlyState(
                                 icon = Icons.Default.CheckCircle,
-                                title = "🎉 Nothing to clean!",
-                                message = "Grant a quick review later or refresh to rescan your photos and videos."
+                                title = "Nothing to clean right now",
+                                message = "Refresh later to rescan your photos, videos, memes, and quick-win suggestions."
                             )
                         }
                     }
                 } else {
-                    items(items, key = { it.uri.toString() }) { item ->
-                        val isSelected = selected.contains(item.uri.toString())
-                        AnimatedVisibility(
-                            visible = item.uri.toString() !in hiddenItemIds,
-                            enter = fadeIn(animationSpec = tween(420)) + slideInVertically(
-                                animationSpec = tween(420),
-                                initialOffsetY = { it / 3 }
-                            ),
-                            exit = fadeOut(animationSpec = tween(320)) + shrinkVertically(animationSpec = tween(320))
-                        ) {
-                            MediaSwipeRow(
-                                item = item,
-                                selected = isSelected,
-                                onClick = {
-                                    selected = if (isSelected) selected - item.uri.toString() else selected + item.uri.toString()
-                                },
-                                onDelete = { pendingDelete = item },
-                                onKeep = {
-                                    scope.launch { snackbarHostState.showSnackbar("Kept ${item.name}") }
-                                },
-                                onOpen = { onOpenInSystem(item) }
-                            )
-                        }
-                    }
-                }
-                item {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        ActionButton(
-                            text = "Refresh",
-                            icon = Icons.Default.Refresh,
-                            onClick = onRefreshClick,
-                            modifier = Modifier.weight(1f)
-                        )
-                        ActionButton(
-                            text = "Storage",
-                            icon = Icons.Default.Storage,
-                            onClick = onOpenSystemStorage,
-                            modifier = Modifier.weight(1f)
-                        )
-                        ActionButton(
-                            text = "Review (${selected.size})",
-                            icon = Icons.Default.Visibility,
-                            onClick = {
-                                val first = items.firstOrNull { it.uri.toString() in selected && it.uri.toString() !in hiddenItemIds }
-                                if (first != null) {
-                                    successMessage = "🎉 Review ready!"
-                                    onOpenInSystem(first)
+                    gridItems(items, key = { it.uri.toString() }) { item ->
+                        MediaGridCard(
+                            item = item,
+                            selected = item.uri.toString() in selected,
+                            onSelect = {
+                                selected = if (item.uri.toString() in selected) {
+                                    selected - item.uri.toString()
                                 } else {
-                                    onNavigateToMediaViewer()
+                                    selected + item.uri.toString()
                                 }
                             },
-                            modifier = Modifier.weight(1f),
-                            enabled = selected.isNotEmpty() || remainingVisibleItems > 0
+                            onOpen = { onOpenInSystem(item) },
+                            onKeep = {
+                                successMessage = "Kept ${item.name.take(18)}"
+                                scope.launch { snackbarHostState.showSnackbar("Kept ${item.name}") }
+                            },
+                            onDelete = { pendingDelete = item }
                         )
                     }
                 }
-                item { Spacer(Modifier.height(8.dp)) }
             }
         }
     }
@@ -347,17 +340,21 @@ fun SimpleHomeScreen(
         AlertDialog(
             onDismissRequest = { pendingDelete = null },
             title = { Text("Delete this file?", color = TextMain) },
-            text = { Text("Are you sure you want to delete ${item.name}? We’ll open the file in the system viewer so you can remove it safely.", color = TextSecondary) },
+            text = {
+                Text(
+                    "We’ll open ${item.name} in the system viewer so you can delete it safely without changing app logic.",
+                    color = TextSecondary
+                )
+            },
             confirmButton = {
                 LegitButton(
                     text = "Open delete flow",
                     onClick = {
                         pendingDelete = null
-                        hiddenItemIds = hiddenItemIds + item.uri.toString()
                         selected = selected - item.uri.toString()
-                        successMessage = "🎉 ${formatSize(item.sizeKb.toLong() * 1024L)} ready to clear!"
+                        successMessage = "${formatSize(item.sizeKb.toLong() * 1024L)} ready to clear"
                         onOpenInSystem(item)
-                        scope.launch { snackbarHostState.showSnackbar("Opened ${item.name} for safe deletion") }
+                        scope.launch { snackbarHostState.showSnackbar("Opened ${item.name} for deletion") }
                     }
                 )
             },
@@ -367,6 +364,184 @@ fun SimpleHomeScreen(
             containerColor = SurfaceWhite,
             tonalElevation = 0.dp
         )
+    }
+}
+
+@Composable
+private fun DashboardHeader(
+    summaryInfo: String,
+    remindersEnabled: Boolean,
+    onRemindersToggle: (Boolean) -> Unit,
+    selectedFrequency: ReminderFreq,
+    selectedTime: ReminderTime,
+    onMenuClick: () -> Unit,
+    onRefreshClick: () -> Unit,
+    onStorageClick: () -> Unit,
+    onInsightsClick: () -> Unit
+) {
+    LegitCard {
+        Column(
+            modifier = Modifier
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            SurfaceWhite,
+                            SurfaceWhite.copy(alpha = 0.96f)
+                        )
+                    )
+                )
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(
+                    onClick = onMenuClick,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(SurfaceMuted.copy(alpha = 0.85f))
+                ) {
+                    Icon(Icons.Default.Menu, contentDescription = "Menu", tint = TextMain)
+                }
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("WhatsApp Cleaner", style = MaterialTheme.typography.headlineSmall, color = TextMain)
+                    Text("Premium storage care for every scan.", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+                }
+            }
+
+            Text(summaryInfo, style = MaterialTheme.typography.bodyLarge, color = BrandNavy)
+
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                item {
+                    QuickPill(icon = Icons.Default.Refresh, label = "Refresh", onClick = onRefreshClick)
+                }
+                item {
+                    QuickPill(icon = Icons.Default.Storage, label = "Storage", onClick = onStorageClick)
+                }
+                item {
+                    QuickPill(icon = Icons.Default.Visibility, label = "Insights", onClick = onInsightsClick)
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                MiniMetricCard(
+                    title = selectedFrequency.label,
+                    subtitle = "Reminder cadence",
+                    icon = Icons.Default.AutoAwesome,
+                    modifier = Modifier.weight(1f)
+                )
+                MiniMetricCard(
+                    title = selectedTime.label,
+                    subtitle = "Next reminder",
+                    icon = Icons.Default.CheckCircle,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Daily reminders",
+                    color = TextMain,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f)
+                )
+                Switch(
+                    checked = remindersEnabled,
+                    onCheckedChange = onRemindersToggle,
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = Color.White,
+                        checkedTrackColor = AccentBlue,
+                        uncheckedTrackColor = SurfaceMuted
+                    )
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun QuickPill(icon: ImageVector, label: String, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(SurfaceMuted.copy(alpha = 0.9f))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(icon, contentDescription = null, tint = AccentBlue, modifier = Modifier.size(18.dp))
+        Text(label, color = TextMain, style = MaterialTheme.typography.labelLarge)
+    }
+}
+
+@Composable
+private fun StorageOverviewCard(
+    totalFiles: Int,
+    totalSize: Long,
+    largeTodayCount: Int,
+    largeTodaySizeText: String,
+    screenshotTodayCount: Int,
+    screenshotTodaySizeText: String,
+    oldFilesCount: Int,
+    progress: Float,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = SurfaceWhite),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    Brush.horizontalGradient(
+                        listOf(AccentBlue.copy(alpha = 0.16f), AccentPurple.copy(alpha = 0.12f))
+                    )
+                )
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Storage overview", style = MaterialTheme.typography.titleLarge, color = TextMain)
+                Text("$totalFiles files • ${formatSize(totalSize)}", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+                StatLine(Icons.Default.CleaningServices, "$largeTodayCount large today", largeTodaySizeText.ifBlank { "Ready for review" })
+                StatLine(Icons.Default.Image, "$screenshotTodayCount screenshots", screenshotTodaySizeText.ifBlank { "Quick wins available" })
+                StatLine(Icons.Default.Analytics, "$oldFilesCount older files", "Tap for analytics")
+            }
+            StorageRing(
+                progress = progress,
+                label = "${(progress * 100).toInt()}%",
+                subtitle = "reviewable"
+            )
+        }
+    }
+}
+
+@Composable
+private fun StatLine(icon: ImageVector, title: String, subtitle: String) {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Icon(icon, contentDescription = null, tint = AccentBlue, modifier = Modifier.size(16.dp))
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(title, style = MaterialTheme.typography.labelLarge, color = TextMain)
+            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+        }
     }
 }
 
@@ -400,121 +575,108 @@ private fun AnimatedSuccessBanner(message: String?) {
     }
 }
 
+private data class InsightCardModel(
+    val title: String,
+    val subtitle: String,
+    val icon: ImageVector,
+    val accent: Color,
+    val onClick: () -> Unit
+)
+
 @Composable
-private fun ActionButton(
-    text: String,
-    icon: ImageVector,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    enabled: Boolean = true
-) {
+private fun InsightCard(model: InsightCardModel) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(
-        targetValue = if (isPressed) 0.95f else 1f,
-        animationSpec = tween(durationMillis = 320),
-        label = "action_scale"
+        targetValue = if (isPressed) 0.98f else 1f,
+        animationSpec = tween(220),
+        label = "insight_scale"
     )
 
-    Button(
-        onClick = onClick,
-        enabled = enabled,
-        interactionSource = interactionSource,
-        shape = RoundedCornerShape(16.dp),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = Color(0xFF3B82F6),
-            contentColor = Color.White,
-            disabledContainerColor = Color(0xFF3B82F6).copy(alpha = 0.45f),
-            disabledContentColor = Color.White.copy(alpha = 0.85f)
-        ),
-        elevation = ButtonDefaults.buttonElevation(defaultElevation = 5.dp, pressedElevation = 1.dp),
-        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
-        modifier = modifier
-            .height(56.dp)
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
             .scale(scale)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = model.onClick
+            ),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = SurfaceWhite),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp))
-            Spacer(modifier = Modifier.size(8.dp))
-            Text(
-                text = text,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                style = MaterialTheme.typography.titleSmall
-            )
-        }
-    }
-}
-
-@Composable
-private fun PremiumHeaderCard(
-    summaryInfo: String,
-    remindersEnabled: Boolean,
-    onRemindersToggle: (Boolean) -> Unit,
-    largeTodayCount: Int,
-    largeTodaySizeText: String,
-    screenshotTodayCount: Int,
-    screenshotTodaySizeText: String,
-    selectedFrequency: ReminderFreq,
-    selectedTime: ReminderTime
-) {
-    val totalTarget = (largeTodayCount + screenshotTodayCount).coerceAtLeast(1)
-    val resolved = screenshotTodayCount.coerceAtMost(totalTarget)
-    val ringProgress = resolved.toFloat() / totalTarget.toFloat()
-    val usagePercent = (ringProgress * 100).toInt()
-    val brush = Brush.horizontalGradient(listOf(AccentBlue.copy(alpha = 0.22f), AccentPurple.copy(alpha = 0.18f)))
-
-    LegitCard {
         Column(
             modifier = Modifier
-                .background(brush)
-                .padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("🔥 Streak + storage pulse", color = TextMain, style = MaterialTheme.typography.titleLarge)
-                    Text(summaryInfo, color = TextSecondary, style = MaterialTheme.typography.bodyMedium)
-                    Spacer(Modifier.height(8.dp))
-                    Text("Large today: $largeTodayCount • $largeTodaySizeText", color = TextMain, style = MaterialTheme.typography.bodyMedium)
-                    Text("Screenshots today: $screenshotTodayCount • $screenshotTodaySizeText", color = TextSecondary, style = MaterialTheme.typography.bodyMedium)
-                    Text("$usagePercent% storage used", color = AccentBlue, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(model.accent.copy(alpha = 0.16f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(model.icon, contentDescription = null, tint = model.accent)
+            }
+            Text(model.title, style = MaterialTheme.typography.titleMedium, color = TextMain)
+            Text(model.subtitle, style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+        }
+    }
+}
+
+@Composable
+private fun QuickActionRow(
+    selectedCount: Int,
+    onReviewClick: () -> Unit,
+    onJunkClick: () -> Unit,
+    onStorageClick: () -> Unit,
+    onAnalyticsClick: () -> Unit
+) {
+    LegitCard {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text("Quick actions", style = MaterialTheme.typography.titleMedium, color = TextMain)
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                item {
+                    ActionChip(icon = Icons.Default.Visibility, label = "Review ($selectedCount)", onClick = onReviewClick, accent = AccentBlue)
                 }
-                StorageRing(progress = ringProgress, label = "$usagePercent%", subtitle = "storage used")
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                MiniMetricCard("🔥 6 day", "clean streak")
-                MiniMetricCard(selectedFrequency.label, "reminder cadence")
-                MiniMetricCard(selectedTime.label, "next reminder")
-            }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text("Daily reminders", color = TextMain, fontWeight = FontWeight.SemiBold)
-                Switch(
-                    checked = remindersEnabled,
-                    onCheckedChange = onRemindersToggle,
-                    colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = AccentGreen)
-                )
+                item {
+                    ActionChip(icon = Icons.Default.CleaningServices, label = "Junk", onClick = onJunkClick, accent = AccentPurple)
+                }
+                item {
+                    ActionChip(icon = Icons.Default.Analytics, label = "Analytics", onClick = onAnalyticsClick, accent = AccentGreen)
+                }
+                item {
+                    ActionChip(icon = Icons.Default.Storage, label = "Storage", onClick = onStorageClick, accent = AccentBlue)
+                }
             }
         }
     }
 }
 
 @Composable
-private fun MiniMetricCard(title: String, subtitle: String) {
-    Box(
+private fun ActionChip(icon: ImageVector, label: String, onClick: () -> Unit, accent: Color) {
+    Row(
         modifier = Modifier
-            .clip(RoundedCornerShape(18.dp))
-            .background(SurfaceMuted.copy(alpha = 0.9f))
-            .padding(horizontal = 12.dp, vertical = 10.dp)
+            .clip(RoundedCornerShape(20.dp))
+            .background(accent.copy(alpha = 0.14f))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(horizontalAlignment = Alignment.Start) {
-            Text(title, color = TextMain, style = MaterialTheme.typography.titleSmall)
-            Text(subtitle, color = TextSecondary, style = MaterialTheme.typography.labelSmall)
-        }
+        Icon(icon, contentDescription = null, tint = accent, modifier = Modifier.size(18.dp))
+        Text(label, color = TextMain, style = MaterialTheme.typography.labelLarge)
+    }
+}
+
+@Composable
+private fun SectionTitle(title: String, subtitle: String) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(title, style = MaterialTheme.typography.titleLarge, color = TextMain)
+        Text(subtitle, style = MaterialTheme.typography.bodySmall, color = TextSecondary)
     }
 }
 
@@ -522,23 +684,33 @@ private fun MiniMetricCard(title: String, subtitle: String) {
 @Composable
 fun FilterTabs(currentFilter: MediaFilter, onFilterChange: (MediaFilter) -> Unit) {
     val filters = listOf(
-        MediaFilter.ALL to "All",
-        MediaFilter.IMAGES to "Images",
-        MediaFilter.VIDEOS to "Videos",
-        MediaFilter.MEMES to "Memes",
-        MediaFilter.DUPLICATES to "Duplicates"
+        MediaFilter.ALL to Pair("All", Icons.Default.FolderOpen),
+        MediaFilter.IMAGES to Pair("Images", Icons.Default.Image),
+        MediaFilter.VIDEOS to Pair("Videos", Icons.Default.VideoLibrary),
+        MediaFilter.MEMES to Pair("Memes", Icons.Default.Mood)
     )
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        filters.forEach { (filter, title) ->
+
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        items(filters) { (filter, descriptor) ->
             FilterChip(
                 selected = currentFilter == filter,
                 onClick = { onFilterChange(filter) },
-                label = { Text(title) },
+                label = { Text(descriptor.first) },
+                leadingIcon = {
+                    Icon(
+                        imageVector = descriptor.second,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                },
+                shape = RoundedCornerShape(20.dp),
                 colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = AccentBlue.copy(alpha = 0.16f),
+                    selectedContainerColor = AccentBlue.copy(alpha = 0.18f),
                     selectedLabelColor = TextMain,
+                    selectedLeadingIconColor = AccentBlue,
                     containerColor = SurfaceWhite,
-                    labelColor = TextSecondary
+                    labelColor = TextSecondary,
+                    iconColor = TextSecondary
                 ),
                 border = FilterChipDefaults.filterChipBorder(
                     enabled = true,
@@ -547,107 +719,6 @@ fun FilterTabs(currentFilter: MediaFilter, onFilterChange: (MediaFilter) -> Unit
                     selectedBorderColor = AccentBlue
                 )
             )
-        }
-    }
-}
-
-@Composable
-private fun InsightGrid(
-    memeCount: Int,
-    spamCount: Int,
-    junkCount: Int,
-    duplicateCount: Int,
-    onNavigateToSmartClean: () -> Unit,
-    onNavigateToPhoneReality: () -> Unit,
-    onNavigateToMemeAnalyzer: () -> Unit,
-    onNavigateToJunk: () -> Unit,
-    onNavigateToAnalytics: () -> Unit,
-    onNavigateToSpam: () -> Unit
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text("📦 Insight cards", style = MaterialTheme.typography.titleLarge, color = TextMain)
-        DashboardCardRow(
-            DashboardCardModel("Smart Clean", "$junkCount junk • $duplicateCount duplicates", Icons.Default.AutoDelete, onNavigateToSmartClean),
-            DashboardCardModel("Phone Reality", "Storage truth, streaks, usage", Icons.Default.Analytics, onNavigateToPhoneReality),
-            rowIndex = 0
-        )
-        DashboardCardRow(
-            DashboardCardModel("Meme Detector", "$memeCount memes detected", Icons.Default.Mood, onNavigateToMemeAnalyzer),
-            DashboardCardModel("Junk Files", "$junkCount review-worthy files", Icons.Default.CleaningServices, onNavigateToJunk),
-            rowIndex = 1
-        )
-        DashboardCardRow(
-            DashboardCardModel("Storage Analytics", "Visual usage and trends", Icons.Default.AutoAwesome, onNavigateToAnalytics),
-            DashboardCardModel("Spam Media", "$spamCount possible spam items", Icons.Default.Shield, onNavigateToSpam),
-            rowIndex = 2
-        )
-    }
-}
-
-private data class DashboardCardModel(val title: String, val subtitle: String, val icon: ImageVector, val onClick: () -> Unit)
-
-@Composable
-private fun DashboardCardRow(first: DashboardCardModel, second: DashboardCardModel, rowIndex: Int) {
-    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-        DashboardCard(first, Modifier.weight(1f), rowIndex * 2)
-        DashboardCard(second, Modifier.weight(1f), rowIndex * 2 + 1)
-    }
-}
-
-@Composable
-private fun DashboardCard(model: DashboardCardModel, modifier: Modifier = Modifier, animationIndex: Int) {
-    var visible by remember { mutableStateOf(false) }
-    val interactionSource = remember { MutableInteractionSource() }
-    val isPressed by interactionSource.collectIsPressedAsState()
-    val scale by animateFloatAsState(
-        targetValue = if (isPressed) 0.97f else 1f,
-        animationSpec = tween(320),
-        label = "dashboard_scale"
-    )
-    val elevation by animateDpAsState(
-        targetValue = if (isPressed) 10.dp else 3.dp,
-        animationSpec = tween(320),
-        label = "dashboard_elevation"
-    )
-
-    LaunchedEffect(Unit) {
-        delay((animationIndex * 90).toLong())
-        visible = true
-    }
-
-    AnimatedVisibility(
-        visible = visible,
-        enter = fadeIn(animationSpec = tween(420)) + slideInVertically(
-            animationSpec = tween(420),
-            initialOffsetY = { it / 2 }
-        )
-    ) {
-        androidx.compose.material3.Card(
-            colors = CardDefaults.cardColors(containerColor = SurfaceWhite),
-            elevation = CardDefaults.cardElevation(defaultElevation = elevation),
-            shape = RoundedCornerShape(22.dp),
-            modifier = modifier
-                .fillMaxWidth()
-                .scale(scale)
-                .clickable(
-                    interactionSource = interactionSource,
-                    indication = null,
-                    onClick = model.onClick
-                )
-        ) {
-            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Box(
-                    modifier = Modifier
-                        .size(42.dp)
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(AccentBlue.copy(alpha = 0.16f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(model.icon, contentDescription = null, tint = AccentBlue)
-                }
-                Text(model.title, color = TextMain, style = MaterialTheme.typography.titleMedium)
-                Text(model.subtitle, color = TextSecondary, style = MaterialTheme.typography.bodySmall)
-            }
         }
     }
 }
@@ -664,24 +735,253 @@ private fun SuggestionStrip(
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text("Quick wins", style = MaterialTheme.typography.titleMedium, color = TextMain)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                SuggestionChip("Everything", activeSuggestion == SuggestionType.NONE) { onSuggestionChange(SuggestionType.NONE) }
-                SuggestionChip("Large today ($largeTodayCount)", activeSuggestion == SuggestionType.LARGE_TODAY) { onSuggestionChange(SuggestionType.LARGE_TODAY) }
-                SuggestionChip("Screenshots ($screenshotTodayCount)", activeSuggestion == SuggestionType.SCREENSHOTS_TODAY) { onSuggestionChange(SuggestionType.SCREENSHOTS_TODAY) }
+                SuggestionChip(
+                    label = "Everything",
+                    selected = activeSuggestion == SuggestionType.NONE,
+                    icon = Icons.Default.FolderOpen
+                ) { onSuggestionChange(SuggestionType.NONE) }
+                SuggestionChip(
+                    label = "Large today ($largeTodayCount)",
+                    selected = activeSuggestion == SuggestionType.LARGE_TODAY,
+                    icon = Icons.Default.CleaningServices
+                ) { onSuggestionChange(SuggestionType.LARGE_TODAY) }
+                SuggestionChip(
+                    label = "Screenshots ($screenshotTodayCount)",
+                    selected = activeSuggestion == SuggestionType.SCREENSHOTS_TODAY,
+                    icon = Icons.Default.Image
+                ) { onSuggestionChange(SuggestionType.SCREENSHOTS_TODAY) }
             }
         }
     }
 }
 
 @Composable
-private fun SuggestionChip(label: String, selected: Boolean, onClick: () -> Unit) {
-    Box(
+private fun SuggestionChip(label: String, selected: Boolean, icon: ImageVector, onClick: () -> Unit) {
+    Row(
         modifier = Modifier
             .clip(RoundedCornerShape(999.dp))
             .background(if (selected) AccentGreen.copy(alpha = 0.18f) else SurfaceMuted)
             .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 10.dp)
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
+        Icon(icon, contentDescription = null, tint = if (selected) AccentGreen else TextSecondary, modifier = Modifier.size(16.dp))
         Text(label, color = if (selected) AccentGreen else TextSecondary, style = MaterialTheme.typography.labelLarge)
+    }
+}
+
+@Composable
+private fun MediaGridCard(
+    item: SimpleMediaItem,
+    selected: Boolean,
+    onSelect: () -> Unit,
+    onOpen: () -> Unit,
+    onKeep: () -> Unit,
+    onDelete: () -> Unit
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.98f else 1f,
+        animationSpec = tween(220),
+        label = "media_scale"
+    )
+    val model = remember(item.uri, item.mimeType) {
+        ImageRequest.Builder(context)
+            .data(item.uri)
+            .crossfade(true)
+            .apply {
+                if (item.mimeType?.startsWith("video") == true) {
+                    videoFrameMillis(0)
+                }
+            }
+            .build()
+    }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .scale(scale)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onSelect
+            ),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = SurfaceWhite),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(1f)
+            ) {
+                AsyncImage(
+                    model = model,
+                    contentDescription = item.name,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(Color.Transparent, PrimaryBackground.copy(alpha = 0.82f))
+                            )
+                        )
+                )
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(10.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(PrimaryBackground.copy(alpha = 0.72f))
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = when {
+                            selected -> Icons.Default.Check
+                            item.mimeType?.startsWith("image") == true -> Icons.Default.Image
+                            item.mimeType?.startsWith("video") == true -> Icons.Default.VideoLibrary
+                            else -> Icons.Default.InsertDriveFile
+                        },
+                        contentDescription = null,
+                        tint = if (selected) AccentGreen else Color.White,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Text(
+                        if (selected) "Selected" else formatSize(item.sizeKb.toLong() * 1024L),
+                        color = Color.White,
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                }
+            }
+
+            Column(modifier = Modifier.padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(item.name, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleSmall, color = TextMain)
+                Text(item.mimeType ?: "Unknown media", style = MaterialTheme.typography.bodySmall, color = TextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 12.dp, end = 12.dp, bottom = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                MiniActionButton(
+                    icon = Icons.Default.FolderOpen,
+                    label = "Open",
+                    accent = AccentBlue,
+                    modifier = Modifier.weight(1f),
+                    onClick = onOpen
+                )
+                MiniActionButton(
+                    icon = Icons.Default.CheckCircle,
+                    label = "Keep",
+                    accent = AccentGreen,
+                    modifier = Modifier.weight(1f),
+                    onClick = onKeep
+                )
+                MiniActionButton(
+                    icon = Icons.Default.DeleteOutline,
+                    label = "Delete",
+                    accent = AccentError,
+                    modifier = Modifier.weight(1f),
+                    onClick = onDelete
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun MiniActionButton(
+    icon: ImageVector,
+    label: String,
+    accent: Color,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(16.dp))
+            .background(accent.copy(alpha = 0.12f))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(icon, contentDescription = null, tint = accent, modifier = Modifier.size(16.dp))
+        Spacer(Modifier.width(6.dp))
+        Text(label, style = MaterialTheme.typography.labelMedium, color = accent, maxLines = 1)
+    }
+}
+
+@Composable
+private fun MediaGridShimmer() {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(1f)
+                .clip(RoundedCornerShape(20.dp))
+                .shimmerEffect()
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(16.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .shimmerEffect()
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(0.65f)
+                .height(14.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .shimmerEffect()
+        )
+    }
+}
+
+@Composable
+private fun MiniMetricCard(
+    title: String,
+    subtitle: String,
+    icon: ImageVector,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(18.dp))
+            .background(SurfaceMuted.copy(alpha = 0.9f))
+            .padding(horizontal = 12.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(36.dp)
+                .clip(CircleShape)
+                .background(AccentBlue.copy(alpha = 0.18f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(icon, contentDescription = null, tint = AccentBlue, modifier = Modifier.size(18.dp))
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(title, color = TextMain, style = MaterialTheme.typography.titleSmall)
+            Text(subtitle, color = TextSecondary, style = MaterialTheme.typography.labelSmall)
+        }
     }
 }
 
@@ -702,10 +1002,12 @@ fun MediaSwipeRow(
                     onKeep()
                     false
                 }
+
                 SwipeToDismissBoxValue.EndToStart -> {
                     onDelete()
                     false
                 }
+
                 SwipeToDismissBoxValue.Settled -> false
             }
         }
@@ -783,8 +1085,8 @@ private fun LoadingCard() {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(96.dp)
-                .clip(RoundedCornerShape(22.dp))
+                .heightIn(min = 96.dp)
+                .clip(RoundedCornerShape(20.dp))
                 .shimmerEffect()
         )
         HorizontalDivider(color = DividerColor.copy(alpha = 0.4f))
