@@ -4,6 +4,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -11,26 +13,34 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.whatsappcleaner.data.ReminderFreq
 import com.example.whatsappcleaner.data.ReminderTime
 import com.example.whatsappcleaner.data.local.SimpleMediaItem
+import com.example.whatsappcleaner.ui.components.FriendlyState
+import com.example.whatsappcleaner.ui.home.AnalyticsScreen
 import com.example.whatsappcleaner.ui.home.HomeUiState
+import com.example.whatsappcleaner.ui.home.JunkFilesScreen
 import com.example.whatsappcleaner.ui.home.MediaFilter
 import com.example.whatsappcleaner.ui.home.MediaViewerScreen
-import com.example.whatsappcleaner.ui.home.MemeAnalyzerScreen
-import com.example.whatsappcleaner.ui.home.PhoneRealityReportScreen
+import com.example.whatsappcleaner.ui.home.PolishedMemeScreen
+import com.example.whatsappcleaner.ui.home.PolishedPhoneRealityScreen
+import com.example.whatsappcleaner.ui.home.PolishedSmartCleanScreen
 import com.example.whatsappcleaner.ui.home.SimpleHomeScreen
-import com.example.whatsappcleaner.ui.home.SmartCleanScreen
 import com.example.whatsappcleaner.ui.home.SuggestionType
+import com.example.whatsappcleaner.ui.home.SpamMediaScreen
 
 private object Routes {
     const val Home = "home"
     const val SmartClean = "smart_clean"
     const val PhoneReality = "phone_reality"
-    const val MemeAnalyzer = "meme_analyzer"
+    const val MemeScreen = "meme_screen"
+    const val JunkScreen = "junk_screen"
+    const val Analytics = "analytics_screen"
+    const val Spam = "spam_screen"
     const val MediaViewer = "media_viewer"
 }
 
@@ -48,12 +58,13 @@ fun WhatsCleanAppRoot(
     onRequestPermission: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val navController = rememberNavController()
+
     if (!state.permissionGranted) {
         PermissionGate(onRequestPermission = onRequestPermission, modifier = modifier)
         return
     }
 
-    val navController = rememberNavController()
     NavHost(navController = navController, startDestination = Routes.Home, modifier = modifier) {
         composable(Routes.Home) {
             SimpleHomeScreen(
@@ -69,10 +80,13 @@ fun WhatsCleanAppRoot(
                 spamCount = state.spamCount,
                 junkCount = state.junkCount,
                 duplicateCount = state.duplicateCount,
-                onNavigateToSmartClean = { navController.navigate(Routes.SmartClean) },
-                onNavigateToPhoneReality = { navController.navigate(Routes.PhoneReality) },
-                onNavigateToMemeAnalyzer = { navController.navigate(Routes.MemeAnalyzer) },
-                onNavigateToMediaViewer = { navController.navigate(Routes.MediaViewer) },
+                onNavigateToSmartClean = { navController.navigateSingleTop(Routes.SmartClean) },
+                onNavigateToPhoneReality = { navController.navigateSingleTop(Routes.PhoneReality) },
+                onNavigateToMemeAnalyzer = { navController.navigateSingleTop(Routes.MemeScreen) },
+                onNavigateToMediaViewer = { navController.navigateSingleTop(Routes.MediaViewer) },
+                onNavigateToJunk = { navController.navigateSingleTop(Routes.JunkScreen) },
+                onNavigateToAnalytics = { navController.navigateSingleTop(Routes.Analytics) },
+                onNavigateToSpam = { navController.navigateSingleTop(Routes.Spam) },
                 onOpenInSystem = onOpenInSystem,
                 onOpenSystemStorage = onOpenSystemStorage,
                 selectedFrequency = state.selectedFrequency,
@@ -90,30 +104,58 @@ fun WhatsCleanAppRoot(
         }
 
         composable(Routes.SmartClean) {
-            SmartCleanScreen(
+            PolishedSmartCleanScreen(
                 duplicateItems = state.duplicateItems,
                 spamItems = state.spamItems,
                 largeFileItems = state.largeFileItems,
                 sentFiles = state.sentFileItems,
                 onOpenInSystem = onOpenInSystem,
-                onNext = { navController.navigate(Routes.PhoneReality) }
+                onBack = { navController.popBackStack() }
             )
         }
 
         composable(Routes.PhoneReality) {
-            PhoneRealityReportScreen(
+            PolishedPhoneRealityScreen(
                 report = state.report,
-                imagesCount = state.allItems.count { it.mimeType?.startsWith("image") == true },
-                videosCount = state.allItems.count { it.mimeType?.startsWith("video") == true },
-                onNext = { navController.navigate(Routes.MemeAnalyzer) }
+                imageCount = state.allItems.count { it.mimeType?.startsWith("image") == true },
+                videoCount = state.allItems.count { it.mimeType?.startsWith("video") == true },
+                onBack = { navController.popBackStack() }
             )
         }
 
-        composable(Routes.MemeAnalyzer) {
-            MemeAnalyzerScreen(
+        composable(Routes.MemeScreen) {
+            PolishedMemeScreen(
                 memes = state.memeItems,
                 onOpenInSystem = onOpenInSystem,
-                onNext = { navController.navigate(Routes.MediaViewer) }
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Routes.JunkScreen) {
+            JunkFilesScreen(
+                items = state.largeFileItems + state.sentFileItems,
+                onOpenInSystem = onOpenInSystem,
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Routes.Analytics) {
+            AnalyticsScreen(
+                report = state.report,
+                imageCount = state.allItems.count { it.mimeType?.startsWith("image") == true },
+                videoCount = state.allItems.count { it.mimeType?.startsWith("video") == true },
+                memeCount = state.memeCount,
+                duplicateCount = state.duplicateCount,
+                spamCount = state.spamCount,
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Routes.Spam) {
+            SpamMediaScreen(
+                items = state.spamItems,
+                onOpenInSystem = onOpenInSystem,
+                onBack = { navController.popBackStack() }
             )
         }
 
@@ -122,24 +164,39 @@ fun WhatsCleanAppRoot(
                 allItems = state.allItems,
                 spamItems = state.spamItems,
                 duplicateItems = state.duplicateItems,
-                onOpenInSystem = onOpenInSystem
+                onOpenInSystem = onOpenInSystem,
+                onBack = { navController.popBackStack() }
             )
         }
+    }
+}
+
+private fun NavHostController.navigateSingleTop(route: String) {
+    navigate(route) {
+        launchSingleTop = true
     }
 }
 
 @Composable
 private fun PermissionGate(onRequestPermission: () -> Unit, modifier: Modifier = Modifier) {
     Column(
-        modifier = modifier.fillMaxSize().padding(24.dp),
+        modifier = modifier
+            .fillMaxSize()
+            .padding(24.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text("Storage permission needed", style = MaterialTheme.typography.headlineSmall)
-        Text(
-            "Allow image/video access so the app can scan gallery media using scoped storage APIs.",
-            modifier = Modifier.padding(top = 8.dp, bottom = 16.dp)
+        FriendlyState(
+            icon = Icons.Default.Lock,
+            title = "Media permission required",
+            message = "Allow photo and video access so the dashboard can show WhatsApp images, videos, memes, and cleanup suggestions."
         )
-        Button(onClick = onRequestPermission) { Text("Grant access") }
+        Text(
+            "If you previously denied access, grant it from the next system prompt and then tap refresh.",
+            modifier = Modifier.padding(vertical = 16.dp),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
+        )
+        Button(onClick = onRequestPermission) { Text("Grant media access") }
     }
 }

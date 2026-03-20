@@ -81,9 +81,10 @@ class MainActivity : ComponentActivity() {
     private fun openFileInSystem(uri: Uri) {
         val intent = Intent(Intent.ACTION_VIEW).apply {
             setDataAndType(uri, "*/*")
-            flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
-        startActivity(intent)
+        runCatching { startActivity(Intent.createChooser(intent, "Open media")) }
+            .onFailure { openSystemStorage() }
     }
 
     private fun openSystemStorage() {

@@ -155,6 +155,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         var result = when (filter) {
             MediaFilter.IMAGES -> items.filter { it.mimeType?.startsWith("image") == true }
             MediaFilter.VIDEOS -> items.filter { it.mimeType?.startsWith("video") == true }
+            MediaFilter.MEMES -> items.filter { it.name.contains("meme", ignoreCase = true) || it.path.contains("meme", ignoreCase = true) }
+            MediaFilter.DUPLICATES -> items.groupBy { "${it.name.lowercase()}_${it.sizeKb}" }.values.filter { group -> group.size > 1 }.flatten()
             MediaFilter.OTHER -> items.filter { it.mimeType?.startsWith("image") != true && it.mimeType?.startsWith("video") != true }
             MediaFilter.ALL -> items
         }
