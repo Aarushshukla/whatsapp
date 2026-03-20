@@ -491,7 +491,7 @@ private fun SuggestionChip(label: String, selected: Boolean, onClick: () -> Unit
 }
 
 @Composable
-private fun MediaSwipeRow(
+fun MediaSwipeRow(
     item: SimpleMediaItem,
     selected: Boolean,
     onClick: () -> Unit,
