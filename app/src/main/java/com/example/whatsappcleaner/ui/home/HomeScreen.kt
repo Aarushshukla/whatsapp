@@ -34,6 +34,9 @@ import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.Mood
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.VideoLibrary
@@ -45,6 +48,8 @@ import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
@@ -71,6 +76,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.whatsappcleaner.data.ReminderFreq
 import com.example.whatsappcleaner.data.ReminderTime
@@ -256,11 +262,27 @@ fun SimpleHomeScreen(
                     }
                 }
                 item {
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        LegitButton("Refresh", onRefreshClick, Modifier.weight(1f))
-                        LegitButton("Storage", onOpenSystemStorage, Modifier.weight(1f))
-                        LegitButton(
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        ActionButton(
+                            text = "Refresh",
+                            icon = Icons.Default.Refresh,
+                            onClick = onRefreshClick,
+                            modifier = Modifier.weight(1f)
+                        )
+                        ActionButton(
+                            text = "Storage",
+                            icon = Icons.Default.Storage,
+                            onClick = onOpenSystemStorage,
+                            modifier = Modifier.weight(1f)
+                        )
+                        ActionButton(
                             text = "Review (${selected.size})",
+                            icon = Icons.Default.Visibility,
                             onClick = {
                                 val first = items.firstOrNull { it.uri.toString() in selected }
                                 if (first != null) onOpenInSystem(first) else onNavigateToMediaViewer()
@@ -296,6 +318,45 @@ fun SimpleHomeScreen(
             containerColor = SurfaceWhite,
             tonalElevation = 0.dp
         )
+    }
+}
+
+@Composable
+private fun ActionButton(
+    text: String,
+    icon: ImageVector,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true
+) {
+    Button(
+        onClick = onClick,
+        enabled = enabled,
+        shape = RoundedCornerShape(16.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = Color(0xFF3B82F6),
+            contentColor = Color.White,
+            disabledContainerColor = Color(0xFF3B82F6).copy(alpha = 0.45f),
+            disabledContentColor = Color.White.copy(alpha = 0.85f)
+        ),
+        elevation = ButtonDefaults.buttonElevation(defaultElevation = 5.dp, pressedElevation = 2.dp),
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+        modifier = modifier.height(56.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp))
+            Spacer(modifier = Modifier.size(8.dp))
+            Text(
+                text = text,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                style = MaterialTheme.typography.titleSmall
+            )
+        }
     }
 }
 
