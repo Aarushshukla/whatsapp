@@ -1,6 +1,5 @@
 package com.example.whatsappcleaner.ui.components
 
-import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
@@ -38,10 +37,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
-import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -64,7 +63,11 @@ fun LegitButton(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (isPressed) 0.96f else 1f, label = "scale")
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.95f else 1f,
+        animationSpec = tween(durationMillis = 350),
+        label = "scale"
+    )
 
     Button(
         onClick = onClick,
@@ -79,7 +82,7 @@ fun LegitButton(
         elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp, pressedElevation = 1.dp),
         modifier = modifier
             .height(54.dp)
-            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .scale(scale)
     ) {
         Text(text, style = MaterialTheme.typography.titleMedium)
     }
@@ -94,7 +97,11 @@ fun GradientHeroButton(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (isPressed) 0.97f else 1f, label = "hero_scale")
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.95f else 1f,
+        animationSpec = tween(durationMillis = 350),
+        label = "hero_scale"
+    )
     val brush = Brush.horizontalGradient(listOf(AccentBlue, AccentPurple))
 
     Button(
@@ -105,7 +112,7 @@ fun GradientHeroButton(
         contentPadding = androidx.compose.foundation.layout.PaddingValues(),
         modifier = modifier
             .height(60.dp)
-            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .scale(scale)
     ) {
         Row(
             modifier = Modifier
@@ -138,25 +145,20 @@ fun LegitCard(
 
 fun Modifier.shimmerEffect(): Modifier = composed {
     val transition = rememberInfiniteTransition(label = "shimmer")
-    val translateAnim by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1000f,
+    val animatedAlpha by transition.animateFloat(
+        initialValue = 0.3f,
+        targetValue = 0.7f,
         animationSpec = infiniteRepeatable(
-            animation = tween(1100, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
+            animation = tween(durationMillis = 650),
+            repeatMode = RepeatMode.Reverse
         ),
-        label = "anim"
+        label = "shimmer_alpha"
     )
-    val brush = Brush.linearGradient(
-        colors = listOf(
-            Color.White.copy(alpha = 0.08f),
-            Color.White.copy(alpha = 0.18f),
-            Color.White.copy(alpha = 0.08f)
-        ),
-        start = Offset.Zero,
-        end = Offset(translateAnim, translateAnim)
-    )
-    background(brush, RoundedCornerShape(18.dp))
+
+    background(
+        color = SurfaceMuted.copy(alpha = animatedAlpha),
+        shape = RoundedCornerShape(18.dp)
+    ).alpha(animatedAlpha)
 }
 
 @Composable
@@ -186,9 +188,15 @@ fun FriendlyState(
 
 @Composable
 fun StorageRing(progress: Float, label: String, subtitle: String, modifier: Modifier = Modifier) {
+    val animatedProgress by animateFloatAsState(
+        targetValue = progress.coerceIn(0f, 1f),
+        animationSpec = tween(durationMillis = 600),
+        label = "storage_progress"
+    )
+
     Box(modifier = modifier.size(90.dp), contentAlignment = Alignment.Center) {
         CircularProgressIndicator(
-            progress = { progress.coerceIn(0f, 1f) },
+            progress = { animatedProgress },
             trackColor = SurfaceMuted,
             strokeWidth = 8.dp,
             color = AccentBlue,
@@ -196,7 +204,12 @@ fun StorageRing(progress: Float, label: String, subtitle: String, modifier: Modi
         )
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(label, style = MaterialTheme.typography.titleMedium, color = TextMain)
-            Text(subtitle, style = MaterialTheme.typography.labelSmall, color = TextSecondary, textAlign = TextAlign.Center)
+            Text(
+                subtitle,
+                style = MaterialTheme.typography.labelSmall,
+                color = TextSecondary,
+                textAlign = TextAlign.Center
+            )
         }
     }
 }

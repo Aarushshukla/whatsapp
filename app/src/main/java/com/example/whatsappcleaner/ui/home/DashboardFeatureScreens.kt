@@ -4,10 +4,13 @@ package com.example.whatsappcleaner.ui.home
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,10 +20,9 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Analytics
@@ -38,13 +40,14 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -54,14 +57,15 @@ import com.example.whatsappcleaner.data.local.formatSize
 import com.example.whatsappcleaner.ui.components.FriendlyState
 import com.example.whatsappcleaner.ui.components.LegitButton
 import com.example.whatsappcleaner.ui.components.LegitCard
-import com.example.whatsappcleaner.ui.components.StorageRing
 import com.example.whatsappcleaner.ui.components.StorageHeatMap
+import com.example.whatsappcleaner.ui.components.StorageRing
 import com.example.whatsappcleaner.ui.theme.AccentBlue
 import com.example.whatsappcleaner.ui.theme.AccentGreen
 import com.example.whatsappcleaner.ui.theme.BrandNavy
 import com.example.whatsappcleaner.ui.theme.PrimaryBackground
 import com.example.whatsappcleaner.ui.theme.TextMain
 import com.example.whatsappcleaner.ui.theme.TextSecondary
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -100,8 +104,10 @@ fun JunkFilesScreen(items: List<SimpleMediaItem>, onOpenInSystem: (SimpleMediaIt
             FriendlyState(Icons.Default.CleaningServices, "✨ Junk under control", "No junk files are currently flagged.")
         } else {
             LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                items(items.take(20), key = { it.uri.toString() }) { item ->
-                    SimpleActionCard(Icons.Default.DeleteSweep, item.name, formatSize(item.sizeKb.toLong() * 1024L), { onOpenInSystem(item) })
+                itemsIndexed(items.take(20), key = { _, item -> item.uri.toString() }) { index, item ->
+                    AnimatedListItem(index = index) {
+                        SimpleActionCard(Icons.Default.DeleteSweep, item.name, formatSize(item.sizeKb.toLong() * 1024L), { onOpenInSystem(item) })
+                    }
                 }
             }
         }
@@ -110,6 +116,9 @@ fun JunkFilesScreen(items: List<SimpleMediaItem>, onOpenInSystem: (SimpleMediaIt
 
 @Composable
 fun AnalyticsScreen(report: StorageReport, imageCount: Int, videoCount: Int, memeCount: Int, duplicateCount: Int, spamCount: Int, onBack: () -> Unit) {
+    val indexedProgress = if (report.totalFiles == 0) 0f else (imageCount + videoCount).toFloat() / report.totalFiles.toFloat()
+    val indexedPercent = (indexedProgress * 100).toInt()
+
     FeatureScreenScaffold("Storage Analytics", "Breakdown, heatmap, and storage health", onBack) {
         LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             item {
@@ -118,11 +127,12 @@ fun AnalyticsScreen(report: StorageReport, imageCount: Int, videoCount: Int, mem
                         Column(modifier = Modifier.weight(1f)) {
                             Text("📊 Storage snapshot", color = TextMain, style = MaterialTheme.typography.titleLarge)
                             Text("${report.totalFiles} files • ${formatSize(report.totalSize)}", color = TextSecondary)
+                            Text("$indexedPercent% storage used", color = AccentBlue, fontWeight = FontWeight.Bold)
                         }
                         StorageRing(
-                            progress = if (report.totalFiles == 0) 0f else (imageCount + videoCount).toFloat() / report.totalFiles.toFloat(),
-                            label = formatSize(report.totalSize),
-                            subtitle = "indexed media"
+                            progress = indexedProgress,
+                            label = "$indexedPercent%",
+                            subtitle = "storage used"
                         )
                     }
                 }
@@ -161,8 +171,10 @@ fun SpamMediaScreen(items: List<SimpleMediaItem>, onOpenInSystem: (SimpleMediaIt
             FriendlyState(Icons.Default.Security, "🛡 Inbox looks clean", "No spam-like media was found.")
         } else {
             LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                items(items.take(20), key = { it.uri.toString() }) { item ->
-                    SimpleActionCard(Icons.Default.Security, item.name, item.mimeType ?: "Unknown", { onOpenInSystem(item) })
+                itemsIndexed(items.take(20), key = { _, item -> item.uri.toString() }) { index, item ->
+                    AnimatedListItem(index = index) {
+                        SimpleActionCard(Icons.Default.Security, item.name, item.mimeType ?: "Unknown", { onOpenInSystem(item) })
+                    }
                 }
             }
         }
@@ -178,33 +190,57 @@ fun PolishedSmartCleanScreen(
     onOpenInSystem: (SimpleMediaItem) -> Unit,
     onBack: () -> Unit
 ) {
-    var celebrate by remember { mutableStateOf(false) }
+    var successMessage by remember { mutableStateOf<String?>(null) }
     val recoverableBytes = (duplicateItems + spamItems + largeFileItems + sentFiles).distinctBy { it.uri }.sumOf { it.sizeKb.toLong() * 1024L }
-    val scale by animateFloatAsState(if (celebrate) 1f else 0.92f, label = "success_scale")
+    val scale by animateFloatAsState(
+        targetValue = if (successMessage != null) 1f else 0.84f,
+        animationSpec = tween(420),
+        label = "success_scale"
+    )
+
+    LaunchedEffect(successMessage) {
+        if (successMessage != null) {
+            delay(1800)
+            successMessage = null
+        }
+    }
 
     FeatureScreenScaffold("Smart Clean", "High-confidence cleanup suggestions", onBack) {
         LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            item {
+                AnimatedVisibility(
+                    visible = successMessage != null,
+                    enter = fadeIn(animationSpec = tween(360)) + scaleIn(animationSpec = tween(360), initialScale = 0.8f),
+                    exit = fadeOut(animationSpec = tween(260)) + scaleOut(animationSpec = tween(260), targetScale = 0.92f)
+                ) {
+                    successMessage?.let { message ->
+                        LegitCard {
+                            Box(modifier = Modifier.fillMaxWidth().padding(18.dp), contentAlignment = Alignment.Center) {
+                                Text(
+                                    text = message,
+                                    color = AccentGreen,
+                                    modifier = Modifier.scale(scale),
+                                    fontWeight = FontWeight.Bold,
+                                    style = MaterialTheme.typography.titleLarge
+                                )
+                            }
+                        }
+                    }
+                }
+            }
             item {
                 LegitCard {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Text("Potential cleanup", color = TextMain, style = MaterialTheme.typography.titleLarge)
                         Text("We found ${duplicateItems.size + spamItems.size + largeFileItems.size + sentFiles.size} review items.", color = TextSecondary)
                         LegitButton("Open best candidate", onClick = {
-                            celebrate = true
+                            successMessage = if (recoverableBytes > 0) {
+                                "🎉 ${formatSize(recoverableBytes)} Freed!"
+                            } else {
+                                "🎉 Storage Cleaned!"
+                            }
                             (largeFileItems.firstOrNull() ?: duplicateItems.firstOrNull() ?: spamItems.firstOrNull() ?: sentFiles.firstOrNull())?.let(onOpenInSystem)
                         })
-                        AnimatedVisibility(
-                            visible = celebrate,
-                            enter = fadeIn() + scaleIn(),
-                            exit = fadeOut() + scaleOut()
-                        ) {
-                            Text(
-                                text = "🎉 ${formatSize(recoverableBytes)} Freed!",
-                                color = AccentGreen,
-                                modifier = Modifier.padding(top = 4.dp).graphicsLayer { scaleX = scale; scaleY = scale },
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
                     }
                 }
             }
@@ -216,26 +252,28 @@ fun PolishedSmartCleanScreen(
                     statBox("🛡 ${spamItems.size}", "Spam")
                 }
             }
-            items(
+            itemsIndexed(
                 listOf(
                     Triple("Duplicates", duplicateItems, Icons.Default.AutoAwesome),
                     Triple("Spam Media", spamItems, Icons.Default.Security),
                     Triple("Large Files", largeFileItems, Icons.Default.Analytics),
                     Triple("Sent Files", sentFiles, Icons.Default.VideoLibrary)
                 )
-            ) { (title, items, icon) ->
-                LegitCard {
-                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Icon(icon, contentDescription = null, tint = AccentBlue)
-                            Text(title, color = TextMain, style = MaterialTheme.typography.titleMedium)
-                        }
-                        Text("${items.size} files", color = TextSecondary)
-                        items.take(3).forEach { item ->
-                            Text("• ${item.name}", color = TextMain)
-                        }
-                        items.firstOrNull()?.let { first ->
-                            LegitButton("Review sample", onClick = { onOpenInSystem(first) })
+            ) { index, (title, items, icon) ->
+                AnimatedListItem(index = index) {
+                    LegitCard {
+                        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Icon(icon, contentDescription = null, tint = AccentBlue)
+                                Text(title, color = TextMain, style = MaterialTheme.typography.titleMedium)
+                            }
+                            Text("${items.size} files", color = TextSecondary)
+                            items.take(3).forEach { item ->
+                                Text("• ${item.name}", color = TextMain)
+                            }
+                            items.firstOrNull()?.let { first ->
+                                LegitButton("Review sample", onClick = { onOpenInSystem(first) })
+                            }
                         }
                     }
                 }
@@ -283,11 +321,34 @@ fun PolishedMemeScreen(memes: List<SimpleMediaItem>, onOpenInSystem: (SimpleMedi
             FriendlyState(Icons.Default.Image, "😂 Meme folder is calm", "No memes were detected in the current scan.")
         } else {
             LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                items(memes, key = { it.uri.toString() }) { item ->
-                    SimpleActionCard(Icons.Default.Image, item.name, formatSize(item.sizeKb.toLong() * 1024L), { onOpenInSystem(item) })
+                itemsIndexed(memes, key = { _, item -> item.uri.toString() }) { index, item ->
+                    AnimatedListItem(index = index) {
+                        SimpleActionCard(Icons.Default.Image, item.name, formatSize(item.sizeKb.toLong() * 1024L), { onOpenInSystem(item) })
+                    }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun AnimatedListItem(index: Int, content: @Composable () -> Unit) {
+    var visible by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        delay((index * 70).toLong())
+        visible = true
+    }
+
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(animationSpec = tween(420)) + slideInVertically(
+            animationSpec = tween(420),
+            initialOffsetY = { it / 3 }
+        ),
+        exit = fadeOut(animationSpec = tween(320)) + shrinkVertically(animationSpec = tween(320))
+    ) {
+        content()
     }
 }
 
