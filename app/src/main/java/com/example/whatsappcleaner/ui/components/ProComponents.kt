@@ -73,7 +73,7 @@ fun LegitButton(
         onClick = onClick,
         enabled = enabled,
         interactionSource = interactionSource,
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(20.dp),
         colors = ButtonDefaults.buttonColors(
             containerColor = if (isDestructive) AccentError else AccentBlue,
             contentColor = Color.White,
@@ -107,7 +107,7 @@ fun GradientHeroButton(
     Button(
         onClick = onClick,
         interactionSource = interactionSource,
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(20.dp),
         colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent, contentColor = Color.White),
         contentPadding = androidx.compose.foundation.layout.PaddingValues(),
         modifier = modifier
@@ -117,7 +117,7 @@ fun GradientHeroButton(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(brush, RoundedCornerShape(24.dp))
+                .background(brush, RoundedCornerShape(20.dp))
                 .padding(horizontal = 20.dp, vertical = 16.dp),
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically
@@ -137,7 +137,7 @@ fun LegitCard(
     Card(
         colors = CardDefaults.cardColors(containerColor = SurfaceWhite),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        shape = RoundedCornerShape(22.dp),
+        shape = RoundedCornerShape(20.dp),
         modifier = modifier.fillMaxWidth(),
         content = content
     )
