@@ -2,21 +2,19 @@ package com.example.whatsappcleaner.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// --- The "Legit" Professional Palette ---
+val PrimaryBackground = Color(0xFF0F172A)
+val SurfaceWhite = Color(0xFF1E293B)
+val SurfaceMuted = Color(0xFF334155)
 
-// 60% Neutral (Backgrounds)
-val PrimaryBackground = Color(0xFFF8FAFC) // Slate-50 (Modern Grey-White)
-val SurfaceWhite      = Color(0xFFFFFFFF) // Pure White (Cards)
+val BrandNavy = Color(0xFFE2E8F0)
+val BrandSecondary = Color(0xFFCBD5E1)
 
-// 30% Brand (Identity)
-val BrandNavy         = Color(0xFF0F172A) // Slate-900 (Headers/Menu)
-val BrandSecondary    = Color(0xFF334155) // Slate-700 (Sub-text)
+val AccentBlue = Color(0xFF3B82F6)
+val AccentPurple = Color(0xFF8B5CF6)
+val AccentGreen = Color(0xFF10B981)
+val AccentError = Color(0xFFEF4444)
+val AccentWarning = Color(0xFFF59E0B)
 
-// 10% Accents (Action)
-val AccentBlue        = Color(0xFF3B82F6) // Royal Blue (Primary Buttons)
-val AccentGreen       = Color(0xFF10B981) // Emerald (Success/Safe)
-val AccentError       = Color(0xFFEF4444) // Red (Destructive)
-
-// Text
-val TextMain          = Color(0xFF1E293B) // High Contrast
-val TextSecondary     = Color(0xFF64748B) // Medium Contrast
+val TextMain = Color(0xFFF8FAFC)
+val TextSecondary = Color(0xFF94A3B8)
+val DividerColor = Color(0xFF475569)

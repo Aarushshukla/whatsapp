@@ -9,6 +9,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.example.whatsappcleaner.ui.theme.AccentBlue
+import com.example.whatsappcleaner.ui.theme.SurfaceMuted
+import com.example.whatsappcleaner.ui.theme.TextMain
+import com.example.whatsappcleaner.ui.theme.TextSecondary
 
 @Composable
 fun StorageHeatMap(
@@ -24,7 +28,7 @@ fun StorageHeatMap(
         HeatRow("Videos", videosPct)
         HeatRow("Memes", memesPct)
         HeatRow("Duplicates", duplicatesPct)
-        HeatRow("Spam", spamPct)
+        HeatRow("Spam / Junk", spamPct)
     }
 }
 
@@ -33,12 +37,21 @@ private fun HeatRow(label: String, percentage: Float) {
     Text(
         text = "$label ${(percentage * 100).toInt()}%",
         style = MaterialTheme.typography.labelLarge,
+        color = TextMain,
         modifier = Modifier.padding(top = 8.dp)
     )
     LinearProgressIndicator(
         progress = { percentage.coerceIn(0f, 1f) },
+        color = AccentBlue,
+        trackColor = SurfaceMuted,
         modifier = Modifier
             .fillMaxWidth()
             .padding(top = 4.dp)
+    )
+    Text(
+        text = "Used for quick visual storage breakdown.",
+        style = MaterialTheme.typography.bodySmall,
+        color = TextSecondary,
+        modifier = Modifier.padding(top = 4.dp)
     )
 }
