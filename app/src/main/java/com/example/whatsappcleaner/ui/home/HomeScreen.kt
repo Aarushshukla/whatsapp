@@ -300,7 +300,9 @@ fun SimpleHomeScreen(
                 }
 
                 if (isLoading) {
-                    gridItems(6) { MediaGridShimmer() }
+                    repeat(6) {
+                        item { MediaGridShimmer() }
+                    }
                 } else if (items.isEmpty()) {
                     item(span = { GridItemSpan(maxLineSpan) }) {
                         LegitCard {
