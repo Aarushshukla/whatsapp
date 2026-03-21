@@ -33,7 +33,7 @@ class ReminderWorker(
 
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle("WhatsApp Cleaner")
+            .setContentTitle("Cleanly AI")
             .setContentText("Today you added ~$sizeText. Review now?")
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setAutoCancel(true)
@@ -50,8 +50,8 @@ class ReminderWorker(
 
     private fun createChannel(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(CHANNEL_ID, "WhatsClean Reminders", NotificationManager.IMPORTANCE_DEFAULT).apply {
-                description = "Daily reminders to review WhatsApp media"
+            val channel = NotificationChannel(CHANNEL_ID, "Cleanly AI Reminders", NotificationManager.IMPORTANCE_DEFAULT).apply {
+                description = "Daily reminders to review space and cleanup opportunities"
             }
             (context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).createNotificationChannel(channel)
         }

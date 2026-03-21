@@ -36,31 +36,30 @@ android {
 
 dependencies {
     val composeBom = platform("androidx.compose:compose-bom:2024.04.01")
+    val firebaseBom = platform("com.google.firebase:firebase-bom:34.1.0")
+
     implementation(composeBom)
+    implementation(firebaseBom)
+
     implementation("androidx.work:work-runtime-ktx:2.9.0")
-
-
-    implementation("androidx.work:work-runtime-ktx:2.9.0") // For Timer
-    implementation("com.airbnb.android:lottie-compose:6.3.0") // For Animations
-    implementation("androidx.compose.material:material-icons-extended:1.6.0") // For Icons
+    implementation("com.airbnb.android:lottie-compose:6.3.0")
+    implementation("androidx.compose.material:material-icons-extended:1.6.0")
 
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.4")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.4")
     implementation("androidx.activity:activity-compose:1.9.1")
     implementation("androidx.navigation:navigation-compose:2.7.7")
 
     implementation("io.coil-kt:coil-compose:2.4.0")
-    implementation("io.coil-kt:coil-video:2.4.0") // <-- Add this for video thumbnails
+    implementation("io.coil-kt:coil-video:2.4.0")
 
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.ui:ui-tooling-preview")
     debugImplementation("androidx.compose.ui:ui-tooling")
 
-    //implementation("androidx.room:room-runtime:2.6.1")
-    //implementation("androidx.room:room-ktx:2.6.1")
-
-
-    implementation("androidx.work:work-runtime-ktx:2.9.0")
+    implementation("com.android.billingclient:billing-ktx:7.1.1")
+    implementation("com.google.firebase:firebase-analytics-ktx")
     implementation("org.tensorflow:tensorflow-lite:2.14.0")
 }

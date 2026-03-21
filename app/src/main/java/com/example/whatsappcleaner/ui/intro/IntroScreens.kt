@@ -39,7 +39,7 @@ fun SplashScreen(onSplashFinished: () -> Unit) {
                 // Logo Placeholder
                 Box(Modifier.size(80.dp).background(AccentBlue, CircleShape))
                 Spacer(Modifier.height(16.dp))
-                Text("Cleaner Pro", style = MaterialTheme.typography.displaySmall, color = Color.White, fontWeight = FontWeight.Bold)
+                Text("Cleanly AI", style = MaterialTheme.typography.displaySmall, color = Color.White, fontWeight = FontWeight.Bold)
             }
         }
     }

@@ -188,7 +188,9 @@ fun PolishedSmartCleanScreen(
     largeFileItems: List<SimpleMediaItem>,
     sentFiles: List<SimpleMediaItem>,
     onOpenInSystem: (SimpleMediaItem) -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onShareResult: () -> Unit,
+    onCleanupRecorded: (Long) -> Unit
 ) {
     var successMessage by remember { mutableStateOf<String?>(null) }
     val recoverableBytes = (duplicateItems + spamItems + largeFileItems + sentFiles).distinctBy { it.uri }.sumOf { it.sizeKb.toLong() * 1024L }
@@ -235,12 +237,18 @@ fun PolishedSmartCleanScreen(
                         Text("We found ${duplicateItems.size + spamItems.size + largeFileItems.size + sentFiles.size} review items.", color = TextSecondary)
                         LegitButton("Open best candidate", onClick = {
                             successMessage = if (recoverableBytes > 0) {
-                                "🎉 ${formatSize(recoverableBytes)} Freed!"
+                                "🎉 Freed ${formatSize(recoverableBytes)}!"
                             } else {
                                 "🎉 Storage Cleaned!"
                             }
+                            onCleanupRecorded(recoverableBytes)
                             (largeFileItems.firstOrNull() ?: duplicateItems.firstOrNull() ?: spamItems.firstOrNull() ?: sentFiles.firstOrNull())?.let(onOpenInSystem)
                         })
+                        LegitButton(
+                            text = "Share Result",
+                            onClick = onShareResult,
+                            modifier = Modifier.fillMaxWidth()
+                        )
                     }
                 }
             }
