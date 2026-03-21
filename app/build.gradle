@@ -49,12 +49,14 @@ android {
     }
 }
 
+def composeBom = platform('androidx.compose:compose-bom:2024.09.00')
+def firebaseBom = platform('com.google.firebase:firebase-bom:34.11.0')
+
 dependencies {
-    def composeBom = platform('androidx.compose:compose-bom:2024.09.03')
     implementation composeBom
     androidTestImplementation composeBom
 
-    implementation platform('com.google.firebase:firebase-bom:33.5.1')
+    implementation firebaseBom
 
     implementation 'androidx.core:core-ktx:1.13.1'
     implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.8.7'
@@ -74,8 +76,8 @@ dependencies {
     implementation 'io.coil-kt:coil-video:2.7.0'
     implementation 'com.airbnb.android:lottie-compose:6.6.1'
 
-    implementation 'com.android.billingclient:billing-ktx:7.1.1'
-    implementation 'com.google.firebase:firebase-analytics'
+    implementation 'com.android.billingclient:billing-ktx:8.3.0'
+    implementation 'com.google.firebase:firebase-analytics-ktx'
     implementation 'org.tensorflow:tensorflow-lite:2.14.0'
 
     testImplementation 'junit:junit:4.13.2'
