@@ -8,6 +8,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -24,20 +25,28 @@ import com.example.whatsappcleaner.ui.theme.WhatsCleanTheme
 
 class MainActivity : ComponentActivity() {
 
+    companion object {
+        private const val TAG = "MainActivity"
+    }
+
     private val viewModel: HomeViewModel by viewModels()
     private val subscriptionRepository by lazy { SubscriptionRepository.get(this) }
 
     private val requestPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
             val granted = permissions.all { it.value }
+            Log.d(TAG, "Permission result: $permissions")
             viewModel.updatePermissionStatus(granted)
             if (granted) {
                 viewModel.refreshMedia()
+            } else {
+                Log.w(TAG, "Media permissions denied. Showing fallback UI.")
             }
         }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        Log.d(TAG, "onCreate called.")
         subscriptionRepository.start()
         syncPermissionState()
 
@@ -99,6 +108,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        Log.d(TAG, "onResume called. Refreshing purchases and permission state.")
         subscriptionRepository.refreshPurchases()
         syncPermissionState()
     }
@@ -119,6 +129,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun requestStoragePermissions() {
+        Log.d(TAG, "Requesting media permissions: ${requiredPermissions().joinToString()}")
         requestPermissionLauncher.launch(requiredPermissions())
     }
 
@@ -128,13 +139,20 @@ class MainActivity : ComponentActivity() {
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         runCatching { startActivity(Intent.createChooser(intent, "Open media")) }
-            .onFailure { openSystemStorage() }
+            .onFailure { error ->
+                Log.e(TAG, "Unable to open media file in system app.", error)
+                openSystemStorage()
+            }
     }
 
     private fun openSystemStorage() {
         val intent = Intent(Settings.ACTION_INTERNAL_STORAGE_SETTINGS)
         runCatching { startActivity(intent) }
-            .onFailure { startActivity(Intent(Settings.ACTION_SETTINGS)) }
+            .onFailure { error ->
+                Log.e(TAG, "Unable to open internal storage settings.", error)
+                runCatching { startActivity(Intent(Settings.ACTION_SETTINGS)) }
+                    .onFailure { fallbackError -> Log.e(TAG, "Unable to open Android settings.", fallbackError) }
+            }
     }
 
     private fun shareText(text: String) {
@@ -142,7 +160,8 @@ class MainActivity : ComponentActivity() {
             type = "text/plain"
             putExtra(Intent.EXTRA_TEXT, text)
         }
-        startActivity(Intent.createChooser(intent, "Share Cleanly AI"))
+        runCatching { startActivity(Intent.createChooser(intent, "Share Cleanly AI")) }
+            .onFailure { error -> Log.e(TAG, "Unable to share text.", error) }
     }
 
     private fun rateApp() {
@@ -150,18 +169,28 @@ class MainActivity : ComponentActivity() {
         val webUri = Uri.parse("https://play.google.com/store/apps/details?id=$packageName")
         val intent = Intent(Intent.ACTION_VIEW, appUri)
         runCatching { startActivity(intent) }
-            .onFailure { startActivity(Intent(Intent.ACTION_VIEW, webUri)) }
+            .onFailure { error ->
+                Log.e(TAG, "Unable to open Play Store rating page.", error)
+                runCatching { startActivity(Intent(Intent.ACTION_VIEW, webUri)) }
+                    .onFailure { fallbackError -> Log.e(TAG, "Unable to open web Play Store page.", fallbackError) }
+            }
     }
 
     private fun openManageSubscription() {
         val webUri = Uri.parse("https://play.google.com/store/account/subscriptions?package=$packageName")
         runCatching { startActivity(Intent(Intent.ACTION_VIEW, webUri)) }
-            .onFailure { rateApp() }
+            .onFailure { error ->
+                Log.e(TAG, "Unable to open subscription management page.", error)
+                rateApp()
+            }
     }
 
     private fun openUrl(url: String) {
         runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
-            .onFailure { openSystemStorage() }
+            .onFailure { error ->
+                Log.e(TAG, "Unable to open url: $url", error)
+                openSystemStorage()
+            }
     }
 
     private fun sendEmail(address: String, subject: String) {
@@ -171,7 +200,8 @@ class MainActivity : ComponentActivity() {
         }
         try {
             startActivity(Intent.createChooser(intent, "Contact Cleanly AI"))
-        } catch (_: ActivityNotFoundException) {
+        } catch (error: ActivityNotFoundException) {
+            Log.e(TAG, "No email app available.", error)
             shareText("Reach us at $address")
         }
     }

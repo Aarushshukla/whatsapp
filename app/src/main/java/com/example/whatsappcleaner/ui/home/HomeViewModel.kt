@@ -1,6 +1,7 @@
 package com.example.whatsappcleaner.ui.home
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.whatsappcleaner.ai.ImageCategory
@@ -80,6 +81,10 @@ fun generateTimeOptions(): List<ReminderTime> = (0..23).map { hour ->
 
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
+    companion object {
+        private const val TAG = "HomeViewModel"
+    }
+
     private val mediaLoader = MediaLoader(application)
     private val smartJunkAnalyzer = SmartJunkAnalyzer()
     private val spamMediaAnalyzer = SpamMediaAnalyzer()
@@ -103,6 +108,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun updatePermissionStatus(granted: Boolean) {
+        Log.d(TAG, "Permission state updated: granted=$granted")
         _uiState.update { it.copy(permissionGranted = granted) }
         if (granted) refreshMedia() else _uiState.update { it.copy(summaryInfo = "Permission needed to scan.", isLoading = false) }
     }
@@ -110,6 +116,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     fun refreshMedia() {
         if (!_uiState.value.permissionGranted) return
         viewModelScope.launch {
+            Log.d(TAG, "Refreshing media library.")
             _uiState.update { it.copy(summaryInfo = "Scanning...", isLoading = true) }
             try {
                 val images = mediaLoader.loadAllDeviceMedia("image")
@@ -127,8 +134,10 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
                 val totalSize = allItems.sumOf { it.sizeKb.toLong() * 1024 }
                 val summary = if (allItems.isEmpty()) {
+                    Log.d(TAG, "No media items found on device.")
                     "No media found."
                 } else {
+                    Log.d(TAG, "Loaded ${allItems.size} media items.")
                     "Found ${allItems.size} files (${formatSize(totalSize)})"
                 }
 
@@ -164,7 +173,11 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                         )
                     )
                 }
+            } catch (error: SecurityException) {
+                Log.e(TAG, "Media scan failed due to permission issue.", error)
+                _uiState.update { it.copy(summaryInfo = "Scan failed: permission denied", isLoading = false) }
             } catch (error: Exception) {
+                Log.e(TAG, "Media scan failed.", error)
                 _uiState.update { it.copy(summaryInfo = "Scan failed: ${error.message ?: "Unknown error"}", isLoading = false) }
             }
         }

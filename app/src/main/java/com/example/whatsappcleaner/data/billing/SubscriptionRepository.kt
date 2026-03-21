@@ -3,6 +3,7 @@ package com.example.whatsappcleaner.data.billing
 import android.app.Activity
 import android.content.Context
 import android.content.SharedPreferences
+import android.util.Log
 import com.android.billingclient.api.AcknowledgePurchaseParams
 import com.android.billingclient.api.BillingClient
 import com.android.billingclient.api.BillingClientStateListener
@@ -11,7 +12,6 @@ import com.android.billingclient.api.BillingResult
 import com.android.billingclient.api.PendingPurchasesParams
 import com.android.billingclient.api.ProductDetails
 import com.android.billingclient.api.Purchase
-import com.android.billingclient.api.PurchasesResponseListener
 import com.android.billingclient.api.QueryProductDetailsParams
 import com.android.billingclient.api.QueryPurchasesParams
 import com.example.whatsappcleaner.data.analytics.AppAnalytics
@@ -20,9 +20,12 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 
+private const val TAG = "SubscriptionRepo"
 private const val PREFS_NAME = "subscription_prefs"
 private const val KEY_IS_PRO = "is_pro_user"
 private const val KEY_PLAN = "current_plan"
+private const val KEY_BILLING_MESSAGE = "billing_message"
+
 
 enum class BillingProduct(val productId: String, val productType: String, val label: String) {
     MONTHLY("cleanly_ai_monthly", BillingClient.ProductType.SUBS, "Monthly"),
@@ -53,7 +56,8 @@ class SubscriptionRepository private constructor(context: Context) {
     private val _state = MutableStateFlow(
         SubscriptionState(
             isProUser = prefs.getBoolean(KEY_IS_PRO, false),
-            currentPlan = SubscriptionPlan.valueOf(prefs.getString(KEY_PLAN, SubscriptionPlan.FREE.name) ?: SubscriptionPlan.FREE.name)
+            currentPlan = safePlan(prefs.getString(KEY_PLAN, SubscriptionPlan.FREE.name)),
+            lastMessage = prefs.getString(KEY_BILLING_MESSAGE, null)
         )
     )
     val state: StateFlow<SubscriptionState> = _state.asStateFlow()
@@ -61,65 +65,114 @@ class SubscriptionRepository private constructor(context: Context) {
     private val billingClient: BillingClient by lazy {
         BillingClient.newBuilder(appContext)
             .setListener(::onPurchasesUpdated)
-            .enablePendingPurchases(PendingPurchasesParams.newBuilder().enableOneTimeProducts().build())
+            .enablePendingPurchases(
+                PendingPurchasesParams.newBuilder()
+                    .enableOneTimeProducts()
+                    .build()
+            )
             .build()
     }
 
     fun start() {
         if (billingClient.isReady) {
+            Log.d(TAG, "Billing client already ready.")
             queryCatalogAndPurchases()
             return
         }
-        billingClient.startConnection(object : BillingClientStateListener {
-            override fun onBillingSetupFinished(result: BillingResult) {
-                val ready = result.responseCode == BillingClient.BillingResponseCode.OK
-                _state.update { it.copy(billingReady = ready, lastMessage = result.debugMessage.takeIf { msg -> msg.isNotBlank() }) }
-                if (ready) queryCatalogAndPurchases()
-            }
+        runCatching {
+            Log.d(TAG, "Starting BillingClient connection.")
+            billingClient.startConnection(object : BillingClientStateListener {
+                override fun onBillingSetupFinished(result: BillingResult) {
+                    Log.d(TAG, "Billing setup finished: code=${result.responseCode}, message=${result.debugMessage}")
+                    val ready = result.responseCode == BillingClient.BillingResponseCode.OK
+                    updateMessage(result.debugMessage.ifBlank { if (ready) "Billing ready" else "Billing unavailable" }, ready)
+                    if (ready) {
+                        queryCatalogAndPurchases()
+                    } else {
+                        analytics.trackPurchaseFailed(_state.value.currentPlan.name.lowercase(), "setup_${result.responseCode}")
+                    }
+                }
 
-            override fun onBillingServiceDisconnected() {
-                _state.update { it.copy(billingReady = false, lastMessage = "Billing temporarily unavailable") }
-            }
-        })
+                override fun onBillingServiceDisconnected() {
+                    Log.w(TAG, "Billing service disconnected.")
+                    updateMessage("Billing temporarily unavailable. Purchases can be retried when Play Store reconnects.", false)
+                }
+            })
+        }.onFailure { error ->
+            Log.e(TAG, "Unable to start billing connection.", error)
+            updateMessage("Billing is unavailable on this device right now.", false)
+        }
     }
 
     fun launchPurchase(activity: Activity, product: BillingProduct, source: String): BillingResult? {
-        val details = productDetails[product] ?: run {
-            analytics.trackPurchaseFailed(product.name.lowercase(), "missing_product_details")
-            _state.update { it.copy(lastMessage = "Pricing is still loading. Please try again in a moment.") }
+        if (!billingClient.isReady) {
+            Log.w(TAG, "launchPurchase called before billing was ready.")
+            start()
+            analytics.trackPurchaseFailed(product.name.lowercase(), "billing_not_ready")
+            updateMessage("Play Billing is still connecting. Please try again in a moment.", false)
             return null
         }
+        val details = productDetails[product]
+        if (details == null) {
+            Log.w(TAG, "Missing product details for ${product.productId}.")
+            analytics.trackPurchaseFailed(product.name.lowercase(), "missing_product_details")
+            queryProductDetails()
+            updateMessage("Pricing is still loading. Please try again shortly.", true)
+            return null
+        }
+
         val productParams = BillingFlowParams.ProductDetailsParams.newBuilder()
             .setProductDetails(details)
             .apply {
                 if (product.productType == BillingClient.ProductType.SUBS) {
-                    val offerToken = details.subscriptionOfferDetails?.firstOrNull()?.offerToken
-                    if (offerToken != null) setOfferToken(offerToken)
+                    val offerToken = details.subscriptionOfferDetails
+                        ?.firstOrNull()
+                        ?.offerToken
+                    if (offerToken.isNullOrBlank()) {
+                        Log.w(TAG, "No offer token available for ${product.productId}.")
+                    } else {
+                        setOfferToken(offerToken)
+                    }
                 }
             }
             .build()
+
         analytics.trackPurchaseClicked(product.name.lowercase(), source)
-        return billingClient.launchBillingFlow(
-            activity,
-            BillingFlowParams.newBuilder().setProductDetailsParamsList(listOf(productParams)).build()
-        )
+        return runCatching {
+            Log.d(TAG, "Launching billing flow for ${product.productId} from $source.")
+            billingClient.launchBillingFlow(
+                activity,
+                BillingFlowParams.newBuilder()
+                    .setProductDetailsParamsList(listOf(productParams))
+                    .build()
+            )
+        }.onFailure { error ->
+            Log.e(TAG, "Failed to launch billing flow for ${product.productId}.", error)
+            analytics.trackPurchaseFailed(product.name.lowercase(), "launch_exception")
+            updateMessage("Unable to open the Play purchase sheet right now.", true)
+        }.getOrNull()
     }
 
     fun restorePurchases(source: String = "settings") {
+        Log.d(TAG, "Restoring purchases from $source.")
         analytics.trackRestorePurchaseClicked(source)
-        queryActivePurchases()
+        queryActivePurchases(forceReconnect = true)
     }
 
     fun refreshPurchases() {
-        queryActivePurchases()
+        queryActivePurchases(forceReconnect = false)
     }
 
     private fun queryCatalogAndPurchases() {
         queryProductDetails()
-        queryActivePurchases()
+        queryActivePurchases(forceReconnect = false)
     }
 
     private fun queryProductDetails() {
+        if (!billingClient.isReady) {
+            Log.w(TAG, "queryProductDetails skipped because billing is not ready.")
+            return
+        }
         val products = BillingProduct.entries.map {
             QueryProductDetailsParams.Product.newBuilder()
                 .setProductId(it.productId)
@@ -127,8 +180,16 @@ class SubscriptionRepository private constructor(context: Context) {
                 .build()
         }
         billingClient.queryProductDetailsAsync(
-            QueryProductDetailsParams.newBuilder().setProductList(products).build()
-        ) { _, detailsList ->
+            QueryProductDetailsParams.newBuilder()
+                .setProductList(products)
+                .build()
+        ) { result, detailsList ->
+            Log.d(TAG, "Product details response: code=${result.responseCode}, count=${detailsList.size}")
+            if (result.responseCode != BillingClient.BillingResponseCode.OK) {
+                updateMessage(result.debugMessage.ifBlank { "Unable to load pricing from Play Billing." }, true)
+                return@queryProductDetailsAsync
+            }
+
             val priceMap = buildMap {
                 detailsList.forEach { details ->
                     val match = BillingProduct.entries.firstOrNull { it.productId == details.productId } ?: return@forEach
@@ -142,49 +203,77 @@ class SubscriptionRepository private constructor(context: Context) {
                             ?.formattedPrice
                         BillingProduct.LIFETIME -> details.oneTimePurchaseOfferDetails?.formattedPrice
                     }
-                    if (formattedPrice != null) put(match, formattedPrice)
+                    if (!formattedPrice.isNullOrBlank()) {
+                        put(match, formattedPrice)
+                    }
                 }
             }
-            _state.update { current -> current.copy(prices = priceMap.ifEmpty { current.prices }) }
+
+            _state.update { current ->
+                current.copy(
+                    prices = if (priceMap.isEmpty()) current.prices else priceMap,
+                    billingReady = true,
+                    lastMessage = if (priceMap.isEmpty()) "Pricing unavailable. You can try again later." else current.lastMessage
+                )
+            }
         }
     }
 
-    private fun queryActivePurchases() {
-        if (!billingClient.isReady) return
-        val results = mutableListOf<Purchase>()
-        val listener = PurchasesResponseListener { _, purchases ->
-            results += purchases
-            if (results.size >= 0) updateFromPurchases(results)
-        }
-        billingClient.queryPurchasesAsync(
-            QueryPurchasesParams.newBuilder().setProductType(BillingClient.ProductType.SUBS).build(),
-            listener
-        )
-        billingClient.queryPurchasesAsync(
-            QueryPurchasesParams.newBuilder().setProductType(BillingClient.ProductType.INAPP).build(),
-            listener
-        )
-    }
-
-    private fun onPurchasesUpdated(result: BillingResult, purchases: MutableList<Purchase>?) {
-        if (result.responseCode == BillingClient.BillingResponseCode.OK && purchases != null) {
-            updateFromPurchases(purchases)
+    private fun queryActivePurchases(forceReconnect: Boolean) {
+        if (!billingClient.isReady) {
+            if (forceReconnect) start() else Log.d(TAG, "queryActivePurchases skipped while billing is offline.")
             return
         }
-        if (result.responseCode != BillingClient.BillingResponseCode.USER_CANCELED) {
-            val attemptedPlan = _state.value.currentPlan.name.lowercase()
-            analytics.trackPurchaseFailed(attemptedPlan, result.debugMessage.ifBlank { "billing_error_${result.responseCode}" })
+
+        val purchases = mutableListOf<Purchase>()
+        var callbacksRemaining = 2
+        fun handleBatch(result: BillingResult, batch: List<Purchase>) {
+            Log.d(TAG, "Purchases response: code=${result.responseCode}, count=${batch.size}")
+            if (result.responseCode == BillingClient.BillingResponseCode.OK) {
+                purchases += batch
+            } else {
+                updateMessage(result.debugMessage.ifBlank { "Unable to refresh purchases." }, true)
+            }
+            callbacksRemaining -= 1
+            if (callbacksRemaining == 0) {
+                updateFromPurchases(purchases)
+            }
         }
-        _state.update { it.copy(lastMessage = result.debugMessage.takeIf { message -> message.isNotBlank() }) }
+
+        billingClient.queryPurchasesAsync(
+            QueryPurchasesParams.newBuilder().setProductType(BillingClient.ProductType.SUBS).build()
+        ) { result, batch -> handleBatch(result, batch) }
+
+        billingClient.queryPurchasesAsync(
+            QueryPurchasesParams.newBuilder().setProductType(BillingClient.ProductType.INAPP).build()
+        ) { result, batch -> handleBatch(result, batch) }
+    }
+
+    private fun onPurchasesUpdated(result: BillingResult, purchases: List<Purchase>?) {
+        Log.d(TAG, "onPurchasesUpdated: code=${result.responseCode}, count=${purchases?.size ?: 0}")
+        when {
+            result.responseCode == BillingClient.BillingResponseCode.OK && !purchases.isNullOrEmpty() -> {
+                updateFromPurchases(purchases)
+            }
+            result.responseCode == BillingClient.BillingResponseCode.USER_CANCELED -> {
+                updateMessage("Purchase cancelled.", true)
+            }
+            else -> {
+                val attemptedPlan = _state.value.currentPlan.name.lowercase()
+                analytics.trackPurchaseFailed(attemptedPlan, result.debugMessage.ifBlank { "billing_error_${result.responseCode}" })
+                updateMessage(result.debugMessage.ifBlank { "Purchase failed. Please try again later." }, true)
+            }
+        }
     }
 
     private fun updateFromPurchases(purchases: List<Purchase>) {
+        Log.d(TAG, "Updating local subscription state from ${purchases.size} purchases.")
         purchases.forEach { purchase ->
             if (purchase.purchaseState == Purchase.PurchaseState.PURCHASED && !purchase.isAcknowledged) {
-                val params = AcknowledgePurchaseParams.newBuilder().setPurchaseToken(purchase.purchaseToken).build()
-                billingClient.acknowledgePurchase(params) { }
+                acknowledgePurchase(purchase)
             }
         }
+
         val activePurchase = purchases.firstOrNull { it.purchaseState == Purchase.PurchaseState.PURCHASED }
         val plan = when {
             activePurchase == null -> SubscriptionPlan.FREE
@@ -196,12 +285,50 @@ class SubscriptionRepository private constructor(context: Context) {
         persistState(plan != SubscriptionPlan.FREE, plan)
         if (plan != SubscriptionPlan.FREE) {
             analytics.trackPurchaseSuccess(plan.name.lowercase())
+            updateMessage("${plan.displayName} active.", true)
+        } else {
+            updateMessage("Using free plan.", billingClient.isReady)
         }
     }
 
+    private fun acknowledgePurchase(purchase: Purchase) {
+        val params = AcknowledgePurchaseParams.newBuilder()
+            .setPurchaseToken(purchase.purchaseToken)
+            .build()
+        billingClient.acknowledgePurchase(params) { result ->
+            if (result.responseCode == BillingClient.BillingResponseCode.OK) {
+                Log.d(TAG, "Purchase acknowledged for token=${purchase.purchaseToken.take(6)}***")
+            } else {
+                Log.e(TAG, "Failed to acknowledge purchase: code=${result.responseCode}, message=${result.debugMessage}")
+                analytics.trackPurchaseFailed(planNameFromPurchase(purchase), "ack_${result.responseCode}")
+            }
+        }
+    }
+
+    private fun planNameFromPurchase(purchase: Purchase): String = when {
+        purchase.products.contains(BillingProduct.LIFETIME.productId) -> BillingProduct.LIFETIME.name.lowercase()
+        purchase.products.contains(BillingProduct.YEARLY.productId) -> BillingProduct.YEARLY.name.lowercase()
+        purchase.products.contains(BillingProduct.MONTHLY.productId) -> BillingProduct.MONTHLY.name.lowercase()
+        else -> SubscriptionPlan.FREE.name.lowercase()
+    }
+
     private fun persistState(isPro: Boolean, plan: SubscriptionPlan) {
-        prefs.edit().putBoolean(KEY_IS_PRO, isPro).putString(KEY_PLAN, plan.name).apply()
+        prefs.edit()
+            .putBoolean(KEY_IS_PRO, isPro)
+            .putString(KEY_PLAN, plan.name)
+            .apply()
         _state.update { it.copy(isProUser = isPro, currentPlan = plan) }
+    }
+
+    private fun updateMessage(message: String, billingReady: Boolean) {
+        prefs.edit().putString(KEY_BILLING_MESSAGE, message).apply()
+        _state.update { it.copy(lastMessage = message, billingReady = billingReady) }
+    }
+
+    private fun safePlan(raw: String?): SubscriptionPlan = runCatching {
+        SubscriptionPlan.valueOf(raw ?: SubscriptionPlan.FREE.name)
+    }.getOrElse {
+        SubscriptionPlan.FREE
     }
 
     companion object {

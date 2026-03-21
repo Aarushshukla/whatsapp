@@ -45,6 +45,7 @@ class MediaLoader(private val context: Context) {
 
         val items = mutableListOf<SimpleMediaItem>()
         try {
+            Log.d("MediaLoader", "Querying $mediaType media between $minDate and $maxDate")
             resolver.query(
                 collection,
                 projection,
@@ -79,6 +80,8 @@ class MediaLoader(private val context: Context) {
                     )
                 }
             }
+        } catch (error: SecurityException) {
+            Log.e("MediaLoader", "Permission denied while loading $mediaType media", error)
         } catch (error: Exception) {
             Log.e("MediaLoader", "Error loading $mediaType media", error)
         }
