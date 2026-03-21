@@ -72,7 +72,7 @@ dependencies {
     implementation("com.airbnb.android:lottie-compose:6.6.1")
 
     implementation("com.android.billingclient:billing-ktx:8.3.0")
-    implementation("com.google.firebase:firebase-analytics-ktx")
+    implementation("com.google.firebase:firebase-analytics")
     implementation("org.tensorflow:tensorflow-lite:2.14.0")
 
     testImplementation("junit:junit:4.13.2")
