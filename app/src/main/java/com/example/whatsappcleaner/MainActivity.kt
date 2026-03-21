@@ -11,6 +11,7 @@ import android.provider.Settings
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.ActivityResultCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -33,16 +34,21 @@ class MainActivity : ComponentActivity() {
     private val subscriptionRepository by lazy { SubscriptionRepository.get(this) }
 
     private val requestPermissionLauncher =
-        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
-            val granted = permissions.all { it.value }
-            Log.d(TAG, "Permission result: $permissions")
-            viewModel.updatePermissionStatus(granted)
-            if (granted) {
-                viewModel.refreshMedia()
-            } else {
-                Log.w(TAG, "Media permissions denied. Showing fallback UI.")
+        registerForActivityResult(
+            ActivityResultContracts.RequestMultiplePermissions(),
+            object : ActivityResultCallback<Map<String, Boolean>> {
+                override fun onActivityResult(permissions: Map<String, Boolean>) {
+                    val granted = permissions.values.all { it }
+                    Log.d(TAG, "Permission result: $permissions")
+                    viewModel.updatePermissionStatus(granted)
+                    if (granted) {
+                        viewModel.refreshMedia()
+                    } else {
+                        Log.w(TAG, "Media permissions denied. Showing fallback UI.")
+                    }
+                }
             }
-        }
+        )
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
