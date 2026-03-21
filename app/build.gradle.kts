@@ -13,7 +13,7 @@ if (hasGoogleServices) {
 
 android {
     namespace = "com.example.whatsappcleaner"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.example.whatsappcleaner"
