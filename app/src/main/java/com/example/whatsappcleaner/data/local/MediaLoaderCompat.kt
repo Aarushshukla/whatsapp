@@ -10,7 +10,7 @@ fun MediaLoader.loadTodayWhatsAppMediaCompat(nowMillis: Long = System.currentTim
 
     val rangedMethod = MediaLoader::class.java.methods.firstOrNull {
         it.name == "loadWhatsAppMediaInRange" &&
-                it.parameterTypes.contentEquals(arrayOf(Long::class.javaPrimitiveType, Long::class.javaPrimitiveType))
+            it.parameterTypes.contentEquals(arrayOf(Long::class.javaPrimitiveType, Long::class.javaPrimitiveType))
     }
 
     @Suppress("UNCHECKED_CAST")
@@ -20,12 +20,12 @@ fun MediaLoader.loadTodayWhatsAppMediaCompat(nowMillis: Long = System.currentTim
 
     if (rangedItems != null) {
         return rangedItems
+            .filter { it.addedMillis in oneDayAgo..nowMillis }
+            .sortedByDescending { it.addedMillis }
     }
 
-
-    val allMedia = queryMediaStore("all", oneDayAgo, nowMillis)
-
-    return allMedia
+    return (queryMediaStore("image", oneDayAgo, nowMillis) + queryMediaStore("video", oneDayAgo, nowMillis))
+        .distinctBy { it.uri }
         .filter { it.addedMillis in oneDayAgo..nowMillis }
         .sortedByDescending { it.addedMillis }
 }

@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.tensorflow.lite.Interpreter
@@ -21,6 +22,10 @@ class MemeClassifier(
     private val context: Context,
     private val modelAssetName: String = "meme_classifier.tflite"
 ) {
+    companion object {
+        private const val TAG = "MemeClassifier"
+    }
+
     private var interpreter: Interpreter? = null
 
     suspend fun classify(uri: Uri): ClassificationResult = withContext(Dispatchers.Default) {
@@ -30,8 +35,11 @@ class MemeClassifier(
 
         return@withContext runCatching {
             ensureInterpreter()
-            interpreter?.run(input, output)
+            val activeInterpreter = interpreter ?: return@runCatching ClassificationResult(ImageCategory.UNKNOWN, 0f)
+            activeInterpreter.run(input, output)
             mapOutput(output[0])
+        }.onFailure { error ->
+            Log.e(TAG, "Unable to classify media item: $uri", error)
         }.getOrElse {
             ClassificationResult(ImageCategory.UNKNOWN, 0f)
         }.also {
@@ -54,6 +62,8 @@ class MemeClassifier(
 
     private fun decodeBitmap(uri: Uri): Bitmap? = runCatching {
         context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it) }
+    }.onFailure { error ->
+        Log.e(TAG, "Unable to decode bitmap for $uri", error)
     }.getOrNull()
 
     private fun preprocess(source: Bitmap): ByteBuffer {

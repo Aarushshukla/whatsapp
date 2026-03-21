@@ -16,10 +16,11 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.getValue
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.whatsappcleaner.data.billing.SubscriptionRepository
 import com.example.whatsappcleaner.ui.WhatsCleanAppRoot
+import com.example.whatsappcleaner.ui.home.HomeUiState
 import com.example.whatsappcleaner.ui.home.HomeViewModel
 import com.example.whatsappcleaner.ui.settings.AppThemeMode
 import com.example.whatsappcleaner.ui.theme.WhatsCleanTheme
@@ -31,14 +32,14 @@ class MainActivity : ComponentActivity() {
     }
 
     private val viewModel: HomeViewModel by viewModels()
-    private val subscriptionRepository by lazy { SubscriptionRepository.get(this) }
+    private val subscriptionRepository by lazy(LazyThreadSafetyMode.NONE) { SubscriptionRepository.get(this) }
 
     private val requestPermissionLauncher =
         registerForActivityResult(
             ActivityResultContracts.RequestMultiplePermissions(),
             object : ActivityResultCallback<Map<String, Boolean>> {
                 override fun onActivityResult(permissions: Map<String, Boolean>) {
-                    val granted = permissions.values.all { it }
+                    val granted = permissions.isNotEmpty() && permissions.values.all { it }
                     Log.d(TAG, "Permission result: $permissions")
                     viewModel.updatePermissionStatus(granted)
                     if (granted) {
@@ -53,12 +54,14 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Log.d(TAG, "onCreate called.")
-        subscriptionRepository.start()
+        runCatching { subscriptionRepository.start() }
+            .onFailure { error -> Log.e(TAG, "Unable to initialize subscriptions during onCreate.", error) }
         syncPermissionState()
 
         setContent {
-            val state by viewModel.uiState.collectAsStateWithLifecycle()
-            val darkTheme = when (state.settings.themeMode) {
+            val state by viewModel.uiState.collectAsStateWithLifecycle(initialValue = HomeUiState())
+            val themeMode = state.settings.themeMode
+            val darkTheme = when (themeMode) {
                 AppThemeMode.DARK -> true
                 AppThemeMode.LIGHT -> false
                 AppThemeMode.SYSTEM -> isSystemInDarkTheme()
@@ -92,7 +95,8 @@ class MainActivity : ComponentActivity() {
                     onManageSubscription = { openManageSubscription() },
                     onPurchasePlan = { product, source ->
                         viewModel.notePaywallViewed(source)
-                        subscriptionRepository.launchPurchase(this, product, source)
+                        runCatching { subscriptionRepository.launchPurchase(this, product, source) }
+                            .onFailure { error -> Log.e(TAG, "Unable to launch purchase flow.", error) }
                     },
                     onShareText = { text -> shareText(text) },
                     onShareResult = { shareText(viewModel.shareResultText()) },
@@ -106,7 +110,7 @@ class MainActivity : ComponentActivity() {
                     onDeleteClicked = { viewModel.onDeleteClicked(it) },
                     onReviewClicked = { viewModel.onReviewClicked() },
                     onCleanupRecorded = { bytes -> viewModel.recordCleanupResult(bytes) },
-                    versionLabel = "v${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})"
+                    versionLabel = safeVersionLabel()
                 )
             }
         }
@@ -115,31 +119,53 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         Log.d(TAG, "onResume called. Refreshing purchases and permission state.")
-        subscriptionRepository.refreshPurchases()
+        runCatching { subscriptionRepository.refreshPurchases() }
+            .onFailure { error -> Log.e(TAG, "Unable to refresh purchases on resume.", error) }
         syncPermissionState()
     }
 
-    private fun requiredPermissions(): Array<String> {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+    private fun requiredPermissions(): Array<String> =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             arrayOf(Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_MEDIA_VIDEO)
         } else {
             arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
         }
-    }
 
     private fun syncPermissionState() {
-        val granted = requiredPermissions().all {
+        val permissions = requiredPermissions()
+        val granted = permissions.isNotEmpty() && permissions.all {
             ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED
         }
         viewModel.updatePermissionStatus(granted)
     }
 
     private fun requestStoragePermissions() {
-        Log.d(TAG, "Requesting media permissions: ${requiredPermissions().joinToString()}")
-        requestPermissionLauncher.launch(requiredPermissions())
+        val permissions = requiredPermissions()
+        if (permissions.isEmpty()) {
+            Log.w(TAG, "No storage permissions are required on this device configuration.")
+            viewModel.updatePermissionStatus(true)
+            viewModel.refreshMedia()
+            return
+        }
+        val alreadyGranted = permissions.all {
+            ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED
+        }
+        if (alreadyGranted) {
+            Log.d(TAG, "Storage permissions already granted.")
+            viewModel.updatePermissionStatus(true)
+            viewModel.refreshMedia()
+            return
+        }
+        Log.d(TAG, "Requesting media permissions: ${permissions.joinToString()}")
+        requestPermissionLauncher.launch(permissions)
     }
 
-    private fun openFileInSystem(uri: Uri) {
+    private fun openFileInSystem(uri: Uri?) {
+        if (uri == null || uri == Uri.EMPTY) {
+            Log.w(TAG, "Skipping openFileInSystem because the uri was null or empty.")
+            openSystemStorage()
+            return
+        }
         val intent = Intent(Intent.ACTION_VIEW).apply {
             setDataAndType(uri, "*/*")
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
@@ -161,10 +187,12 @@ class MainActivity : ComponentActivity() {
             }
     }
 
-    private fun shareText(text: String) {
+    private fun shareText(text: String?) {
+        val safeText = text?.takeIf { it.isNotBlank() }
+            ?: "Clean smarter. Free space instantly with Cleanly AI."
         val intent = Intent(Intent.ACTION_SEND).apply {
             type = "text/plain"
-            putExtra(Intent.EXTRA_TEXT, text)
+            putExtra(Intent.EXTRA_TEXT, safeText)
         }
         runCatching { startActivity(Intent.createChooser(intent, "Share Cleanly AI")) }
             .onFailure { error -> Log.e(TAG, "Unable to share text.", error) }
@@ -192,23 +220,31 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun openUrl(url: String) {
-        runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
+        val safeUrl = url.takeIf { it.isNotBlank() } ?: return
+        runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(safeUrl))) }
             .onFailure { error ->
-                Log.e(TAG, "Unable to open url: $url", error)
+                Log.e(TAG, "Unable to open url: $safeUrl", error)
                 openSystemStorage()
             }
     }
 
     private fun sendEmail(address: String, subject: String) {
+        val safeAddress = address.takeIf { it.isNotBlank() } ?: return
         val intent = Intent(Intent.ACTION_SENDTO).apply {
-            data = Uri.parse("mailto:$address")
-            putExtra(Intent.EXTRA_SUBJECT, subject)
+            data = Uri.parse("mailto:$safeAddress")
+            putExtra(Intent.EXTRA_SUBJECT, subject.ifBlank { "Cleanly AI support" })
         }
         try {
             startActivity(Intent.createChooser(intent, "Contact Cleanly AI"))
         } catch (error: ActivityNotFoundException) {
             Log.e(TAG, "No email app available.", error)
-            shareText("Reach us at $address")
+            shareText("Reach us at $safeAddress")
         }
+    }
+
+    private fun safeVersionLabel(): String {
+        val versionName = BuildConfig.VERSION_NAME.takeIf { it.isNotBlank() } ?: "1.0"
+        val versionCode = BuildConfig.VERSION_CODE.takeIf { it > 0 } ?: 1
+        return "v$versionName ($versionCode)"
     }
 }

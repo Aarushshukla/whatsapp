@@ -43,6 +43,82 @@ cd "$SAVED" >/dev/null
 APP_NAME="Gradle"
 APP_BASE_NAME=`basename "$0"`
 
+find_java_cmd() {
+    if [ -n "$JAVA_HOME" ] ; then
+        if [ -x "$JAVA_HOME/jre/sh/java" ] ; then
+            echo "$JAVA_HOME/jre/sh/java"
+        else
+            echo "$JAVA_HOME/bin/java"
+        fi
+    else
+        command -v java 2>/dev/null || true
+    fi
+}
+
+java_major_version() {
+    java_cmd="$1"
+    [ -x "$java_cmd" ] || return 1
+    java_version=`"$java_cmd" -version 2>&1 | sed -n '1s/.*version "\([^"]*\)".*/\1/p'`
+    [ -n "$java_version" ] || return 1
+    java_major=`echo "$java_version" | awk -F[._-] '{ if ($1 == "1") print $2; else print $1 }'`
+    [ -n "$java_major" ] || return 1
+    echo "$java_major"
+}
+
+ensure_compatible_java_home() {
+    detected_java=`find_java_cmd`
+    detected_major=`java_major_version "$detected_java" 2>/dev/null || true`
+    if [ -n "$detected_major" ] && [ "$detected_major" -ge 17 ] && [ "$detected_major" -le 21 ] ; then
+        return 0
+    fi
+
+    os_name=`uname | tr '[:upper:]' '[:lower:]'`
+    arch_name=`uname -m`
+    case "$os_name" in
+        linux*) platform='linux' ;;
+        darwin*) platform='mac' ;;
+        *) return 0 ;;
+    esac
+    case "$arch_name" in
+        x86_64|amd64) arch='x64' ;;
+        aarch64|arm64) arch='aarch64' ;;
+        *) return 0 ;;
+    esac
+
+    for candidate in         "$HOME"/.local/share/mise/installs/java/17*         "$HOME"/.sdkman/candidates/java/17*         /usr/lib/jvm/java-17*         /usr/lib/jvm/jdk-17*         /opt/java/openjdk-17* ; do
+        if [ -x "$candidate/bin/java" ] ; then
+            JAVA_HOME="$candidate"
+            export JAVA_HOME
+            return 0
+        fi
+    done
+
+    compat_home="$APP_HOME/.gradle/jdks/temurin-17"
+    compat_java="$compat_home/bin/java"
+    if [ ! -x "$compat_java" ] ; then
+        archive_path="$APP_HOME/.gradle/jdks/temurin-17.tar.gz"
+        download_url="https://api.adoptium.net/v3/binary/latest/17/ga/${platform}/${arch}/jdk/hotspot/normal/eclipse?project=jdk"
+        mkdir -p "$compat_home" || return 0
+        echo "Downloading a Gradle-compatible JDK 17 to $compat_home" >&2
+        if command -v curl >/dev/null 2>&1 ; then
+            curl -fsSL "$download_url" -o "$archive_path" || return 0
+        elif command -v wget >/dev/null 2>&1 ; then
+            wget -qO "$archive_path" "$download_url" || return 0
+        else
+            return 0
+        fi
+        tar -xzf "$archive_path" -C "$compat_home" --strip-components=1 || return 0
+        rm -f "$archive_path"
+    fi
+
+    if [ -x "$compat_java" ] ; then
+        JAVA_HOME="$compat_home"
+        export JAVA_HOME
+    fi
+}
+
+ensure_compatible_java_home
+
 # Add default JVM options here. You can also use JAVA_OPTS and GRADLE_OPTS to pass JVM options to this script.
 DEFAULT_JVM_OPTS='"-Xmx64m" "-Xms64m"'
 
