@@ -1,5 +1,9 @@
 package com.example.whatsappcleaner.ui
 
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -13,16 +17,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.compose.animation.AnimatedContentTransitionScope
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.core.tween
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.whatsappcleaner.data.ReminderFreq
 import com.example.whatsappcleaner.data.ReminderTime
+import com.example.whatsappcleaner.data.billing.BillingProduct
 import com.example.whatsappcleaner.data.local.SimpleMediaItem
 import com.example.whatsappcleaner.ui.components.FriendlyState
 import com.example.whatsappcleaner.ui.home.AnalyticsScreen
@@ -33,9 +34,14 @@ import com.example.whatsappcleaner.ui.home.MediaViewerScreen
 import com.example.whatsappcleaner.ui.home.PolishedMemeScreen
 import com.example.whatsappcleaner.ui.home.PolishedPhoneRealityScreen
 import com.example.whatsappcleaner.ui.home.PolishedSmartCleanScreen
+import com.example.whatsappcleaner.ui.home.PremiumFeature
 import com.example.whatsappcleaner.ui.home.SimpleHomeScreen
-import com.example.whatsappcleaner.ui.home.SuggestionType
 import com.example.whatsappcleaner.ui.home.SpamMediaScreen
+import com.example.whatsappcleaner.ui.home.SuggestionType
+import com.example.whatsappcleaner.ui.paywall.PaywallScreen
+import com.example.whatsappcleaner.ui.settings.AppThemeMode
+import com.example.whatsappcleaner.ui.settings.ReminderFrequencyOption
+import com.example.whatsappcleaner.ui.settings.SettingsScreen
 
 private object Routes {
     const val Home = "home"
@@ -46,6 +52,8 @@ private object Routes {
     const val Analytics = "analytics_screen"
     const val Spam = "spam_screen"
     const val MediaViewer = "media_viewer"
+    const val Paywall = "paywall"
+    const val Settings = "settings"
 }
 
 @Composable
@@ -60,6 +68,32 @@ fun WhatsCleanAppRoot(
     onOpenInSystem: (SimpleMediaItem) -> Unit,
     onOpenSystemStorage: () -> Unit,
     onRequestPermission: () -> Unit,
+    onSettingsOpened: () -> Unit,
+    onThemeSelected: (AppThemeMode) -> Unit,
+    onSmartAlertsToggle: (Boolean) -> Unit,
+    onAutoCleanFrequencySelected: (ReminderFrequencyOption) -> Unit,
+    onFileSizeFilterSelected: (Int) -> Unit,
+    onShowOnlyLargeToggle: (Boolean) -> Unit,
+    onIncludeScreenshotsToggle: (Boolean) -> Unit,
+    onIncludeMemesToggle: (Boolean) -> Unit,
+    onIncludeDuplicatesToggle: (Boolean) -> Unit,
+    onUpgradeToPro: () -> Unit,
+    onRestorePurchase: (String) -> Unit,
+    onManageSubscription: () -> Unit,
+    onPurchasePlan: (BillingProduct, String) -> Unit,
+    onShareText: (String) -> Unit,
+    onShareResult: () -> Unit,
+    onInviteFriends: () -> Unit,
+    onRateApp: () -> Unit,
+    onPrivacyPolicy: () -> Unit,
+    onFaq: () -> Unit,
+    onContactSupport: () -> Unit,
+    onReportIssue: () -> Unit,
+    onPremiumFeatureRequested: (PremiumFeature) -> Boolean,
+    onDeleteClicked: (String) -> Unit,
+    onReviewClicked: () -> Unit,
+    onCleanupRecorded: (Long) -> Unit,
+    versionLabel: String,
     modifier: Modifier = Modifier
 ) {
     val navController = rememberNavController()
@@ -112,13 +146,48 @@ fun WhatsCleanAppRoot(
                 spamCount = state.spamCount,
                 junkCount = state.junkCount,
                 duplicateCount = state.duplicateCount,
-                onNavigateToSmartClean = { navController.navigateSingleTop(Routes.SmartClean) },
+                isProUser = state.isProUser,
+                onNavigateToSmartClean = {
+                    if (onPremiumFeatureRequested(PremiumFeature.SMART_CLEAN_ADVANCED)) {
+                        navController.navigateSingleTop(Routes.SmartClean)
+                    } else navController.navigateSingleTop(Routes.Paywall)
+                },
                 onNavigateToPhoneReality = { navController.navigateSingleTop(Routes.PhoneReality) },
-                onNavigateToMemeAnalyzer = { navController.navigateSingleTop(Routes.MemeScreen) },
-                onNavigateToMediaViewer = { navController.navigateSingleTop(Routes.MediaViewer) },
+                onNavigateToMemeAnalyzer = {
+                    if (onPremiumFeatureRequested(PremiumFeature.MEME_DETECTION)) {
+                        navController.navigateSingleTop(Routes.MemeScreen)
+                    } else navController.navigateSingleTop(Routes.Paywall)
+                },
+                onNavigateToMediaViewer = {
+                    onReviewClicked()
+                    navController.navigateSingleTop(Routes.MediaViewer)
+                },
                 onNavigateToJunk = { navController.navigateSingleTop(Routes.JunkScreen) },
-                onNavigateToAnalytics = { navController.navigateSingleTop(Routes.Analytics) },
+                onNavigateToAnalytics = {
+                    if (onPremiumFeatureRequested(PremiumFeature.ADVANCED_ANALYTICS)) {
+                        navController.navigateSingleTop(Routes.Analytics)
+                    } else navController.navigateSingleTop(Routes.Paywall)
+                },
                 onNavigateToSpam = { navController.navigateSingleTop(Routes.Spam) },
+                onNavigateToSettings = {
+                    onSettingsOpened()
+                    navController.navigateSingleTop(Routes.Settings)
+                },
+                onNavigateToDuplicates = {
+                    if (onPremiumFeatureRequested(PremiumFeature.DUPLICATE_DETECTION)) {
+                        navController.navigateSingleTop(Routes.SmartClean)
+                    } else navController.navigateSingleTop(Routes.Paywall)
+                },
+                onBulkDeleteClick = {
+                    if (onPremiumFeatureRequested(PremiumFeature.BULK_DELETE)) {
+                        onDeleteClicked("bulk_delete")
+                    } else navController.navigateSingleTop(Routes.Paywall)
+                },
+                onUpgradeToPro = {
+                    onUpgradeToPro()
+                    navController.navigateSingleTop(Routes.Paywall)
+                },
+                onDeleteConfirmed = { onDeleteClicked("home_delete") },
                 onOpenInSystem = onOpenInSystem,
                 onOpenSystemStorage = onOpenSystemStorage,
                 selectedFrequency = state.selectedFrequency,
@@ -145,7 +214,9 @@ fun WhatsCleanAppRoot(
                 largeFileItems = state.largeFileItems,
                 sentFiles = state.sentFileItems,
                 onOpenInSystem = onOpenInSystem,
-                onBack = { navController.popBackStack() }
+                onBack = { navController.popBackStack() },
+                onShareResult = onShareResult,
+                onCleanupRecorded = onCleanupRecorded
             )
         }
 
@@ -201,6 +272,49 @@ fun WhatsCleanAppRoot(
                 duplicateItems = state.duplicateItems,
                 onOpenInSystem = onOpenInSystem,
                 onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Routes.Paywall) {
+            PaywallScreen(
+                subscriptionState = state.subscriptionState,
+                source = state.paywallSource,
+                exceededFreeLimit = state.hasExceededFreeLimit,
+                onBack = { navController.popBackStack() },
+                onPurchaseClick = { product -> onPurchasePlan(product, state.paywallSource) },
+                onRestoreClick = { onRestorePurchase("paywall") }
+            )
+        }
+
+        composable(Routes.Settings) {
+            SettingsScreen(
+                settings = state.settings,
+                subscriptionState = state.subscriptionState,
+                versionLabel = versionLabel,
+                tagline = "Clean smarter. Free space instantly.",
+                onBack = { navController.popBackStack() },
+                onThemeSelected = onThemeSelected,
+                onDailyReminderToggle = onRemindersToggle,
+                onSmartAlertToggle = onSmartAlertsToggle,
+                onAutoCleanFrequencySelected = onAutoCleanFrequencySelected,
+                onFileSizeFilterSelected = onFileSizeFilterSelected,
+                onShowOnlyLargeToggle = onShowOnlyLargeToggle,
+                onIncludeScreenshotsToggle = onIncludeScreenshotsToggle,
+                onIncludeMemesToggle = onIncludeMemesToggle,
+                onIncludeDuplicatesToggle = onIncludeDuplicatesToggle,
+                onUpgradeToPro = {
+                    onUpgradeToPro()
+                    navController.navigateSingleTop(Routes.Paywall)
+                },
+                onRestorePurchase = { onRestorePurchase("settings") },
+                onManageSubscription = onManageSubscription,
+                onPrivacyPolicy = onPrivacyPolicy,
+                onFaq = onFaq,
+                onContactSupport = onContactSupport,
+                onReportIssue = onReportIssue,
+                onRateApp = onRateApp,
+                onShareApp = { onShareText("Clean smarter. Free space instantly with Cleanly AI.") },
+                onInviteFriends = onInviteFriends
             )
         }
     }

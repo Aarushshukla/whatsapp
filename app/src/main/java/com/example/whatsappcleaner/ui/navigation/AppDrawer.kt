@@ -49,8 +49,8 @@ fun AppDrawer(onItemClick: (String) -> Unit) {
             Column {
                 Box(Modifier.size(50.dp).background(AccentBlue, RoundedCornerShape(12.dp)))
                 Spacer(Modifier.height(12.dp))
-                Text("Cleaner Pro", style = MaterialTheme.typography.headlineSmall, color = BrandNavy)
-                Text("Dark dashboard edition", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                Text("Cleanly AI", style = MaterialTheme.typography.headlineSmall, color = BrandNavy)
+                Text("Clean smarter. Free space instantly.", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
             }
         }
 
@@ -59,7 +59,7 @@ fun AppDrawer(onItemClick: (String) -> Unit) {
         DrawerItem("Smart Clean", Icons.Default.CleaningServices) { onItemClick("smart_clean") }
         DrawerItem("Analytics", Icons.Default.Analytics) { onItemClick("analytics_screen") }
         Divider(Modifier.padding(vertical = 16.dp, horizontal = 24.dp))
-        DrawerItem("Settings", Icons.Default.Settings) { onItemClick("home") }
+        DrawerItem("Settings", Icons.Default.Settings) { onItemClick("settings") }
         DrawerItem("Help Center", Icons.Default.Help) { onItemClick("phone_reality") }
     }
 }

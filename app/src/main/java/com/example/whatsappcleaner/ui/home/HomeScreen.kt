@@ -56,6 +56,8 @@ import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Mood
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Storage
@@ -144,6 +146,7 @@ fun SimpleHomeScreen(
     spamCount: Int,
     junkCount: Int,
     duplicateCount: Int,
+    isProUser: Boolean,
     onNavigateToSmartClean: () -> Unit,
     onNavigateToPhoneReality: () -> Unit,
     onNavigateToMemeAnalyzer: () -> Unit,
@@ -151,6 +154,11 @@ fun SimpleHomeScreen(
     onNavigateToJunk: () -> Unit,
     onNavigateToAnalytics: () -> Unit,
     onNavigateToSpam: () -> Unit,
+    onNavigateToSettings: () -> Unit,
+    onNavigateToDuplicates: () -> Unit,
+    onBulkDeleteClick: () -> Unit,
+    onUpgradeToPro: () -> Unit,
+    onDeleteConfirmed: () -> Unit,
     onOpenInSystem: (SimpleMediaItem) -> Unit,
     onOpenSystemStorage: () -> Unit,
     selectedFrequency: ReminderFreq,
@@ -195,6 +203,7 @@ fun SimpleHomeScreen(
                         "home" -> Unit
                         "smart_clean" -> onNavigateToSmartClean()
                         "analytics_screen" -> onNavigateToAnalytics()
+                        "settings" -> onNavigateToSettings()
                         else -> onNavigateToPhoneReality()
                     }
                 }
@@ -221,10 +230,13 @@ fun SimpleHomeScreen(
                         onRemindersToggle = onRemindersToggle,
                         selectedFrequency = selectedFrequency,
                         selectedTime = selectedTime,
+                        isProUser = isProUser,
                         onMenuClick = { scope.launch { drawerState.open() } },
                         onRefreshClick = onRefreshClick,
                         onStorageClick = onOpenSystemStorage,
-                        onInsightsClick = onNavigateToPhoneReality
+                        onInsightsClick = onNavigateToPhoneReality,
+                        onSettingsClick = onNavigateToSettings,
+                        onUpgradeToPro = onUpgradeToPro
                     )
                 }
                 item(span = { GridItemSpan(maxLineSpan) }) {
@@ -245,7 +257,7 @@ fun SimpleHomeScreen(
                 }
                 item(span = { GridItemSpan(maxLineSpan) }) {
                     GradientHeroButton(
-                        text = "Smart Clean Now",
+                        text = if (isProUser) "Smart Clean Advanced" else "Unlock Smart Clean Pro",
                         onClick = onNavigateToSmartClean,
                         modifier = Modifier.fillMaxWidth(),
                         icon = Icons.Default.AutoAwesome
@@ -256,7 +268,7 @@ fun SimpleHomeScreen(
                 }
                 gridItems(
                     items = listOf(
-                        InsightCardModel("Duplicates", "$duplicateCount review items", Icons.Default.AutoDelete, AccentBlue, onNavigateToSmartClean),
+                        InsightCardModel("Duplicates", "$duplicateCount review items", Icons.Default.AutoDelete, AccentBlue, onNavigateToDuplicates),
                         InsightCardModel("Spam Shield", "$spamCount suspicious files", Icons.Default.Shield, AccentPurple, onNavigateToSpam),
                         InsightCardModel("Meme Radar", "$memeCount memes detected", Icons.Default.Mood, AccentGreen, onNavigateToMemeAnalyzer),
                         InsightCardModel("Reality Check", "$junkCount junk • $oldFilesCount old", Icons.Default.Analytics, AccentBlue, onNavigateToPhoneReality)
@@ -267,6 +279,7 @@ fun SimpleHomeScreen(
                 item(span = { GridItemSpan(maxLineSpan) }) {
                     QuickActionRow(
                         selectedCount = selected.size,
+                        isProUser = isProUser,
                         onReviewClick = {
                             val firstSelected = items.firstOrNull { it.uri.toString() in selected }
                             when {
@@ -281,7 +294,8 @@ fun SimpleHomeScreen(
                         },
                         onJunkClick = onNavigateToJunk,
                         onStorageClick = onOpenSystemStorage,
-                        onAnalyticsClick = onNavigateToAnalytics
+                        onAnalyticsClick = onNavigateToAnalytics,
+                        onBulkDeleteClick = onBulkDeleteClick
                     )
                 }
                 item(span = { GridItemSpan(maxLineSpan) }) {
@@ -355,6 +369,7 @@ fun SimpleHomeScreen(
                         pendingDelete = null
                         selected = selected - item.uri.toString()
                         successMessage = "${formatSize(item.sizeKb.toLong() * 1024L)} ready to clear"
+                        onDeleteConfirmed()
                         onOpenInSystem(item)
                         scope.launch { snackbarHostState.showSnackbar("Opened ${item.name} for deletion") }
                     }
@@ -376,10 +391,13 @@ private fun DashboardHeader(
     onRemindersToggle: (Boolean) -> Unit,
     selectedFrequency: ReminderFreq,
     selectedTime: ReminderTime,
+    isProUser: Boolean,
     onMenuClick: () -> Unit,
     onRefreshClick: () -> Unit,
     onStorageClick: () -> Unit,
-    onInsightsClick: () -> Unit
+    onInsightsClick: () -> Unit,
+    onSettingsClick: () -> Unit,
+    onUpgradeToPro: () -> Unit
 ) {
     LegitCard {
         Column(
@@ -409,8 +427,8 @@ private fun DashboardHeader(
                     Icon(Icons.Default.Menu, contentDescription = "Menu", tint = TextMain)
                 }
                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("WhatsApp Cleaner", style = MaterialTheme.typography.headlineSmall, color = TextMain)
-                    Text("Premium storage care for every scan.", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+                    Text("Cleanly AI", style = MaterialTheme.typography.headlineSmall, color = TextMain)
+                    Text("Clean smarter. Free space instantly.", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
                 }
             }
 
@@ -425,6 +443,12 @@ private fun DashboardHeader(
                 }
                 item {
                     QuickPill(icon = Icons.Default.Visibility, label = "Insights", onClick = onInsightsClick)
+                }
+                item {
+                    QuickPill(icon = Icons.Default.Settings, label = "Settings", onClick = onSettingsClick)
+                }
+                item {
+                    QuickPill(icon = Icons.Default.Star, label = if (isProUser) "Pro active" else "Go Pro", onClick = onUpgradeToPro)
                 }
             }
 
@@ -632,10 +656,12 @@ private fun InsightCard(model: InsightCardModel) {
 @Composable
 private fun QuickActionRow(
     selectedCount: Int,
+    isProUser: Boolean,
     onReviewClick: () -> Unit,
     onJunkClick: () -> Unit,
     onStorageClick: () -> Unit,
-    onAnalyticsClick: () -> Unit
+    onAnalyticsClick: () -> Unit,
+    onBulkDeleteClick: () -> Unit
 ) {
     LegitCard {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -649,6 +675,9 @@ private fun QuickActionRow(
                 }
                 item {
                     ActionChip(icon = Icons.Default.Analytics, label = "Analytics", onClick = onAnalyticsClick, accent = AccentGreen)
+                }
+                item {
+                    ActionChip(icon = Icons.Default.DeleteOutline, label = if (isProUser) "Bulk delete" else "Bulk delete • Pro", onClick = onBulkDeleteClick, accent = AccentPurple)
                 }
                 item {
                     ActionChip(icon = Icons.Default.Storage, label = "Storage", onClick = onStorageClick, accent = AccentBlue)
