@@ -115,7 +115,7 @@ fun SettingsScreen(
             }
             item {
                 SettingsSection(title = "General") {
-                    ChoiceRow("Theme", settings.themeMode.label, Icons.Default.DarkMode, AppThemeMode.entries.map { themeMode -> themeMode.label to { onThemeSelected(themeMode) } })
+                    ChoiceRow("Theme", settings.themeMode.label, Icons.Default.DarkMode, AppThemeMode.entries.map { themeMode: AppThemeMode -> themeMode.label to { onThemeSelected(themeMode) } })
                     ChoiceRow("Language", settings.languageLabel, Icons.Default.Language, listOf("English (coming soon)" to onFaq))
                 }
             }
@@ -124,7 +124,7 @@ fun SettingsScreen(
                     ToggleRow("Daily reminder", "Get a gentle nudge to review clutter.", Icons.Default.Notifications, settings.dailyReminderEnabled, onDailyReminderToggle)
                     ToggleRow("Smart alert", "Notify when junk or duplicates spike.", Icons.Default.CheckCircle, settings.smartAlertEnabled, onSmartAlertToggle)
                     if (subscriptionState.isProUser) {
-                        ChoiceRow("Auto-clean reminder", settings.autoCleanFrequency.label, Icons.Default.Tune, ReminderFrequencyOption.entries.map { frequencyOption -> frequencyOption.label to { onAutoCleanFrequencySelected(frequencyOption) } })
+                        ChoiceRow("Auto-clean reminder", settings.autoCleanFrequency.label, Icons.Default.Tune, ReminderFrequencyOption.entries.map { frequencyOption: ReminderFrequencyOption -> frequencyOption.label to { onAutoCleanFrequencySelected(frequencyOption) } })
                     } else {
                         ActionRow("Auto-clean reminder", "Pro only: unlock advanced cleanup automation", Icons.Default.Tune, onUpgradeToPro)
                     }
@@ -132,7 +132,7 @@ fun SettingsScreen(
             }
             item {
                 SettingsSection(title = "Cleaning Preferences") {
-                    ChoiceRow("File size filter", ">= ${settings.fileSizeFilterMb} MB", Icons.Default.Tune, listOf(25, 50, 100, 250).map { value -> "$value MB" to { onFileSizeFilterSelected(value) } })
+                    ChoiceRow("File size filter", ">= ${settings.fileSizeFilterMb} MB", Icons.Default.Tune, listOf(25, 50, 100, 250).map { value: Int -> "$value MB" to { onFileSizeFilterSelected(value) } })
                     ToggleRow("Show only large files", "Focus on heavier items first.", Icons.Default.Tune, settings.showOnlyLargeFiles, onShowOnlyLargeToggle)
                     ToggleRow("Include screenshots", "Surface camera roll screenshots.", Icons.Default.Tune, settings.includeScreenshots, onIncludeScreenshotsToggle)
                     ToggleRow("Include memes", "Premium meme detection candidates.", Icons.Default.Tune, settings.includeMemes, onIncludeMemesToggle)
