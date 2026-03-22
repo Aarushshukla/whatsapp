@@ -15,12 +15,12 @@ import androidx.activity.result.ActivityResultCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.whatsappcleaner.data.billing.SubscriptionRepository
 import com.example.whatsappcleaner.ui.WhatsCleanAppRoot
-import com.example.whatsappcleaner.ui.home.HomeUiState
 import com.example.whatsappcleaner.ui.home.HomeViewModel
 import com.example.whatsappcleaner.ui.settings.AppThemeMode
 import com.example.whatsappcleaner.ui.theme.WhatsCleanTheme
@@ -57,62 +57,10 @@ class MainActivity : ComponentActivity() {
         runCatching { subscriptionRepository.start() }
             .onFailure { error -> Log.e(TAG, "Unable to initialize subscriptions during onCreate.", error) }
         syncPermissionState()
+        val versionLabel = safeVersionLabel()
 
         setContent {
-            val state by viewModel.uiState.collectAsStateWithLifecycle(initialValue = HomeUiState())
-            val themeMode = state.settings.themeMode
-            val darkTheme = when (themeMode) {
-                AppThemeMode.DARK -> true
-                AppThemeMode.LIGHT -> false
-                AppThemeMode.SYSTEM -> isSystemInDarkTheme()
-            }
-            WhatsCleanTheme(darkTheme = darkTheme) {
-                WhatsCleanAppRoot(
-                    state = state,
-                    onRefreshClick = { viewModel.refreshMedia() },
-                    onFilterChange = { viewModel.setFilter(it) },
-                    onSuggestionChange = { viewModel.setSuggestion(it) },
-                    onFrequencyChange = { viewModel.setFrequency(it) },
-                    onTimeChange = { viewModel.setTime(it) },
-                    onRemindersToggle = { viewModel.toggleReminders(it) },
-                    onOpenInSystem = { item -> openFileInSystem(item.uri) },
-                    onOpenSystemStorage = {
-                        viewModel.onStorageScreenOpened()
-                        openSystemStorage()
-                    },
-                    onRequestPermission = { requestStoragePermissions() },
-                    onSettingsOpened = { viewModel.onSettingsOpened() },
-                    onThemeSelected = { viewModel.setThemeMode(it) },
-                    onSmartAlertsToggle = { viewModel.setSmartAlerts(it) },
-                    onAutoCleanFrequencySelected = { viewModel.setAutoCleanFrequency(it) },
-                    onFileSizeFilterSelected = { viewModel.setFileSizeFilter(it) },
-                    onShowOnlyLargeToggle = { viewModel.setShowOnlyLargeFiles(it) },
-                    onIncludeScreenshotsToggle = { viewModel.setIncludeScreenshots(it) },
-                    onIncludeMemesToggle = { viewModel.setIncludeMemes(it) },
-                    onIncludeDuplicatesToggle = { viewModel.setIncludeDuplicates(it) },
-                    onUpgradeToPro = { viewModel.notePaywallViewed("settings_upgrade") },
-                    onRestorePurchase = { source -> viewModel.restorePurchases(source) },
-                    onManageSubscription = { openManageSubscription() },
-                    onPurchasePlan = { product, source ->
-                        viewModel.notePaywallViewed(source)
-                        runCatching { subscriptionRepository.launchPurchase(this, product, source) }
-                            .onFailure { error -> Log.e(TAG, "Unable to launch purchase flow.", error) }
-                    },
-                    onShareText = { text -> shareText(text) },
-                    onShareResult = { shareText(viewModel.shareResultText()) },
-                    onInviteFriends = { shareText(viewModel.shareInviteText()) },
-                    onRateApp = { rateApp() },
-                    onPrivacyPolicy = { openUrl("https://www.google.com/search?q=Cleanly+AI+privacy+policy") },
-                    onFaq = { openUrl("https://www.google.com/search?q=Cleanly+AI+FAQ") },
-                    onContactSupport = { sendEmail("support@cleanlyai.app", "Cleanly AI support") },
-                    onReportIssue = { sendEmail("support@cleanlyai.app", "Cleanly AI bug report") },
-                    onPremiumFeatureRequested = { viewModel.onPremiumFeatureRequested(it) },
-                    onDeleteClicked = { viewModel.onDeleteClicked(it) },
-                    onReviewClicked = { viewModel.onReviewClicked() },
-                    onCleanupRecorded = { bytes -> viewModel.recordCleanupResult(bytes) },
-                    versionLabel = safeVersionLabel()
-                )
-            }
+            MainActivityContent(versionLabel = versionLabel)
         }
     }
 
@@ -246,5 +194,65 @@ class MainActivity : ComponentActivity() {
         val versionName = BuildConfig.VERSION_NAME.takeIf { it.isNotBlank() } ?: "1.0"
         val versionCode = BuildConfig.VERSION_CODE.takeIf { it > 0 } ?: 1
         return "v$versionName ($versionCode)"
+    }
+
+    @Composable
+    private fun MainActivityContent(versionLabel: String) {
+        val state by viewModel.uiState.collectAsStateWithLifecycle()
+        val darkTheme = when (state.settings.themeMode) {
+            AppThemeMode.DARK -> true
+            AppThemeMode.LIGHT -> false
+            AppThemeMode.SYSTEM -> isSystemInDarkTheme()
+        }
+        val privacyPolicyUrl = "https://www.google.com/search?q=Cleanly+AI+privacy+policy"
+        val faqUrl = "https://www.google.com/search?q=Cleanly+AI+FAQ"
+
+        WhatsCleanTheme(darkTheme = darkTheme) {
+            WhatsCleanAppRoot(
+                state = state,
+                onRefreshClick = viewModel::refreshMedia,
+                onFilterChange = viewModel::setFilter,
+                onSuggestionChange = viewModel::setSuggestion,
+                onFrequencyChange = viewModel::setFrequency,
+                onTimeChange = viewModel::setTime,
+                onRemindersToggle = viewModel::toggleReminders,
+                onOpenInSystem = { item -> openFileInSystem(item.uri) },
+                onOpenSystemStorage = {
+                    viewModel.onStorageScreenOpened()
+                    openSystemStorage()
+                },
+                onRequestPermission = ::requestStoragePermissions,
+                onSettingsOpened = viewModel::onSettingsOpened,
+                onThemeSelected = viewModel::setThemeMode,
+                onSmartAlertsToggle = viewModel::setSmartAlerts,
+                onAutoCleanFrequencySelected = viewModel::setAutoCleanFrequency,
+                onFileSizeFilterSelected = viewModel::setFileSizeFilter,
+                onShowOnlyLargeToggle = viewModel::setShowOnlyLargeFiles,
+                onIncludeScreenshotsToggle = viewModel::setIncludeScreenshots,
+                onIncludeMemesToggle = viewModel::setIncludeMemes,
+                onIncludeDuplicatesToggle = viewModel::setIncludeDuplicates,
+                onUpgradeToPro = { viewModel.notePaywallViewed("settings_upgrade") },
+                onRestorePurchase = viewModel::restorePurchases,
+                onManageSubscription = ::openManageSubscription,
+                onPurchasePlan = { product, source ->
+                    viewModel.notePaywallViewed(source)
+                    runCatching { subscriptionRepository.launchPurchase(this@MainActivity, product, source) }
+                        .onFailure { error -> Log.e(TAG, "Unable to launch purchase flow.", error) }
+                },
+                onShareText = ::shareText,
+                onShareResult = { shareText(viewModel.shareResultText()) },
+                onInviteFriends = { shareText(viewModel.shareInviteText()) },
+                onRateApp = ::rateApp,
+                onPrivacyPolicy = { openUrl(privacyPolicyUrl) },
+                onFaq = { openUrl(faqUrl) },
+                onContactSupport = { sendEmail("support@cleanlyai.app", "Cleanly AI support") },
+                onReportIssue = { sendEmail("support@cleanlyai.app", "Cleanly AI bug report") },
+                onPremiumFeatureRequested = viewModel::onPremiumFeatureRequested,
+                onDeleteClicked = viewModel::onDeleteClicked,
+                onReviewClicked = viewModel::onReviewClicked,
+                onCleanupRecorded = viewModel::recordCleanupResult,
+                versionLabel = versionLabel
+            )
+        }
     }
 }

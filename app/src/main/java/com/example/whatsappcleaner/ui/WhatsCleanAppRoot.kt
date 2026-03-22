@@ -96,12 +96,11 @@ fun WhatsCleanAppRoot(
     versionLabel: String,
     modifier: Modifier = Modifier
 ) {
-    val navController = rememberNavController()
-
     if (!state.permissionGranted) {
         PermissionGate(onRequestPermission = onRequestPermission, modifier = modifier)
         return
     }
+    val navController = rememberNavController()
 
     NavHost(
         navController = navController,
