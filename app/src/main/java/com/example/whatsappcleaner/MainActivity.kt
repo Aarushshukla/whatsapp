@@ -54,7 +54,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Log.d(TAG, "onCreate called.")
-        runCatching { subscriptionRepository.start() }
+        runCatching { subscriptionRepository.start(this) }
             .onFailure { error -> Log.e(TAG, "Unable to initialize subscriptions during onCreate.", error) }
         syncPermissionState()
         val versionLabel = safeVersionLabel()
@@ -67,7 +67,10 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         Log.d(TAG, "onResume called. Refreshing purchases and permission state.")
-        runCatching { subscriptionRepository.refreshPurchases() }
+        runCatching {
+            subscriptionRepository.start(this)
+            subscriptionRepository.refreshPurchases()
+        }
             .onFailure { error -> Log.e(TAG, "Unable to refresh purchases on resume.", error) }
         syncPermissionState()
     }
@@ -236,6 +239,7 @@ class MainActivity : ComponentActivity() {
                 onManageSubscription = ::openManageSubscription,
                 onPurchasePlan = { product, source ->
                     viewModel.notePaywallViewed(source)
+                    Log.d(TAG, "Paywall CTA clicked for product=${product.productId}, source=$source")
                     runCatching { subscriptionRepository.launchPurchase(this@MainActivity, product, source) }
                         .onFailure { error -> Log.e(TAG, "Unable to launch purchase flow.", error) }
                 },

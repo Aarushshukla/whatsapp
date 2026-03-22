@@ -76,7 +76,7 @@ fun PaywallScreen(
         }
     }
 
-    val ctaEnabled = subscriptionState.billingReady && (subscriptionState.hasPrices || subscriptionState.currentPlan != SubscriptionPlan.FREE)
+    val ctaEnabled = true
 
     Scaffold(
         containerColor = PrimaryBackground,
@@ -318,7 +318,7 @@ private fun PricingCard(
 private fun BillingFootnote(subscriptionState: SubscriptionState, ctaEnabled: Boolean) {
     val message = when {
         subscriptionState.lastMessage != null -> subscriptionState.lastMessage
-        !subscriptionState.billingReady -> "Connecting to Google Play Billing…"
+        !subscriptionState.billingReady -> "Google Play Billing is connecting. Tap Go Pro and the purchase sheet will open as soon as Billing is ready."
         !ctaEnabled -> "Prices are still loading from Google Play. You can restore purchases anytime."
         else -> "Monthly and yearly plans are managed in Google Play. Lifetime is a one-time purchase."
     }
