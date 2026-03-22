@@ -183,8 +183,12 @@ class SubscriptionRepository private constructor(context: Context) {
             QueryProductDetailsParams.newBuilder()
                 .setProductList(products)
                 .build()
-        ) { result, detailsList ->
-            Log.d(TAG, "Product details response: code=${result.responseCode}, count=${detailsList.size}")
+        ) { result, queryProductDetailsResult ->
+            val detailsList = queryProductDetailsResult.productDetailsList
+            Log.d(
+                TAG,
+                "Product details response: code=${result.responseCode}, count=${detailsList.size}, unfetched=${queryProductDetailsResult.unfetchedProductList.size}"
+            )
             if (result.responseCode != BillingClient.BillingResponseCode.OK) {
                 updateMessage(result.debugMessage.ifBlank { "Unable to load pricing from Play Billing." }, true)
                 return@queryProductDetailsAsync
