@@ -1,6 +1,5 @@
 apply plugin: 'com.android.application'
 apply plugin: 'org.jetbrains.kotlin.android'
-apply plugin: 'org.jetbrains.kotlin.plugin.compose'
 
 
 def hasGoogleServices = file('google-services.json').exists()
@@ -26,8 +25,12 @@ android {
     }
 
     buildFeatures {
-        compose true
+        compose = true
         buildConfig true
+    }
+
+    composeOptions {
+        kotlinCompilerExtensionVersion '1.5.15'
     }
 
     compileOptions {
