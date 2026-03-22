@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -56,7 +57,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.whatsappcleaner.data.billing.SubscriptionState
 import com.example.whatsappcleaner.ui.theme.AccentBlue
-import com.example.whatsappcleaner.ui.theme.AccentGreen
 import com.example.whatsappcleaner.ui.theme.PrimaryBackground
 import com.example.whatsappcleaner.ui.theme.SurfaceWhite
 import com.example.whatsappcleaner.ui.theme.TextMain
@@ -198,7 +198,7 @@ private fun BrandHeader(versionLabel: String, tagline: String) {
 }
 
 @Composable
-private fun SettingsSection(title: String, content: @Composable Column.() -> Unit) {
+private fun SettingsSection(title: String, content: @Composable ColumnScope.() -> Unit) {
     Card(colors = CardDefaults.cardColors(containerColor = SurfaceWhite), shape = RoundedCornerShape(24.dp)) {
         Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(title, color = TextMain, style = MaterialTheme.typography.titleLarge)
