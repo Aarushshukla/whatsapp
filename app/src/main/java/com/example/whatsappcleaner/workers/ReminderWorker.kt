@@ -24,7 +24,7 @@ class ReminderWorker(
         val loader = MediaLoader(context)
         val now = System.currentTimeMillis()
         val todayItems = loader.queryMediaStore("all", now - 86400000L, now)
-        val todayBytes = todayItems.sumOf { it.sizeKb.toLong() * 1024L }
+        val todayBytes = todayItems.sumOf { mediaItem -> mediaItem.sizeKb.toLong() * 1024L }
 
         if (todayItems.isEmpty()) return Result.success()
 

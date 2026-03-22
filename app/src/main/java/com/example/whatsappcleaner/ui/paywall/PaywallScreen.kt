@@ -133,7 +133,7 @@ fun PaywallScreen(
                             )
                         }
                         Text(
-                            "Source: ${source.replace('_', ' ').replaceFirstChar { it.uppercase() }}",
+                            "Source: ${source.replace('_', ' ').replaceFirstChar { firstChar -> firstChar.uppercase() }}",
                             color = TextSecondary,
                             style = MaterialTheme.typography.labelMedium
                         )

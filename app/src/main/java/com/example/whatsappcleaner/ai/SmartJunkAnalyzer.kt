@@ -14,16 +14,16 @@ class SmartJunkAnalyzer {
     fun findJunk(items: List<SimpleMediaItem>): List<SimpleMediaItem> {
         val breakdown = buildBreakdown(items)
         return (breakdown.duplicates + breakdown.largeFiles + breakdown.forwardedMedia + breakdown.sentFiles)
-            .distinctBy { it.uri }
+            .distinctBy { mediaItem -> mediaItem.uri }
     }
 
     fun buildBreakdown(items: List<SimpleMediaItem>): JunkBreakdown {
-        val duplicates = items.groupBy { it.sizeKb }
+        val duplicates = items.groupBy { mediaItem -> mediaItem.sizeKb }
             .values
-            .filter { it.size > 1 }
+            .filter { groupedItems -> groupedItems.size > 1 }
             .flatten()
 
-        val largeFiles = items.filter { it.sizeKb >= LARGE_FILE_KB_THRESHOLD }
+        val largeFiles = items.filter { mediaItem -> mediaItem.sizeKb >= LARGE_FILE_KB_THRESHOLD }
         val forwardedMedia = items.filter { item ->
             KEYWORDS_FORWARDED.any { key ->
                 item.name.contains(key, ignoreCase = true) || item.path.contains(key, ignoreCase = true)

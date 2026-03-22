@@ -34,7 +34,8 @@ fun PhoneRealityReportScreen(
     Column(modifier = modifier.fillMaxSize()) {
         Text("Phone Reality Report", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(16.dp))
         LazyColumn(modifier = Modifier.weight(1f), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            items(entries) { (title, value) ->
+            items(entries) { entry ->
+                val (title, value) = entry
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(text = title, style = MaterialTheme.typography.labelLarge)

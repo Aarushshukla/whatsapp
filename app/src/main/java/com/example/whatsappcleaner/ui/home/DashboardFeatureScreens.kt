@@ -193,7 +193,9 @@ fun PolishedSmartCleanScreen(
     onCleanupRecorded: (Long) -> Unit
 ) {
     var successMessage by remember { mutableStateOf<String?>(null) }
-    val recoverableBytes = (duplicateItems + spamItems + largeFileItems + sentFiles).distinctBy { it.uri }.sumOf { it.sizeKb.toLong() * 1024L }
+    val recoverableBytes = (duplicateItems + spamItems + largeFileItems + sentFiles)
+        .distinctBy { mediaItem -> mediaItem.uri }
+        .sumOf { mediaItem -> mediaItem.sizeKb.toLong() * 1024L }
     val scale by animateFloatAsState(
         targetValue = if (successMessage != null) 1f else 0.84f,
         animationSpec = tween(420),
@@ -242,7 +244,8 @@ fun PolishedSmartCleanScreen(
                                 "🎉 Storage Cleaned!"
                             }
                             onCleanupRecorded(recoverableBytes)
-                            (largeFileItems.firstOrNull() ?: duplicateItems.firstOrNull() ?: spamItems.firstOrNull() ?: sentFiles.firstOrNull())?.let(onOpenInSystem)
+                            (largeFileItems.firstOrNull() ?: duplicateItems.firstOrNull() ?: spamItems.firstOrNull() ?: sentFiles.firstOrNull())
+                                ?.let { mediaItem -> onOpenInSystem(mediaItem) }
                         })
                         LegitButton(
                             text = "Share Result",
@@ -267,7 +270,8 @@ fun PolishedSmartCleanScreen(
                     Triple("Large Files", largeFileItems, Icons.Default.Analytics),
                     Triple("Sent Files", sentFiles, Icons.Default.VideoLibrary)
                 )
-            ) { index, (title, items, icon) ->
+            ) { index, section ->
+                val (title, sectionItems, icon) = section
                 AnimatedListItem(index = index) {
                     LegitCard {
                         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -275,12 +279,12 @@ fun PolishedSmartCleanScreen(
                                 Icon(icon, contentDescription = null, tint = AccentBlue)
                                 Text(title, color = TextMain, style = MaterialTheme.typography.titleMedium)
                             }
-                            Text("${items.size} files", color = TextSecondary)
-                            items.take(3).forEach { item ->
+                            Text("${sectionItems.size} files", color = TextSecondary)
+                            sectionItems.take(3).forEach { item ->
                                 Text("• ${item.name}", color = TextMain)
                             }
-                            items.firstOrNull()?.let { first ->
-                                LegitButton("Review sample", onClick = { onOpenInSystem(first) })
+                            sectionItems.firstOrNull()?.let { firstItem ->
+                                LegitButton("Review sample", onClick = { onOpenInSystem(firstItem) })
                             }
                         }
                     }
@@ -352,7 +356,7 @@ private fun AnimatedListItem(index: Int, content: @Composable () -> Unit) {
         visible = visible,
         enter = fadeIn(animationSpec = tween(420)) + slideInVertically(
             animationSpec = tween(420),
-            initialOffsetY = { it / 3 }
+            initialOffsetY = { offset -> offset / 3 }
         ),
         exit = fadeOut(animationSpec = tween(320)) + shrinkVertically(animationSpec = tween(320))
     ) {

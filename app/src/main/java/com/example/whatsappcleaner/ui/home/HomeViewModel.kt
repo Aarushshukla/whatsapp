@@ -102,26 +102,28 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         subscriptionRepository.refreshPurchases()
         viewModelScope.launch {
             subscriptionRepository.state.collectLatest { subscriptionState ->
-                _uiState.update { it.copy(subscriptionState = subscriptionState) }
+                _uiState.update { currentState -> currentState.copy(subscriptionState = subscriptionState) }
             }
         }
     }
 
     fun updatePermissionStatus(granted: Boolean) {
         Log.d(TAG, "Permission state updated: granted=$granted")
-        _uiState.update { it.copy(permissionGranted = granted) }
-        if (granted) refreshMedia() else _uiState.update { it.copy(summaryInfo = "Permission needed to scan.", isLoading = false) }
+        _uiState.update { currentState -> currentState.copy(permissionGranted = granted) }
+        if (granted) refreshMedia() else _uiState.update { currentState ->
+            currentState.copy(summaryInfo = "Permission needed to scan.", isLoading = false)
+        }
     }
 
     fun refreshMedia() {
         if (!_uiState.value.permissionGranted) return
         viewModelScope.launch {
             Log.d(TAG, "Refreshing media library.")
-            _uiState.update { it.copy(summaryInfo = "Scanning...", isLoading = true) }
+            _uiState.update { currentState -> currentState.copy(summaryInfo = "Scanning...", isLoading = true) }
             try {
                 val images = mediaLoader.loadAllDeviceMedia("image")
                 val videos = mediaLoader.loadAllDeviceMedia("video")
-                val allItems = (images + videos).sortedByDescending { it.addedMillis }
+                val allItems = (images + videos).sortedByDescending { mediaItem -> mediaItem.addedMillis }
 
                 val memeClassifier = MemeClassifier(getApplication())
                 val memes = allItems.filter { item -> isMeme(item, memeClassifier) }
@@ -132,7 +134,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 val spamItems = spamMediaAnalyzer.findSpamMedia(allItems)
                 val baseReport = phoneRealityAnalyzer.generateReport(allItems)
 
-                val totalSize = allItems.sumOf { it.sizeKb.toLong() * 1024 }
+                val totalSize = allItems.sumOf { mediaItem -> mediaItem.sizeKb.toLong() * 1024L }
                 val summary = if (allItems.isEmpty()) {
                     Log.d(TAG, "No media items found on device.")
                     "No media found."
@@ -142,8 +144,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 }
 
                 val today = System.currentTimeMillis() - 86400000
-                val largeItems = allItems.filter { it.addedMillis > today && it.sizeKb > 5000 }
-                val screenshots = allItems.filter { it.addedMillis > today && it.name.startsWith("Screenshot", true) }
+                val largeItems = allItems.filter { mediaItem -> mediaItem.addedMillis > today && mediaItem.sizeKb > 5000 }
+                val screenshots = allItems.filter { mediaItem -> mediaItem.addedMillis > today && mediaItem.name.startsWith("Screenshot", true) }
 
                 _uiState.update { current ->
                     current.copy(
@@ -175,10 +177,14 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 }
             } catch (error: SecurityException) {
                 Log.e(TAG, "Media scan failed due to permission issue.", error)
-                _uiState.update { it.copy(summaryInfo = "Scan failed: permission denied", isLoading = false) }
+                _uiState.update { currentState ->
+                    currentState.copy(summaryInfo = "Scan failed: permission denied", isLoading = false)
+                }
             } catch (error: Exception) {
                 Log.e(TAG, "Media scan failed.", error)
-                _uiState.update { it.copy(summaryInfo = "Scan failed: ${error.message ?: "Unknown error"}", isLoading = false) }
+                _uiState.update { currentState ->
+                    currentState.copy(summaryInfo = "Scan failed: ${error.message ?: "Unknown error"}", isLoading = false)
+                }
             }
         }
     }
@@ -191,14 +197,20 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun setFilter(filter: MediaFilter) {
-        _uiState.update {
-            it.copy(currentFilter = filter, filteredItems = filterList(it.allItems, filter, it.activeSuggestion, it.settings))
+        _uiState.update { currentState ->
+            currentState.copy(
+                currentFilter = filter,
+                filteredItems = filterList(currentState.allItems, filter, currentState.activeSuggestion, currentState.settings)
+            )
         }
     }
 
     fun setSuggestion(suggestion: SuggestionType) {
-        _uiState.update {
-            it.copy(activeSuggestion = suggestion, filteredItems = filterList(it.allItems, it.currentFilter, suggestion, it.settings))
+        _uiState.update { currentState ->
+            currentState.copy(
+                activeSuggestion = suggestion,
+                filteredItems = filterList(currentState.allItems, currentState.currentFilter, suggestion, currentState.settings)
+            )
         }
     }
 
@@ -209,11 +221,19 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         settings: SettingsUiState
     ): List<SimpleMediaItem> {
         var result = when (filter) {
-            MediaFilter.IMAGES -> items.filter { it.mimeType?.startsWith("image") == true }
-            MediaFilter.VIDEOS -> items.filter { it.mimeType?.startsWith("video") == true }
-            MediaFilter.MEMES -> items.filter { it.name.contains("meme", ignoreCase = true) || it.path.contains("meme", ignoreCase = true) }
-            MediaFilter.DUPLICATES -> items.groupBy { "${it.name.lowercase()}_${it.sizeKb}" }.values.filter { group -> group.size > 1 }.flatten()
-            MediaFilter.OTHER -> items.filter { it.mimeType?.startsWith("image") != true && it.mimeType?.startsWith("video") != true }
+            MediaFilter.IMAGES -> items.filter { mediaItem -> mediaItem.mimeType?.startsWith("image") == true }
+            MediaFilter.VIDEOS -> items.filter { mediaItem -> mediaItem.mimeType?.startsWith("video") == true }
+            MediaFilter.MEMES -> items.filter { mediaItem ->
+                mediaItem.name.contains("meme", ignoreCase = true) || mediaItem.path.contains("meme", ignoreCase = true)
+            }
+            MediaFilter.DUPLICATES -> items
+                .groupBy { mediaItem -> "${mediaItem.name.lowercase()}_${mediaItem.sizeKb}" }
+                .values
+                .filter { groupedItems -> groupedItems.size > 1 }
+                .flatten()
+            MediaFilter.OTHER -> items.filter { mediaItem ->
+                mediaItem.mimeType?.startsWith("image") != true && mediaItem.mimeType?.startsWith("video") != true
+            }
             MediaFilter.ALL -> items
         }
         result = result.filter { item ->
@@ -226,8 +246,10 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
         val today = System.currentTimeMillis() - 86400000
         result = when (suggestion) {
-            SuggestionType.LARGE_TODAY -> result.filter { it.addedMillis > today && it.sizeKb > 5000 }
-            SuggestionType.SCREENSHOTS_TODAY -> result.filter { it.addedMillis > today && it.name.startsWith("Screenshot", true) }
+            SuggestionType.LARGE_TODAY -> result.filter { mediaItem -> mediaItem.addedMillis > today && mediaItem.sizeKb > 5000 }
+            SuggestionType.SCREENSHOTS_TODAY -> result.filter { mediaItem ->
+                mediaItem.addedMillis > today && mediaItem.name.startsWith("Screenshot", true)
+            }
             SuggestionType.NONE -> result
         }
         return result
@@ -235,71 +257,92 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     fun toggleReminders(enabled: Boolean) {
         prefs.setRemindersEnabled(enabled)
-        _uiState.update { it.copy(remindersEnabled = enabled, settings = it.settings.copy(dailyReminderEnabled = enabled)) }
+        _uiState.update { currentState ->
+            currentState.copy(remindersEnabled = enabled, settings = currentState.settings.copy(dailyReminderEnabled = enabled))
+        }
     }
 
     fun setFrequency(option: ReminderFreq) {
         prefs.setReminderFrequencyDays(option.days)
-        _uiState.update { it.copy(selectedFrequency = option) }
+        _uiState.update { currentState -> currentState.copy(selectedFrequency = option) }
     }
 
     fun setTime(option: ReminderTime) {
         prefs.setReminderTime(option.hour, option.minute)
-        _uiState.update { it.copy(selectedTime = option) }
+        _uiState.update { currentState -> currentState.copy(selectedTime = option) }
     }
 
     fun setThemeMode(mode: AppThemeMode) {
         prefs.setThemeMode(mode)
-        _uiState.update { it.copy(settings = it.settings.copy(themeMode = mode)) }
+        _uiState.update { currentState -> currentState.copy(settings = currentState.settings.copy(themeMode = mode)) }
     }
 
     fun setSmartAlerts(enabled: Boolean) {
         prefs.setSmartAlertEnabled(enabled)
-        _uiState.update { it.copy(settings = it.settings.copy(smartAlertEnabled = enabled)) }
+        _uiState.update { currentState ->
+            currentState.copy(settings = currentState.settings.copy(smartAlertEnabled = enabled))
+        }
     }
 
     fun setAutoCleanFrequency(option: ReminderFrequencyOption) {
         prefs.setAutoCleanFrequency(option)
-        _uiState.update { it.copy(settings = it.settings.copy(autoCleanFrequency = option)) }
+        _uiState.update { currentState ->
+            currentState.copy(settings = currentState.settings.copy(autoCleanFrequency = option))
+        }
     }
 
     fun setFileSizeFilter(valueMb: Int) {
         prefs.setFileSizeFilterMb(valueMb)
-        _uiState.update {
-            val updatedSettings = it.settings.copy(fileSizeFilterMb = valueMb)
-            it.copy(settings = updatedSettings, filteredItems = filterList(it.allItems, it.currentFilter, it.activeSuggestion, updatedSettings))
+        _uiState.update { currentState ->
+            val updatedSettings = currentState.settings.copy(fileSizeFilterMb = valueMb)
+            currentState.copy(
+                settings = updatedSettings,
+                filteredItems = filterList(currentState.allItems, currentState.currentFilter, currentState.activeSuggestion, updatedSettings)
+            )
         }
     }
 
     fun setShowOnlyLargeFiles(enabled: Boolean) {
         prefs.setShowOnlyLargeFiles(enabled)
-        _uiState.update {
-            val updatedSettings = it.settings.copy(showOnlyLargeFiles = enabled)
-            it.copy(settings = updatedSettings, filteredItems = filterList(it.allItems, it.currentFilter, it.activeSuggestion, updatedSettings))
+        _uiState.update { currentState ->
+            val updatedSettings = currentState.settings.copy(showOnlyLargeFiles = enabled)
+            currentState.copy(
+                settings = updatedSettings,
+                filteredItems = filterList(currentState.allItems, currentState.currentFilter, currentState.activeSuggestion, updatedSettings)
+            )
         }
     }
 
     fun setIncludeScreenshots(enabled: Boolean) {
         prefs.setIncludeScreenshots(enabled)
-        _uiState.update {
-            val updatedSettings = it.settings.copy(includeScreenshots = enabled)
-            it.copy(settings = updatedSettings, filteredItems = filterList(it.allItems, it.currentFilter, it.activeSuggestion, updatedSettings))
+        _uiState.update { currentState ->
+            val updatedSettings = currentState.settings.copy(includeScreenshots = enabled)
+            currentState.copy(
+                settings = updatedSettings,
+                filteredItems = filterList(currentState.allItems, currentState.currentFilter, currentState.activeSuggestion, updatedSettings)
+            )
         }
     }
 
     fun setIncludeMemes(enabled: Boolean) {
         prefs.setIncludeMemes(enabled)
-        _uiState.update {
-            val updatedSettings = it.settings.copy(includeMemes = enabled)
-            it.copy(settings = updatedSettings, filteredItems = filterList(it.allItems, it.currentFilter, it.activeSuggestion, updatedSettings))
+        _uiState.update { currentState ->
+            val updatedSettings = currentState.settings.copy(includeMemes = enabled)
+            currentState.copy(
+                settings = updatedSettings,
+                filteredItems = filterList(currentState.allItems, currentState.currentFilter, currentState.activeSuggestion, updatedSettings)
+            )
         }
     }
 
     fun setIncludeDuplicates(enabled: Boolean) {
         prefs.setIncludeDuplicates(enabled)
-        _uiState.update {
-            val updatedSettings = it.settings.copy(includeDuplicates = enabled)
-            it.copy(settings = updatedSettings, filteredItems = filterList(it.allItems, it.currentFilter, it.activeSuggestion, updatedSettings))
+        _uiState.update { currentState ->
+            val updatedSettings = currentState.settings.copy(includeDuplicates = enabled)
+            currentState.copy(
+                settings = updatedSettings,
+                filteredItems = filterList(currentState.allItems, currentState.currentFilter, currentState.activeSuggestion, updatedSettings)
+            )
         }
     }
 
@@ -308,8 +351,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         val isPro = _uiState.value.isProUser
         if (isPro) return true
         val attempts = prefs.incrementFreePremiumAttempts()
-        _uiState.update {
-            it.copy(
+        _uiState.update { currentState ->
+            currentState.copy(
                 paywallSource = feature.paywallSource,
                 hasExceededFreeLimit = attempts >= 2
             )
@@ -319,7 +362,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun notePaywallViewed(source: String) {
-        _uiState.update { it.copy(paywallSource = source) }
+        _uiState.update { currentState -> currentState.copy(paywallSource = source) }
         analytics.trackPaywallViewed(source)
     }
 
@@ -329,7 +372,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     fun recordCleanupResult(bytes: Long) {
         prefs.recordCleanup()
-        _uiState.update { it.copy(lastCleanupBytes = bytes) }
+        _uiState.update { currentState -> currentState.copy(lastCleanupBytes = bytes) }
     }
 
     fun shareResultText(): String {
@@ -371,8 +414,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             prefs.getReminderTimeHour(),
             prefs.getReminderTimeMinute()
         )
-        _uiState.update {
-            it.copy(
+        _uiState.update { currentState ->
+            currentState.copy(
                 remindersEnabled = prefs.isRemindersEnabled(),
                 selectedFrequency = reminderFreq,
                 selectedTime = reminderTime,

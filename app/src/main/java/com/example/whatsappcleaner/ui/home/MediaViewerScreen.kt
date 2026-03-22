@@ -81,13 +81,13 @@ fun MediaViewerScreen(
     }
 
     val filtered = when (tab) {
-        MediaFilter.IMAGES -> allItems.filter { it.mimeType?.startsWith("image") == true }
-        MediaFilter.VIDEOS -> allItems.filter { it.mimeType?.startsWith("video") == true }
-        MediaFilter.MEMES -> allItems.filter { it.name.contains("meme", true) || it.path.contains("meme", true) }
+        MediaFilter.IMAGES -> allItems.filter { mediaItem -> mediaItem.mimeType?.startsWith("image") == true }
+        MediaFilter.VIDEOS -> allItems.filter { mediaItem -> mediaItem.mimeType?.startsWith("video") == true }
+        MediaFilter.MEMES -> allItems.filter { mediaItem -> mediaItem.name.contains("meme", true) || mediaItem.path.contains("meme", true) }
         MediaFilter.DUPLICATES -> duplicateItems
         else -> allItems
     }
-    val remainingVisibleItems = filtered.count { it.uri.toString() !in removedItemIds }
+    val remainingVisibleItems = filtered.count { mediaItem -> mediaItem.uri.toString() !in removedItemIds }
 
     Scaffold(
         topBar = {
@@ -141,18 +141,23 @@ fun MediaViewerScreen(
                     color = TextSecondary
                 )
             }
-            item { FilterTabs(currentFilter = tab, onFilterChange = { tab = it }) }
+            item {
+                FilterTabs(
+                    currentFilter = tab,
+                    onFilterChange = { selectedFilter -> tab = selectedFilter }
+                )
+            }
             if (remainingVisibleItems == 0) {
                 item {
                     FriendlyState(Icons.Default.PermMedia, "No media here yet", "Try another category or refresh the scan.")
                 }
             } else {
-                items(filtered, key = { it.uri.toString() }) { item ->
+                items(filtered, key = { mediaItem -> mediaItem.uri.toString() }) { item ->
                     AnimatedVisibility(
                         visible = item.uri.toString() !in removedItemIds,
                         enter = fadeIn(animationSpec = tween(420)) + slideInVertically(
                             animationSpec = tween(420),
-                            initialOffsetY = { it / 3 }
+                            initialOffsetY = { offset -> offset / 3 }
                         ),
                         exit = fadeOut(animationSpec = tween(320)) + shrinkVertically(animationSpec = tween(320))
                     ) {
