@@ -196,7 +196,7 @@ fun StorageRing(progress: Float, label: String, subtitle: String, modifier: Modi
 
     Box(modifier = modifier.size(90.dp), contentAlignment = Alignment.Center) {
         CircularProgressIndicator(
-            progress = { animatedProgress },
+            progress = animatedProgress,
             trackColor = SurfaceMuted,
             strokeWidth = 8.dp,
             color = AccentBlue,

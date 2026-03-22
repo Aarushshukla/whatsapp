@@ -41,7 +41,7 @@ private fun HeatRow(label: String, percentage: Float) {
         modifier = Modifier.padding(top = 8.dp)
     )
     LinearProgressIndicator(
-        progress = { percentage.coerceIn(0f, 1f) },
+        progress = percentage.coerceIn(0f, 1f),
         color = AccentBlue,
         trackColor = SurfaceMuted,
         modifier = Modifier
