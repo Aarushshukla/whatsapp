@@ -54,6 +54,8 @@ import com.example.whatsappcleaner.ui.theme.TextSecondary
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
+private fun SimpleMediaItem.safeDisplayName(): String = name.ifBlank { "Media file" }
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MediaViewerScreen(
@@ -159,7 +161,7 @@ fun MediaViewerScreen(
                             selected = false,
                             onClick = { onOpenInSystem(item) },
                             onDelete = { pendingDelete = item },
-                            onKeep = { scope.launch { snackbarHostState.showSnackbar("Kept ${item.name}") } },
+                            onKeep = { scope.launch { snackbarHostState.showSnackbar("Kept ${item.safeDisplayName()}") } },
                             onOpen = { onOpenInSystem(item) }
                         )
                     }
@@ -172,14 +174,14 @@ fun MediaViewerScreen(
         AlertDialog(
             onDismissRequest = { pendingDelete = null },
             title = { Text("Delete this file?", color = TextMain) },
-            text = { Text("Are you sure you want to delete ${item.name}?", color = TextSecondary) },
+            text = { Text("Are you sure you want to delete ${item.safeDisplayName()}?", color = TextSecondary) },
             confirmButton = {
                 LegitButton(text = "Open delete flow", onClick = {
                     pendingDelete = null
                     removedItemIds = removedItemIds + item.uri.toString()
                     successMessage = "🎉 ${formatSize(item.sizeKb.toLong() * 1024L)} Freed!"
                     onOpenInSystem(item)
-                    scope.launch { snackbarHostState.showSnackbar("Opened ${item.name} for deletion") }
+                    scope.launch { snackbarHostState.showSnackbar("Opened ${item.safeDisplayName()} for deletion") }
                 })
             },
             dismissButton = {

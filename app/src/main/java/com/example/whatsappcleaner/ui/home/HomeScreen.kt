@@ -131,6 +131,10 @@ import com.example.whatsappcleaner.ui.theme.TextSecondary
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
+private fun SimpleMediaItem.safeDisplayName(): String = name.ifBlank { "Media file" }
+
+private fun SimpleMediaItem.safeMimeLabel(): String = mimeType.orEmpty().ifBlank { "Unknown media" }
+
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun SimpleHomeScreen(
@@ -341,8 +345,9 @@ fun SimpleHomeScreen(
                             },
                             onOpen = { onOpenInSystem(item) },
                             onKeep = {
-                                successMessage = "Kept ${item.name.take(18)}"
-                                scope.launch { snackbarHostState.showSnackbar("Kept ${item.name}") }
+                                val itemName = item.safeDisplayName()
+                                successMessage = "Kept ${itemName.take(18)}"
+                                scope.launch { snackbarHostState.showSnackbar("Kept $itemName") }
                             },
                             onDelete = { pendingDelete = item }
                         )
@@ -358,7 +363,7 @@ fun SimpleHomeScreen(
             title = { Text("Delete this file?", color = TextMain) },
             text = {
                 Text(
-                    "We’ll open ${item.name} in the system viewer so you can delete it safely without changing app logic.",
+                    "We’ll open ${item.safeDisplayName()} in the system viewer so you can delete it safely without changing app logic.",
                     color = TextSecondary
                 )
             },
@@ -371,7 +376,7 @@ fun SimpleHomeScreen(
                         successMessage = "${formatSize(item.sizeKb.toLong() * 1024L)} ready to clear"
                         onDeleteConfirmed()
                         onOpenInSystem(item)
-                        scope.launch { snackbarHostState.showSnackbar("Opened ${item.name} for deletion") }
+                        scope.launch { snackbarHostState.showSnackbar("Opened ${item.safeDisplayName()} for deletion") }
                     }
                 )
             },
@@ -852,7 +857,7 @@ private fun MediaGridCard(
             ) {
                 AsyncImage(
                     model = model,
-                    contentDescription = item.name,
+                    contentDescription = item.safeDisplayName(),
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop
                 )
@@ -895,8 +900,8 @@ private fun MediaGridCard(
             }
 
             Column(modifier = Modifier.padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(item.name, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleSmall, color = TextMain)
-                Text(item.mimeType ?: "Unknown media", style = MaterialTheme.typography.bodySmall, color = TextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(item.safeDisplayName(), maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleSmall, color = TextMain)
+                Text(item.safeMimeLabel(), style = MaterialTheme.typography.bodySmall, color = TextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
 
             Row(
@@ -1101,8 +1106,8 @@ fun MediaRow(item: SimpleMediaItem, selected: Boolean, onClick: () -> Unit, onOp
             }
             Spacer(Modifier.size(12.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(item.name, maxLines = 1, color = TextMain, style = MaterialTheme.typography.titleSmall)
-                Text(item.mimeType ?: "Unknown media", color = TextSecondary, style = MaterialTheme.typography.bodySmall)
+                Text(item.safeDisplayName(), maxLines = 1, color = TextMain, style = MaterialTheme.typography.titleSmall)
+                Text(item.safeMimeLabel(), color = TextSecondary, style = MaterialTheme.typography.bodySmall)
                 Text(formatSize(item.sizeKb.toLong() * 1024L), color = TextSecondary, style = MaterialTheme.typography.bodySmall)
             }
             LegitButton(text = "Open", onClick = onOpen, modifier = Modifier.height(42.dp))
