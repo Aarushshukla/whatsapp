@@ -55,6 +55,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.whatsappcleaner.data.billing.SubscriptionPlan
 import com.example.whatsappcleaner.data.billing.SubscriptionState
 import com.example.whatsappcleaner.ui.theme.AccentBlue
 import com.example.whatsappcleaner.ui.theme.PrimaryBackground
@@ -141,10 +142,20 @@ fun SettingsScreen(
             }
             item {
                 SettingsSection(title = "Subscription") {
-                    ActionRow("Upgrade to Pro", "Unlock premium cleanup flows", Icons.Default.Upgrade, onUpgradeToPro)
-                    ActionRow("Restore purchase", "Refresh your previous purchases", Icons.Default.Restore, onRestorePurchase)
-                    ActionRow("Manage subscription", "Open the Play subscription center", Icons.Default.Subscriptions, onManageSubscription)
-                    ActionRow("Current plan", subscriptionState.currentPlan.displayName, Icons.Default.Star, onClick = onUpgradeToPro)
+                    ActionRow(
+                        "Upgrade to Pro",
+                        if (subscriptionState.isProUser) "Current plan: ${subscriptionState.currentPlan.displayName}" else "Unlock Smart Clean, duplicate review, meme detection, and bulk delete",
+                        Icons.Default.Upgrade,
+                        onUpgradeToPro
+                    )
+                    ActionRow("Restore purchase", "Refresh your previous Play purchases", Icons.Default.Restore, onRestorePurchase)
+                    ActionRow(
+                        "Manage subscription",
+                        if (subscriptionState.currentPlan == SubscriptionPlan.LIFETIME) "Lifetime unlocks do not renew, but you can still review Play purchases" else "Open the Play subscription center",
+                        Icons.Default.Subscriptions,
+                        onManageSubscription
+                    )
+                    ActionRow("Billing status", subscriptionState.lastMessage ?: subscriptionState.currentPlan.displayName, Icons.Default.Star, onClick = onUpgradeToPro)
                 }
             }
             item {

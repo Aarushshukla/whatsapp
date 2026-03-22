@@ -93,7 +93,8 @@ fun GradientHeroButton(
     text: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    icon: ImageVector = Icons.Default.AutoAwesome
+    icon: ImageVector = Icons.Default.AutoAwesome,
+    enabled: Boolean = true
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
@@ -102,13 +103,23 @@ fun GradientHeroButton(
         animationSpec = tween(durationMillis = 350),
         label = "hero_scale"
     )
-    val brush = Brush.horizontalGradient(listOf(AccentBlue, AccentPurple))
+    val brush = if (enabled) {
+        Brush.horizontalGradient(listOf(AccentBlue, AccentPurple))
+    } else {
+        Brush.horizontalGradient(listOf(SurfaceMuted, SurfaceMuted))
+    }
 
     Button(
         onClick = onClick,
+        enabled = enabled,
         interactionSource = interactionSource,
         shape = RoundedCornerShape(20.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent, contentColor = Color.White),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = Color.Transparent,
+            contentColor = Color.White,
+            disabledContainerColor = Color.Transparent,
+            disabledContentColor = Color.White.copy(alpha = 0.7f)
+        ),
         contentPadding = androidx.compose.foundation.layout.PaddingValues(),
         modifier = modifier
             .height(60.dp)

@@ -84,4 +84,6 @@ class UserPrefs private constructor(context: Context) {
         prefs.edit().putInt(KEY_FREE_PREMIUM_ATTEMPTS, next).apply()
         return next
     }
+
+    fun resetFreePremiumAttempts() = prefs.edit().putInt(KEY_FREE_PREMIUM_ATTEMPTS, 0).apply()
 }
