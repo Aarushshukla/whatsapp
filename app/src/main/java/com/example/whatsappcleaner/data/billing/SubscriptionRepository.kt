@@ -15,6 +15,7 @@ import com.android.billingclient.api.Purchase
 import com.android.billingclient.api.QueryProductDetailsParams
 import com.android.billingclient.api.QueryPurchasesParams
 import com.example.whatsappcleaner.data.analytics.AppAnalytics
+import java.lang.ref.WeakReference
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -54,6 +55,9 @@ class SubscriptionRepository private constructor(context: Context) {
     private val prefs: SharedPreferences = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     private val analytics = AppAnalytics.get(appContext)
     private val productDetails = mutableMapOf<BillingProduct, ProductDetails>()
+    private var billingClient: BillingClient? = null
+    private var billingConnectionInProgress = false
+    private var pendingPurchaseRequest: PendingPurchaseRequest? = null
     private val _state = MutableStateFlow(
         SubscriptionState(
             isProUser = prefs.getBoolean(KEY_IS_PRO, false),
@@ -64,8 +68,23 @@ class SubscriptionRepository private constructor(context: Context) {
     )
     val state: StateFlow<SubscriptionState> = _state.asStateFlow()
 
-    private val billingClient: BillingClient by lazy {
-        BillingClient.newBuilder(appContext)
+    private data class PendingPurchaseRequest(
+        val activityRef: WeakReference<Activity>,
+        val product: BillingProduct,
+        val source: String
+    )
+
+    private fun billingClient(activity: Activity? = null): BillingClient {
+        val existingClient = billingClient
+        if (existingClient != null) return existingClient
+
+        val billingContext = activity ?: appContext
+        if (activity == null) {
+            Log.w(TAG, "Creating BillingClient without an Activity context. Purchase launch may need a later reconnect.")
+        } else {
+            Log.d(TAG, "Creating BillingClient with Activity context: ${activity::class.java.simpleName}")
+        }
+        return BillingClient.newBuilder(billingContext)
             .setListener(::onPurchasesUpdated)
             .enablePendingPurchases(
                 PendingPurchasesParams.newBuilder()
@@ -73,57 +92,107 @@ class SubscriptionRepository private constructor(context: Context) {
                     .build()
             )
             .build()
+            .also { createdClient -> billingClient = createdClient }
     }
 
-    fun start() {
-        if (billingClient.isReady) {
+    fun start(activity: Activity? = null) {
+        val client = billingClient(activity)
+        if (client.isReady) {
             Log.d(TAG, "Billing client already ready.")
             queryCatalogAndPurchases()
             return
         }
+        if (billingConnectionInProgress) {
+            Log.d(TAG, "BillingClient connection already in progress.")
+            return
+        }
         runCatching {
+            billingConnectionInProgress = true
             Log.d(TAG, "Starting BillingClient connection.")
-            billingClient.startConnection(object : BillingClientStateListener {
+            client.startConnection(object : BillingClientStateListener {
                 override fun onBillingSetupFinished(result: BillingResult) {
+                    billingConnectionInProgress = false
                     Log.d(TAG, "Billing setup finished: code=${result.responseCode}, message=${result.debugMessage}")
                     val ready = result.responseCode == BillingClient.BillingResponseCode.OK
                     updateMessage(result.debugMessage.ifBlank { if (ready) "Billing ready" else "Billing unavailable" }, ready)
                     if (ready) {
                         queryCatalogAndPurchases()
+                        launchPendingPurchaseIfReady()
                     } else {
                         analytics.trackPurchaseFailed(_state.value.currentPlan.name.lowercase(), "setup_${result.responseCode}")
                     }
                 }
 
                 override fun onBillingServiceDisconnected() {
+                    billingConnectionInProgress = false
                     Log.w(TAG, "Billing service disconnected.")
                     updateMessage("Billing temporarily unavailable. Purchases can be retried when Play Store reconnects.", false)
-                    start()
+                    start(activity)
                 }
             })
         }.onFailure { error ->
+            billingConnectionInProgress = false
             Log.e(TAG, "Unable to start billing connection.", error)
             updateMessage("Billing is unavailable on this device right now.", false)
         }
     }
 
     fun launchPurchase(activity: Activity, product: BillingProduct, source: String): BillingResult? {
-        if (!billingClient.isReady) {
-            Log.w(TAG, "launchPurchase called before billing was ready.")
-            start()
+        Log.d(TAG, "launchPurchase requested for product=${product.productId}, source=$source, activity=${activity::class.java.simpleName}")
+        pendingPurchaseRequest = PendingPurchaseRequest(
+            activityRef = WeakReference(activity),
+            product = product,
+            source = source
+        )
+
+        val client = billingClient(activity)
+        if (!client.isReady) {
+            Log.w(TAG, "launchPurchase called before billing was ready. Reconnecting BillingClient first.")
+            start(activity)
             analytics.trackPurchaseFailed(product.name.lowercase(), "billing_not_ready")
-            updateMessage("Play Billing is still connecting. Please try again in a moment.", false)
+            updateMessage("Connecting to Google Play Billing. The purchase screen will open automatically when ready.", false)
             return null
         }
         val details = productDetails[product]
         if (details == null) {
-            Log.w(TAG, "Missing product details for ${product.productId}.")
-            analytics.trackPurchaseFailed(product.name.lowercase(), "missing_product_details")
+            Log.w(TAG, "Missing product details for ${product.productId}. Refreshing catalog before launching billing flow.")
             queryProductDetails()
-            updateMessage("Pricing is still loading. Please try again shortly.", true)
+            updateMessage("Loading latest Google Play pricing. The purchase screen will open automatically when ready.", true)
             return null
         }
+        return launchBillingFlow(activity, client, product, source, details)
+    }
 
+    private fun launchPendingPurchaseIfReady() {
+        val pendingRequest = pendingPurchaseRequest ?: return
+        val client = billingClient ?: return
+        if (!client.isReady) {
+            Log.d(TAG, "Pending purchase is waiting for BillingClient readiness.")
+            return
+        }
+        val activity = pendingRequest.activityRef.get()
+        if (activity == null || activity.isFinishing) {
+            Log.w(TAG, "Dropping pending purchase for ${pendingRequest.product.productId} because Activity is no longer valid.")
+            pendingPurchaseRequest = null
+            updateMessage("Purchase screen could not open because the current screen is no longer active.", true)
+            return
+        }
+        val details = productDetails[pendingRequest.product]
+        if (details == null) {
+            Log.d(TAG, "Pending purchase still waiting for product details for ${pendingRequest.product.productId}.")
+            return
+        }
+        Log.d(TAG, "Automatically launching pending purchase for ${pendingRequest.product.productId}.")
+        launchBillingFlow(activity, client, pendingRequest.product, pendingRequest.source, details)
+    }
+
+    private fun launchBillingFlow(
+        activity: Activity,
+        billingClient: BillingClient,
+        product: BillingProduct,
+        source: String,
+        details: ProductDetails
+    ): BillingResult? {
         val productParams = BillingFlowParams.ProductDetailsParams.newBuilder()
             .setProductDetails(details)
             .apply {
@@ -143,12 +212,26 @@ class SubscriptionRepository private constructor(context: Context) {
         analytics.trackPurchaseClicked(product.name.lowercase(), source)
         return runCatching {
             Log.d(TAG, "Launching billing flow for ${product.productId} from $source.")
+            pendingPurchaseRequest = null
             billingClient.launchBillingFlow(
                 activity,
                 BillingFlowParams.newBuilder()
                     .setProductDetailsParamsList(listOf(productParams))
                     .build()
             )
+        }.onSuccess { result ->
+            Log.d(TAG, "launchBillingFlow result: code=${result.responseCode}, message=${result.debugMessage}")
+            if (result.responseCode != BillingClient.BillingResponseCode.OK) {
+                analytics.trackPurchaseFailed(product.name.lowercase(), "launch_${result.responseCode}")
+                val fallbackMessage = when (result.responseCode) {
+                    BillingClient.BillingResponseCode.ITEM_UNAVAILABLE ->
+                        "This Play product is unavailable. Confirm the product exists in Play Console and is active for this build."
+                    BillingClient.BillingResponseCode.SERVICE_DISCONNECTED ->
+                        "Google Play Billing disconnected before the purchase screen opened. Please try again."
+                    else -> "Unable to open the Play purchase sheet right now."
+                }
+                updateMessage(result.debugMessage.ifBlank { fallbackMessage }, billingClient.isReady)
+            }
         }.onFailure { error ->
             Log.e(TAG, "Failed to launch billing flow for ${product.productId}.", error)
             analytics.trackPurchaseFailed(product.name.lowercase(), "launch_exception")
@@ -172,7 +255,8 @@ class SubscriptionRepository private constructor(context: Context) {
     }
 
     private fun queryProductDetails() {
-        if (!billingClient.isReady) {
+        val client = billingClient ?: return
+        if (!client.isReady) {
             Log.w(TAG, "queryProductDetails skipped because billing is not ready.")
             return
         }
@@ -182,7 +266,7 @@ class SubscriptionRepository private constructor(context: Context) {
                 .setProductType(product.productType)
                 .build()
         }
-        billingClient.queryProductDetailsAsync(
+        client.queryProductDetailsAsync(
             QueryProductDetailsParams.newBuilder()
                 .setProductList(products)
                 .build()
@@ -193,6 +277,13 @@ class SubscriptionRepository private constructor(context: Context) {
                 TAG,
                 "Product details response: code=${result.responseCode}, count=${detailsList.size}, unfetched=${unfetchedProducts.size}"
             )
+            unfetchedProducts.forEach { unfetched ->
+                Log.w(
+                    TAG,
+                    "Product details unavailable for productId=${unfetched.productId}, type=${unfetched.productType}, status=${unfetched.statusCode}. " +
+                        "Verify the Play Console product exists, is active, and is available to this app build/account."
+                )
+            }
             if (result.responseCode != BillingClient.BillingResponseCode.OK) {
                 updateMessage(result.debugMessage.ifBlank { "Unable to load pricing from Play Billing." }, true)
                 return@queryProductDetailsAsync
@@ -227,11 +318,17 @@ class SubscriptionRepository private constructor(context: Context) {
                     hasPrices = priceMap.isNotEmpty() || currentState.hasPrices
                 )
             }
+            launchPendingPurchaseIfReady()
         }
     }
 
     private fun queryActivePurchases(forceReconnect: Boolean) {
-        if (!billingClient.isReady) {
+        val client = billingClient
+        if (client == null) {
+            if (forceReconnect) start() else Log.d(TAG, "queryActivePurchases skipped because BillingClient is not created yet.")
+            return
+        }
+        if (!client.isReady) {
             if (forceReconnect) start() else Log.d(TAG, "queryActivePurchases skipped while billing is offline.")
             return
         }
@@ -251,11 +348,11 @@ class SubscriptionRepository private constructor(context: Context) {
             }
         }
 
-        billingClient.queryPurchasesAsync(
+        client.queryPurchasesAsync(
             QueryPurchasesParams.newBuilder().setProductType(BillingClient.ProductType.SUBS).build()
         ) { result, batch -> handleBatch(result, batch) }
 
-        billingClient.queryPurchasesAsync(
+        client.queryPurchasesAsync(
             QueryPurchasesParams.newBuilder().setProductType(BillingClient.ProductType.INAPP).build()
         ) { result, batch -> handleBatch(result, batch) }
     }
@@ -305,15 +402,16 @@ class SubscriptionRepository private constructor(context: Context) {
             }
             updateMessage("${plan.displayName} active.", true)
         } else {
-            updateMessage("Using free plan.", billingClient.isReady)
+            updateMessage("Using free plan.", billingClient?.isReady == true)
         }
     }
 
     private fun acknowledgePurchase(purchase: Purchase) {
+        val client = billingClient ?: return
         val params = AcknowledgePurchaseParams.newBuilder()
             .setPurchaseToken(purchase.purchaseToken)
             .build()
-        billingClient.acknowledgePurchase(params) { result ->
+        client.acknowledgePurchase(params) { result ->
             if (result.responseCode == BillingClient.BillingResponseCode.OK) {
                 Log.d(TAG, "Purchase acknowledged for token=${purchase.purchaseToken.take(6)}***")
             } else {
