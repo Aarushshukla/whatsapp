@@ -5,6 +5,7 @@
 
 package com.example.whatsappcleaner.ui.home
 
+import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -824,16 +825,19 @@ private fun MediaGridCard(
         animationSpec = tween(220),
         label = "media_scale"
     )
-    val model = remember(item.uri, item.mimeType) {
-        ImageRequest.Builder(context)
-            .data(item.uri)
-            .crossfade(true)
-            .apply {
-                if (item.mimeType?.startsWith("video") == true) {
-                    videoFrameMillis(0)
+    val mediaSource = remember(item.uri) { item.uri.takeIf { it != Uri.EMPTY } }
+    val model = remember(mediaSource, item.mimeType) {
+        mediaSource?.let { source ->
+            ImageRequest.Builder(context)
+                .data(source)
+                .crossfade(true)
+                .apply {
+                    if (item.mimeType?.startsWith("video") == true) {
+                        videoFrameMillis(0)
+                    }
                 }
-            }
-            .build()
+                .build()
+        }
     }
 
     Card(
@@ -855,12 +859,20 @@ private fun MediaGridCard(
                     .fillMaxWidth()
                     .aspectRatio(1f)
             ) {
-                AsyncImage(
-                    model = model,
-                    contentDescription = item.safeDisplayName(),
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
+                if (model != null) {
+                    AsyncImage(
+                        model = model,
+                        contentDescription = item.safeDisplayName(),
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(PrimaryBackground.copy(alpha = 0.12f))
+                    )
+                }
                 Box(
                     modifier = Modifier
                         .matchParentSize()

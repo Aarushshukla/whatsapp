@@ -1,17 +1,15 @@
 buildscript {
-    ext {
-        agpVersion = '8.7.3'
-        kotlinVersion = '1.9.25'
-    }
+    ext.kotlin_version = "2.0.21"
+    ext.agp_version = "8.3.2"
+
     repositories {
         google()
         mavenCentral()
     }
+
     dependencies {
-        classpath "com.android.tools.build:gradle:$agpVersion"
-        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion"
-        if (rootProject.file('app/google-services.json').exists()) {
-            classpath 'com.google.gms:google-services:4.4.4'
-        }
+        classpath "com.android.tools.build:gradle:$agp_version"
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+        classpath 'com.google.gms:google-services:4.4.4'
     }
 }
