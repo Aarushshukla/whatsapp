@@ -25,7 +25,7 @@ private const val PREFS_NAME = "subscription_prefs"
 private const val KEY_IS_PRO = "is_pro_user"
 private const val KEY_PLAN = "current_plan"
 private const val KEY_BILLING_MESSAGE = "billing_message"
-
+private const val KEY_LAST_ENTITLED_PLAN = "last_entitled_plan"
 
 enum class BillingProduct(val productId: String, val productType: String, val label: String) {
     MONTHLY("cleanly_ai_monthly", BillingClient.ProductType.SUBS, "Monthly"),
@@ -45,7 +45,8 @@ data class SubscriptionState(
     val currentPlan: SubscriptionPlan = SubscriptionPlan.FREE,
     val prices: Map<BillingProduct, String> = emptyMap(),
     val billingReady: Boolean = false,
-    val lastMessage: String? = null
+    val lastMessage: String? = null,
+    val hasPrices: Boolean = false
 )
 
 class SubscriptionRepository private constructor(context: Context) {
@@ -57,7 +58,8 @@ class SubscriptionRepository private constructor(context: Context) {
         SubscriptionState(
             isProUser = prefs.getBoolean(KEY_IS_PRO, false),
             currentPlan = safePlan(prefs.getString(KEY_PLAN, SubscriptionPlan.FREE.name)),
-            lastMessage = prefs.getString(KEY_BILLING_MESSAGE, null)
+            lastMessage = prefs.getString(KEY_BILLING_MESSAGE, null),
+            hasPrices = false
         )
     )
     val state: StateFlow<SubscriptionState> = _state.asStateFlow()
@@ -96,6 +98,7 @@ class SubscriptionRepository private constructor(context: Context) {
                 override fun onBillingServiceDisconnected() {
                     Log.w(TAG, "Billing service disconnected.")
                     updateMessage("Billing temporarily unavailable. Purchases can be retried when Play Store reconnects.", false)
+                    start()
                 }
             })
         }.onFailure { error ->
@@ -220,7 +223,8 @@ class SubscriptionRepository private constructor(context: Context) {
                 currentState.copy(
                     prices = if (priceMap.isEmpty()) currentState.prices else priceMap,
                     billingReady = true,
-                    lastMessage = if (priceMap.isEmpty()) "Pricing unavailable. You can try again later." else currentState.lastMessage
+                    lastMessage = if (priceMap.isEmpty()) "Pricing unavailable. You can try again later." else currentState.lastMessage,
+                    hasPrices = priceMap.isNotEmpty() || currentState.hasPrices
                 )
             }
         }
@@ -281,9 +285,10 @@ class SubscriptionRepository private constructor(context: Context) {
             }
         }
 
-        val activePurchase = purchases.firstOrNull { purchase ->
-            purchase.purchaseState == Purchase.PurchaseState.PURCHASED
-        }
+        val activePurchase = purchases
+            .filter { purchase -> purchase.purchaseState == Purchase.PurchaseState.PURCHASED }
+            .sortedByDescending(::purchasePriority)
+            .firstOrNull()
         val plan = when {
             activePurchase == null -> SubscriptionPlan.FREE
             activePurchase.products.contains(BillingProduct.LIFETIME.productId) -> SubscriptionPlan.LIFETIME
@@ -291,9 +296,13 @@ class SubscriptionRepository private constructor(context: Context) {
             activePurchase.products.contains(BillingProduct.MONTHLY.productId) -> SubscriptionPlan.MONTHLY
             else -> SubscriptionPlan.FREE
         }
+        val previousPlan = safePlan(prefs.getString(KEY_LAST_ENTITLED_PLAN, SubscriptionPlan.FREE.name))
         persistState(plan != SubscriptionPlan.FREE, plan)
+        prefs.edit().putString(KEY_LAST_ENTITLED_PLAN, plan.name).apply()
         if (plan != SubscriptionPlan.FREE) {
-            analytics.trackPurchaseSuccess(plan.name.lowercase())
+            if (previousPlan != plan) {
+                analytics.trackPurchaseSuccess(plan.name.lowercase())
+            }
             updateMessage("${plan.displayName} active.", true)
         } else {
             updateMessage("Using free plan.", billingClient.isReady)
@@ -312,6 +321,13 @@ class SubscriptionRepository private constructor(context: Context) {
                 analytics.trackPurchaseFailed(planNameFromPurchase(purchase), "ack_${result.responseCode}")
             }
         }
+    }
+
+    private fun purchasePriority(purchase: Purchase): Int = when {
+        purchase.products.contains(BillingProduct.LIFETIME.productId) -> 3
+        purchase.products.contains(BillingProduct.YEARLY.productId) -> 2
+        purchase.products.contains(BillingProduct.MONTHLY.productId) -> 1
+        else -> 0
     }
 
     private fun planNameFromPurchase(purchase: Purchase): String = when {

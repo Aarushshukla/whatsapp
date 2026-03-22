@@ -102,7 +102,15 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         subscriptionRepository.refreshPurchases()
         viewModelScope.launch {
             subscriptionRepository.state.collectLatest { subscriptionState ->
-                _uiState.update { currentState -> currentState.copy(subscriptionState = subscriptionState) }
+                if (subscriptionState.isProUser) {
+                    prefs.resetFreePremiumAttempts()
+                }
+                _uiState.update { currentState ->
+                    currentState.copy(
+                        subscriptionState = subscriptionState,
+                        hasExceededFreeLimit = if (subscriptionState.isProUser) false else prefs.getFreePremiumAttempts() >= 2
+                    )
+                }
             }
         }
     }
@@ -362,7 +370,12 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun notePaywallViewed(source: String) {
-        _uiState.update { currentState -> currentState.copy(paywallSource = source) }
+        _uiState.update { currentState ->
+            currentState.copy(
+                paywallSource = source,
+                hasExceededFreeLimit = !currentState.isProUser && prefs.getFreePremiumAttempts() >= 2
+            )
+        }
         analytics.trackPaywallViewed(source)
     }
 
