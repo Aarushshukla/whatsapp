@@ -32,16 +32,17 @@ fun SmartCleanScreen(
     Column(modifier = modifier.fillMaxSize()) {
         Text("Smart Clean", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(16.dp))
         LazyColumn(modifier = Modifier.weight(1f), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            items(groups) { (title, items) ->
+            items(groups) { group ->
+                val (title, groupItems) = group
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(title, style = MaterialTheme.typography.titleMedium)
-                        Text("${items.size} files", style = MaterialTheme.typography.bodyLarge)
-                        items.take(3).forEach { item ->
+                        Text("${groupItems.size} files", style = MaterialTheme.typography.bodyLarge)
+                        groupItems.take(3).forEach { item ->
                             Text("• ${item.name}", modifier = Modifier.padding(top = 4.dp))
                         }
-                        items.firstOrNull()?.let { first ->
-                            Button(onClick = { onOpenInSystem(first) }, modifier = Modifier.padding(top = 8.dp)) { Text("Open sample") }
+                        groupItems.firstOrNull()?.let { firstItem ->
+                            Button(onClick = { onOpenInSystem(firstItem) }, modifier = Modifier.padding(top = 8.dp)) { Text("Open sample") }
                         }
                     }
                 }

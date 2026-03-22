@@ -21,7 +21,7 @@ data class SmartJunkResult(
 ) {
     val totalCandidates: Int
         get() = (blurryImages + darkImages + burstDuplicates + tinyImages + cachedMedia)
-            .distinctBy { it.uri }
+            .distinctBy { mediaItem -> mediaItem.uri }
             .size
 }
 
@@ -30,7 +30,7 @@ class SmartJunkAnalyzer(
 ) {
 
     suspend fun analyze(items: List<SimpleMediaItem>): SmartJunkResult = withContext(Dispatchers.Default) {
-        val imageItems = items.filter { it.mimeType?.startsWith("image/") == true }
+        val imageItems = items.filter { mediaItem -> mediaItem.mimeType?.startsWith("image/") == true }
 
         val blurry = mutableListOf<SimpleMediaItem>()
         val dark = mutableListOf<SimpleMediaItem>()
@@ -43,17 +43,17 @@ class SmartJunkAnalyzer(
         }
 
         val burst = imageItems
-            .sortedBy { it.addedMillis }
+            .sortedBy { mediaItem -> mediaItem.addedMillis }
             .zipWithNext()
             .filter { (first, second) ->
                 second.addedMillis - first.addedMillis in 0..BURST_WINDOW_MS &&
                     first.name.substringBeforeLast('.') == second.name.substringBeforeLast('.')
             }
-            .flatMap { listOf(it.first, it.second) }
-            .distinctBy { it.uri }
+            .flatMap { pair -> listOf(pair.first, pair.second) }
+            .distinctBy { mediaItem -> mediaItem.uri }
 
-        val tiny = imageItems.filter { it.sizeKb in 1 until TINY_IMAGE_KB }
-        val cached = items.filter { it.path.contains("cache", ignoreCase = true) }
+        val tiny = imageItems.filter { mediaItem -> mediaItem.sizeKb in 1 until TINY_IMAGE_KB }
+        val cached = items.filter { mediaItem -> mediaItem.path.contains("cache", ignoreCase = true) }
 
         SmartJunkResult(
             blurryImages = blurry,
@@ -111,7 +111,9 @@ class SmartJunkAnalyzer(
 
         if (laplacianValues.isEmpty()) return false
         val mean = laplacianValues.average()
-        val variance = laplacianValues.map { (it - mean) * (it - mean) }.average()
+        val variance = laplacianValues.map { laplacianValue ->
+            (laplacianValue - mean) * (laplacianValue - mean)
+        }.average()
         return variance < 120.0
     }
 }

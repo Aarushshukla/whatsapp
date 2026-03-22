@@ -27,22 +27,22 @@ class PhoneRealityAnalyzer {
         storageFreedTodayBytes: Long = 0,
         cleaningStreak: Int = 0
     ): PhoneRealityReport {
-        val images = items.filter { it.mimeType?.startsWith("image/") == true }
-        val videos = items.filter { it.mimeType?.startsWith("video/") == true }
-        val screenshots = images.filter {
-            it.path.contains("screenshots", true) ||
-                it.name.contains("screenshot", true) ||
-                it.name.contains("screen_shot", true)
+        val images = items.filter { mediaItem -> mediaItem.mimeType?.startsWith("image/") == true }
+        val videos = items.filter { mediaItem -> mediaItem.mimeType?.startsWith("video/") == true }
+        val screenshots = images.filter { mediaItem ->
+            mediaItem.path.contains("screenshots", true) ||
+                mediaItem.name.contains("screenshot", true) ||
+                mediaItem.name.contains("screen_shot", true)
         }
 
         val duplicates = items
-            .groupBy { Triple(it.name.lowercase(), it.sizeKb, it.mimeType.orEmpty()) }
+            .groupBy { mediaItem -> Triple(mediaItem.name.lowercase(), mediaItem.sizeKb, mediaItem.mimeType.orEmpty()) }
             .values
             .sumOf { group -> (group.size - 1).coerceAtLeast(0) }
 
-        val oldestPhotoMillis = images.minOfOrNull { it.addedMillis }
-        val oldestPhotoDate = oldestPhotoMillis?.let {
-            SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(Date(it))
+        val oldestPhotoMillis = images.minOfOrNull { mediaItem -> mediaItem.addedMillis }
+        val oldestPhotoDate = oldestPhotoMillis?.let { millis ->
+            SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(Date(millis))
         } ?: "-"
 
         return PhoneRealityReport(
@@ -51,8 +51,8 @@ class PhoneRealityAnalyzer {
             totalScreenshots = screenshots.size,
             totalMemes = memeItems.size,
             duplicateFiles = duplicates,
-            totalStorageUsedBytes = items.sumOf { it.sizeKb.toLong() * 1024L },
-            largestFileSizeBytes = items.maxOfOrNull { it.sizeKb.toLong() * 1024L } ?: 0L,
+            totalStorageUsedBytes = items.sumOf { mediaItem -> mediaItem.sizeKb.toLong() * 1024L },
+            largestFileSizeBytes = items.maxOfOrNull { mediaItem -> mediaItem.sizeKb.toLong() * 1024L } ?: 0L,
             oldestPhotoDate = oldestPhotoDate,
             filesDeletedToday = filesDeletedToday,
             storageFreedTodayBytes = storageFreedTodayBytes,

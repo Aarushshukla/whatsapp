@@ -286,7 +286,7 @@ fun SimpleHomeScreen(
                         selectedCount = selected.size,
                         isProUser = isProUser,
                         onReviewClick = {
-                            val firstSelected = items.firstOrNull { it.uri.toString() in selected }
+                            val firstSelected = items.firstOrNull { mediaItem -> mediaItem.uri.toString() in selected }
                             when {
                                 firstSelected != null -> {
                                     successMessage = "Review ready"
@@ -333,7 +333,7 @@ fun SimpleHomeScreen(
                         }
                     }
                 } else {
-                    gridItems(items, key = { it.uri.toString() }) { item ->
+                    gridItems(items, key = { mediaItem -> mediaItem.uri.toString() }) { item ->
                         MediaGridCard(
                             item = item,
                             selected = item.uri.toString() in selected,
@@ -825,7 +825,7 @@ private fun MediaGridCard(
         animationSpec = tween(220),
         label = "media_scale"
     )
-    val mediaSource = remember(item.uri) { item.uri.takeIf { it != Uri.EMPTY } }
+    val mediaSource = remember(item.uri) { item.uri.takeIf { uri -> uri != Uri.EMPTY } }
     val model = remember(mediaSource, item.mimeType) {
         mediaSource?.let { source ->
             ImageRequest.Builder(context)
@@ -1043,7 +1043,7 @@ fun MediaSwipeRow(
     onOpen: () -> Unit
 ) {
     val dismissState = rememberSwipeToDismissBoxState(
-        positionalThreshold = { it * 0.35f },
+        positionalThreshold = { distance -> distance * 0.35f },
         confirmValueChange = { value ->
             when (value) {
                 SwipeToDismissBoxValue.StartToEnd -> {

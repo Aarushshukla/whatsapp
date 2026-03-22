@@ -74,12 +74,16 @@ dependencies {
     implementation 'io.coil-kt:coil-video:2.7.0'
     implementation 'com.airbnb.android:lottie-compose:6.6.1'
 
-    implementation 'com.android.billingclient:billing-ktx:8.3.0'
-    implementation 'com.google.firebase:firebase-analytics-ktx'
+    implementation 'com.android.billingclient:billing:8.3.0'
+    implementation 'com.google.firebase:firebase-analytics'
     implementation 'org.tensorflow:tensorflow-lite:2.14.0'
 
     testImplementation 'junit:junit:4.13.2'
     androidTestImplementation 'androidx.test.ext:junit:1.2.1'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.6.1'
     androidTestImplementation 'androidx.compose.ui:ui-test-junit4:1.6.0'
+}
+
+kotlin {
+    jvmToolchain(17)
 }

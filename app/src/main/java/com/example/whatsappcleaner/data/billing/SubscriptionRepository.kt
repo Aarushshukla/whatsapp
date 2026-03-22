@@ -173,10 +173,10 @@ class SubscriptionRepository private constructor(context: Context) {
             Log.w(TAG, "queryProductDetails skipped because billing is not ready.")
             return
         }
-        val products = BillingProduct.entries.map {
+        val products = BillingProduct.entries.map { product ->
             QueryProductDetailsParams.Product.newBuilder()
-                .setProductId(it.productId)
-                .setProductType(it.productType)
+                .setProductId(product.productId)
+                .setProductType(product.productType)
                 .build()
         }
         billingClient.queryProductDetailsAsync(
@@ -184,10 +184,11 @@ class SubscriptionRepository private constructor(context: Context) {
                 .setProductList(products)
                 .build()
         ) { result, queryProductDetailsResult ->
-            val detailsList = queryProductDetailsResult.productDetailsList
+            val detailsList = queryProductDetailsResult.productDetailsList.orEmpty()
+            val unfetchedProducts = queryProductDetailsResult.unfetchedProductList.orEmpty()
             Log.d(
                 TAG,
-                "Product details response: code=${result.responseCode}, count=${detailsList.size}, unfetched=${queryProductDetailsResult.unfetchedProductList.size}"
+                "Product details response: code=${result.responseCode}, count=${detailsList.size}, unfetched=${unfetchedProducts.size}"
             )
             if (result.responseCode != BillingClient.BillingResponseCode.OK) {
                 updateMessage(result.debugMessage.ifBlank { "Unable to load pricing from Play Billing." }, true)
@@ -196,7 +197,9 @@ class SubscriptionRepository private constructor(context: Context) {
 
             val priceMap = buildMap {
                 detailsList.forEach { details ->
-                    val match = BillingProduct.entries.firstOrNull { it.productId == details.productId } ?: return@forEach
+                    val match = BillingProduct.entries.firstOrNull { billingProduct ->
+                        billingProduct.productId == details.productId
+                    } ?: return@forEach
                     productDetails[match] = details
                     val formattedPrice = when (match) {
                         BillingProduct.MONTHLY, BillingProduct.YEARLY -> details.subscriptionOfferDetails
@@ -213,11 +216,11 @@ class SubscriptionRepository private constructor(context: Context) {
                 }
             }
 
-            _state.update { current ->
-                current.copy(
-                    prices = if (priceMap.isEmpty()) current.prices else priceMap,
+            _state.update { currentState ->
+                currentState.copy(
+                    prices = if (priceMap.isEmpty()) currentState.prices else priceMap,
                     billingReady = true,
-                    lastMessage = if (priceMap.isEmpty()) "Pricing unavailable. You can try again later." else current.lastMessage
+                    lastMessage = if (priceMap.isEmpty()) "Pricing unavailable. You can try again later." else currentState.lastMessage
                 )
             }
         }
@@ -278,7 +281,9 @@ class SubscriptionRepository private constructor(context: Context) {
             }
         }
 
-        val activePurchase = purchases.firstOrNull { it.purchaseState == Purchase.PurchaseState.PURCHASED }
+        val activePurchase = purchases.firstOrNull { purchase ->
+            purchase.purchaseState == Purchase.PurchaseState.PURCHASED
+        }
         val plan = when {
             activePurchase == null -> SubscriptionPlan.FREE
             activePurchase.products.contains(BillingProduct.LIFETIME.productId) -> SubscriptionPlan.LIFETIME
@@ -321,12 +326,12 @@ class SubscriptionRepository private constructor(context: Context) {
             .putBoolean(KEY_IS_PRO, isPro)
             .putString(KEY_PLAN, plan.name)
             .apply()
-        _state.update { it.copy(isProUser = isPro, currentPlan = plan) }
+        _state.update { currentState -> currentState.copy(isProUser = isPro, currentPlan = plan) }
     }
 
     private fun updateMessage(message: String, billingReady: Boolean) {
         prefs.edit().putString(KEY_BILLING_MESSAGE, message).apply()
-        _state.update { it.copy(lastMessage = message, billingReady = billingReady) }
+        _state.update { currentState -> currentState.copy(lastMessage = message, billingReady = billingReady) }
     }
 
     private fun safePlan(raw: String?): SubscriptionPlan = runCatching {
@@ -341,7 +346,9 @@ class SubscriptionRepository private constructor(context: Context) {
 
         fun get(context: Context): SubscriptionRepository =
             INSTANCE ?: synchronized(this) {
-                INSTANCE ?: SubscriptionRepository(context).also { INSTANCE = it }
+                INSTANCE ?: SubscriptionRepository(context).also { repository ->
+                    INSTANCE = repository
+                }
             }
     }
 }

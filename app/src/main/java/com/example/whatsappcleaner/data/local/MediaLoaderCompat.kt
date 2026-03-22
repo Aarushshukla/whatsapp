@@ -8,24 +8,24 @@ private const val ONE_DAY_MILLIS = 24L * 60L * 60L * 1000L
 fun MediaLoader.loadTodayWhatsAppMediaCompat(nowMillis: Long = System.currentTimeMillis()): List<SimpleMediaItem> {
     val oneDayAgo = nowMillis - ONE_DAY_MILLIS
 
-    val rangedMethod = MediaLoader::class.java.methods.firstOrNull {
-        it.name == "loadWhatsAppMediaInRange" &&
-            it.parameterTypes.contentEquals(arrayOf(Long::class.javaPrimitiveType, Long::class.javaPrimitiveType))
+    val rangedMethod = MediaLoader::class.java.methods.firstOrNull { method ->
+        method.name == "loadWhatsAppMediaInRange" &&
+            method.parameterTypes.contentEquals(arrayOf(Long::class.javaPrimitiveType, Long::class.javaPrimitiveType))
     }
 
     @Suppress("UNCHECKED_CAST")
-    val rangedItems = rangedMethod?.let {
-        runCatching { it.invoke(this, oneDayAgo, nowMillis) as? List<SimpleMediaItem> }.getOrNull()
+    val rangedItems = rangedMethod?.let { method ->
+        runCatching { method.invoke(this, oneDayAgo, nowMillis) as? List<SimpleMediaItem> }.getOrNull()
     }
 
     if (rangedItems != null) {
         return rangedItems
-            .filter { it.addedMillis in oneDayAgo..nowMillis }
-            .sortedByDescending { it.addedMillis }
+            .filter { mediaItem -> mediaItem.addedMillis in oneDayAgo..nowMillis }
+            .sortedByDescending { mediaItem -> mediaItem.addedMillis }
     }
 
     return (queryMediaStore("image", oneDayAgo, nowMillis) + queryMediaStore("video", oneDayAgo, nowMillis))
-        .distinctBy { it.uri }
-        .filter { it.addedMillis in oneDayAgo..nowMillis }
-        .sortedByDescending { it.addedMillis }
+        .distinctBy { mediaItem -> mediaItem.uri }
+        .filter { mediaItem -> mediaItem.addedMillis in oneDayAgo..nowMillis }
+        .sortedByDescending { mediaItem -> mediaItem.addedMillis }
 }

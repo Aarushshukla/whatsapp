@@ -39,7 +39,7 @@ class MainActivity : ComponentActivity() {
             ActivityResultContracts.RequestMultiplePermissions(),
             object : ActivityResultCallback<Map<String, Boolean>> {
                 override fun onActivityResult(permissions: Map<String, Boolean>) {
-                    val granted = permissions.isNotEmpty() && permissions.values.all { it }
+                    val granted = permissions.isNotEmpty() && permissions.values.all { isGranted -> isGranted }
                     Log.d(TAG, "Permission result: $permissions")
                     viewModel.updatePermissionStatus(granted)
                     if (granted) {
@@ -81,8 +81,8 @@ class MainActivity : ComponentActivity() {
 
     private fun syncPermissionState() {
         val permissions = requiredPermissions()
-        val granted = permissions.isNotEmpty() && permissions.all {
-            ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED
+        val granted = permissions.isNotEmpty() && permissions.all { permission ->
+            ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
         }
         viewModel.updatePermissionStatus(granted)
     }
@@ -95,8 +95,8 @@ class MainActivity : ComponentActivity() {
             viewModel.refreshMedia()
             return
         }
-        val alreadyGranted = permissions.all {
-            ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED
+        val alreadyGranted = permissions.all { permission ->
+            ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
         }
         if (alreadyGranted) {
             Log.d(TAG, "Storage permissions already granted.")
@@ -136,7 +136,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun shareText(text: String?) {
-        val safeText = text?.takeIf { it.isNotBlank() }
+        val safeText = text?.takeIf { candidateText -> candidateText.isNotBlank() }
             ?: "Clean smarter. Free space instantly with Cleanly AI."
         val intent = Intent(Intent.ACTION_SEND).apply {
             type = "text/plain"
@@ -168,7 +168,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun openUrl(url: String) {
-        val safeUrl = url.takeIf { it.isNotBlank() } ?: return
+        val safeUrl = url.takeIf { candidateUrl -> candidateUrl.isNotBlank() } ?: return
         runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(safeUrl))) }
             .onFailure { error ->
                 Log.e(TAG, "Unable to open url: $safeUrl", error)
@@ -177,7 +177,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun sendEmail(address: String, subject: String) {
-        val safeAddress = address.takeIf { it.isNotBlank() } ?: return
+        val safeAddress = address.takeIf { candidateAddress -> candidateAddress.isNotBlank() } ?: return
         val intent = Intent(Intent.ACTION_SENDTO).apply {
             data = Uri.parse("mailto:$safeAddress")
             putExtra(Intent.EXTRA_SUBJECT, subject.ifBlank { "Cleanly AI support" })
@@ -191,8 +191,8 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun safeVersionLabel(): String {
-        val versionName = BuildConfig.VERSION_NAME.takeIf { it.isNotBlank() } ?: "1.0"
-        val versionCode = BuildConfig.VERSION_CODE.takeIf { it > 0 } ?: 1
+        val versionName = BuildConfig.VERSION_NAME.takeIf { candidateName -> candidateName.isNotBlank() } ?: "1.0"
+        val versionCode = BuildConfig.VERSION_CODE.takeIf { candidateCode -> candidateCode > 0 } ?: 1
         return "v$versionName ($versionCode)"
     }
 

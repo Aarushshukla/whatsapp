@@ -222,8 +222,8 @@ fun WhatsCleanAppRoot(
         composable(Routes.PhoneReality) {
             PolishedPhoneRealityScreen(
                 report = state.report,
-                imageCount = state.allItems.count { it.mimeType?.startsWith("image") == true },
-                videoCount = state.allItems.count { it.mimeType?.startsWith("video") == true },
+                imageCount = state.allItems.count { mediaItem -> mediaItem.mimeType?.startsWith("image") == true },
+                videoCount = state.allItems.count { mediaItem -> mediaItem.mimeType?.startsWith("video") == true },
                 onBack = { navController.popBackStack() }
             )
         }
@@ -247,8 +247,8 @@ fun WhatsCleanAppRoot(
         composable(Routes.Analytics) {
             AnalyticsScreen(
                 report = state.report,
-                imageCount = state.allItems.count { it.mimeType?.startsWith("image") == true },
-                videoCount = state.allItems.count { it.mimeType?.startsWith("video") == true },
+                imageCount = state.allItems.count { mediaItem -> mediaItem.mimeType?.startsWith("image") == true },
+                videoCount = state.allItems.count { mediaItem -> mediaItem.mimeType?.startsWith("video") == true },
                 memeCount = state.memeCount,
                 duplicateCount = state.duplicateCount,
                 spamCount = state.spamCount,
