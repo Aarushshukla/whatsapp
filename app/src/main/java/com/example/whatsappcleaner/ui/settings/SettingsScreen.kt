@@ -115,7 +115,7 @@ fun SettingsScreen(
             }
             item {
                 SettingsSection(title = "General") {
-                    ChoiceRow("Theme", settings.themeMode.label, Icons.Default.DarkMode, AppThemeMode.entries.map { it.label to { onThemeSelected(it) } })
+                    ChoiceRow("Theme", settings.themeMode.label, Icons.Default.DarkMode, AppThemeMode.entries.map { themeMode -> themeMode.label to { onThemeSelected(themeMode) } })
                     ChoiceRow("Language", settings.languageLabel, Icons.Default.Language, listOf("English (coming soon)" to onFaq))
                 }
             }
@@ -124,7 +124,7 @@ fun SettingsScreen(
                     ToggleRow("Daily reminder", "Get a gentle nudge to review clutter.", Icons.Default.Notifications, settings.dailyReminderEnabled, onDailyReminderToggle)
                     ToggleRow("Smart alert", "Notify when junk or duplicates spike.", Icons.Default.CheckCircle, settings.smartAlertEnabled, onSmartAlertToggle)
                     if (subscriptionState.isProUser) {
-                        ChoiceRow("Auto-clean reminder", settings.autoCleanFrequency.label, Icons.Default.Tune, ReminderFrequencyOption.entries.map { it.label to { onAutoCleanFrequencySelected(it) } })
+                        ChoiceRow("Auto-clean reminder", settings.autoCleanFrequency.label, Icons.Default.Tune, ReminderFrequencyOption.entries.map { frequencyOption -> frequencyOption.label to { onAutoCleanFrequencySelected(frequencyOption) } })
                     } else {
                         ActionRow("Auto-clean reminder", "Pro only: unlock advanced cleanup automation", Icons.Default.Tune, onUpgradeToPro)
                     }
