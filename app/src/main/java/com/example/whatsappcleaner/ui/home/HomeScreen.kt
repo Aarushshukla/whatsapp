@@ -6,6 +6,7 @@
 package com.example.whatsappcleaner.ui.home
 
 import android.net.Uri
+import android.util.Log
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -134,6 +135,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 private fun SimpleMediaItem.safeDisplayName(): String = name.ifBlank { "Media file" }
+private const val HOME_SCREEN_TAG = "HomeScreen"
 
 private fun SimpleMediaItem.safeMimeLabel(): String = mimeType.orEmpty().ifBlank { "Unknown media" }
 
@@ -316,9 +318,11 @@ fun SimpleHomeScreen(
                         onBulkDeleteClick = {
                             val selectedItems = items.filter { mediaItem -> mediaItem.uri.toString() in selected }
                             if (selectedItems.isNotEmpty()) {
+                                Log.d(HOME_SCREEN_TAG, "Bulk delete clicked with ${selectedItems.size} selected items.")
                                 onDeleteItemsRequested(selectedItems)
                                 selected = selected - selectedItems.map { mediaItem -> mediaItem.uri.toString() }.toSet()
                             } else {
+                                Log.d(HOME_SCREEN_TAG, "Bulk delete clicked with no selected items; delegating to fallback action.")
                                 onBulkDeleteClick()
                             }
                         }
