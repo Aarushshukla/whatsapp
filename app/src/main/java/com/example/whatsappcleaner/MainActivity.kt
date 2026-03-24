@@ -25,7 +25,6 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.whatsappcleaner.data.billing.SubscriptionRepository
 import com.example.whatsappcleaner.ui.WhatsCleanAppRoot
-import com.example.whatsappcleaner.ui.home.DeleteTestScreen
 import com.example.whatsappcleaner.ui.home.HomeViewModel
 import com.example.whatsappcleaner.ui.settings.AppThemeMode
 import com.example.whatsappcleaner.ui.theme.WhatsCleanTheme
@@ -103,9 +102,10 @@ class MainActivity : ComponentActivity() {
             .onFailure { error -> Log.e(TAG, "Unable to initialize subscriptions during onCreate.", error) }
         syncPermissionState()
         setContent {
-            WhatsCleanTheme {
-                DeleteTestScreen()
-            }
+            MainActivityContent(
+                activity = this,
+                versionLabel = safeVersionLabel()
+            )
         }
     }
 
