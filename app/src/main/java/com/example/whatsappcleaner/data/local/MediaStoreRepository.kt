@@ -21,7 +21,6 @@ class MediaStoreRepository(
             MediaStore.Images.Media._ID,
             MediaStore.Images.Media.DISPLAY_NAME,
             MediaStore.Images.Media.SIZE,
-            MediaStore.Images.Media.RELATIVE_PATH
         )
 
         context.contentResolver.query(
@@ -34,13 +33,11 @@ class MediaStoreRepository(
             val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
             val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)
             val sizeColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.SIZE)
-            val pathColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.RELATIVE_PATH)
 
             while (cursor.moveToNext()) {
                 val id = cursor.getLong(idColumn)
                 val name = cursor.getString(nameColumn).orEmpty()
                 val size = cursor.getLong(sizeColumn)
-                val path = cursor.getString(pathColumn).orEmpty()
 
                 val uri = ContentUris.withAppendedId(
                     MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
@@ -50,9 +47,9 @@ class MediaStoreRepository(
                 list.add(
                     MediaItem(
                         uri = uri,
+                        id = id,
                         name = name,
-                        size = size,
-                        path = path
+                        size = size
                     )
                 )
             }

@@ -316,13 +316,16 @@ fun SimpleHomeScreen(
                         onStorageClick = onOpenSystemStorage,
                         onAnalyticsClick = onNavigateToAnalytics,
                         onBulkDeleteClick = {
+                            Log.d("DELETE_DEBUG", "Delete button clicked")
                             val selectedItems = items.filter { mediaItem -> mediaItem.uri.toString() in selected }
                             if (selectedItems.isNotEmpty()) {
-                                Log.d(HOME_SCREEN_TAG, "Bulk delete clicked with ${selectedItems.size} selected items.")
+                                val uris = selectedItems.map { mediaItem -> mediaItem.uri }
+                                Log.d("DELETE_DEBUG", "URI list size=${uris.size}")
+                                uris.forEachIndexed { index, uri -> Log.d("DELETE_DEBUG", "Button URI[$index]=$uri") }
                                 onDeleteItemsRequested(selectedItems)
                                 selected = selected - selectedItems.map { mediaItem -> mediaItem.uri.toString() }.toSet()
                             } else {
-                                Log.d(HOME_SCREEN_TAG, "Bulk delete clicked with no selected items; delegating to fallback action.")
+                                Log.d("DELETE_DEBUG", "Delete button clicked with empty selection")
                                 onBulkDeleteClick()
                             }
                         }

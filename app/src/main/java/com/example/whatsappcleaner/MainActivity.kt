@@ -2,8 +2,6 @@ package com.example.whatsappcleaner
 
 import android.Manifest
 import android.content.ActivityNotFoundException
-import android.content.Context
-import android.content.ContextWrapper
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -22,7 +20,6 @@ import androidx.activity.viewModels
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.whatsappcleaner.data.billing.SubscriptionRepository
@@ -62,6 +59,11 @@ class MainActivity : ComponentActivity() {
         Log.d(TAG, "Initializing deleteLauncher with StartIntentSenderForResult contract.")
         deleteLauncher = registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
             val approved = result.resultCode == RESULT_OK
+            if (approved) {
+                Log.d("DELETE_DEBUG", "Delete success")
+            } else {
+                Log.e("DELETE_DEBUG", "Delete cancelled")
+            }
             Log.d(TAG, "Delete request finished. resultCode=${result.resultCode}, approved=$approved")
             val pendingUris = viewModel.uiState.value.pendingDeleteUris
             val deletedUris = if (approved) pendingUris.filterNot(::uriExists) else emptyList()
@@ -95,7 +97,7 @@ class MainActivity : ComponentActivity() {
         val versionLabel = safeVersionLabel()
 
         setContent {
-            MainActivityContent(versionLabel = versionLabel)
+            MainActivityContent(activity = this@MainActivity, versionLabel = versionLabel)
         }
     }
 
@@ -173,18 +175,18 @@ class MainActivity : ComponentActivity() {
             }
     }
 
-    private fun deleteMedia(uris: List<Uri>) {
-        Log.d(TAG, "deleteMedia invoked with ${uris.size} URIs.")
+    fun deleteMedia(uris: List<Uri>) {
+        Log.d("DELETE_DEBUG", "deleteMedia called. uriCount=${uris.size}")
         uris.forEachIndexed { index, uri ->
-            Log.d(TAG, "Delete candidate URI[$index]: $uri")
+            Log.d("DELETE_DEBUG", "URI[$index]=$uri")
         }
         if (uris.isEmpty()) {
-            Log.w(TAG, "Skipping delete launch because URI list is empty.")
+            Log.e("DELETE_DEBUG", "Empty list")
             viewModel.onMediaDeleteResult(success = false)
             return
         }
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
-            Log.w(TAG, "MediaStore.createDeleteRequest requires Android 11+.")
+            Log.w("DELETE_DEBUG", "MediaStore.createDeleteRequest requires Android 11+.")
             viewModel.onMediaDeleteResult(success = false)
             return
         }
@@ -192,31 +194,31 @@ class MainActivity : ComponentActivity() {
             .filter { uri ->
                 val isValid = uri != Uri.EMPTY && uri.scheme == "content"
                 if (!isValid) {
-                    Log.w(TAG, "Skipping invalid delete URI: $uri")
+                    Log.w("DELETE_DEBUG", "Skipping invalid delete URI: $uri")
                 }
                 isValid
             }
             .distinct()
         if (validUris.isEmpty()) {
-            Log.w(TAG, "No valid content:// URIs available for MediaStore delete request.")
+            Log.w("DELETE_DEBUG", "No valid content:// URIs available for MediaStore delete request.")
             viewModel.onMediaDeleteResult(success = false)
             return
         }
 
         runCatching {
-            Log.d(TAG, "Creating MediaStore delete request for ${validUris.size} valid URIs.")
+            Log.d("DELETE_DEBUG", "Creating delete request for ${validUris.size} URIs")
             val request = MediaStore.createDeleteRequest(contentResolver, validUris)
             val intentSenderRequest = IntentSenderRequest.Builder(request.intentSender).build()
             if (!::deleteLauncher.isInitialized) {
-                Log.e(TAG, "deleteLauncher is not initialized; cannot launch MediaStore delete request.")
+                Log.e("DELETE_DEBUG", "deleteLauncher is not initialized; cannot launch request")
                 viewModel.onMediaDeleteResult(success = false)
                 return
             }
-            Log.d(TAG, "Launching delete request with deleteLauncher from activity=${this@MainActivity}.")
+            Log.d("DELETE_DEBUG", "request launched")
             deleteLauncher.launch(intentSenderRequest)
-            Log.d(TAG, "deleteLauncher.launch() executed.")
+            Log.d("DELETE_DEBUG", "deleteLauncher.launch() executed")
         }.onFailure { error ->
-            Log.e(TAG, "Unable to launch MediaStore delete request.", error)
+            Log.e("DELETE_DEBUG", "Unable to launch MediaStore delete request", error)
             viewModel.onMediaDeleteResult(success = false)
         }
     }
@@ -291,10 +293,8 @@ class MainActivity : ComponentActivity() {
     }
 
     @Composable
-    private fun MainActivityContent(versionLabel: String) {
+    private fun MainActivityContent(activity: MainActivity, versionLabel: String) {
         val state by viewModel.uiState.collectAsStateWithLifecycle()
-        val context = LocalContext.current
-        val hostActivity = context.findMainActivity()
         val darkTheme = when (state.settings.themeMode) {
             AppThemeMode.DARK -> true
             AppThemeMode.LIGHT -> false
@@ -304,15 +304,7 @@ class MainActivity : ComponentActivity() {
         val faqUrl = "https://www.google.com/search?q=Cleanly+AI+FAQ"
 
         androidx.compose.runtime.LaunchedEffect(state.deleteRequestId) {
-            if (state.pendingDeleteUris.isNotEmpty()) {
-                Log.d(TAG, "Delete request id changed to ${state.deleteRequestId}; launching system delete flow.")
-                if (hostActivity == null) {
-                    Log.e(TAG, "Unable to launch delete flow from Compose: MainActivity context was not found.")
-                    viewModel.onMediaDeleteResult(success = false)
-                } else {
-                    hostActivity.deleteMedia(state.pendingDeleteUris)
-                }
-            } else {
+            if (state.pendingDeleteUris.isEmpty()) {
                 Log.d(TAG, "Delete request id changed to ${state.deleteRequestId}, but pendingDeleteUris is empty.")
             }
         }
@@ -360,7 +352,14 @@ class MainActivity : ComponentActivity() {
                 onReportIssue = { sendEmail("support@cleanlyai.app", "Cleanly AI bug report") },
                 onPremiumFeatureRequested = viewModel::onPremiumFeatureRequested,
                 onDeleteClicked = viewModel::onDeleteClicked,
-                onDeleteMediaRequest = viewModel::requestMediaDeletion,
+                onDeleteMediaRequest = { items, origin ->
+                    Log.d("DELETE_DEBUG", "Delete button click from $origin with ${items.size} selected items")
+                    val uris = items.map { it.uri }
+                    Log.d("DELETE_DEBUG", "URI list size=${uris.size}")
+                    uris.forEachIndexed { index, uri -> Log.d("DELETE_DEBUG", "Delete URI[$index]=$uri") }
+                    viewModel.requestMediaDeletion(items, origin)
+                    activity.deleteMedia(uris)
+                },
                 onUndoDelete = viewModel::undoLastDelete,
                 onDeleteSnackbarConsumed = viewModel::clearDeleteSnackbar,
                 onReviewClicked = viewModel::onReviewClicked,
@@ -370,9 +369,4 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private tailrec fun Context.findMainActivity(): MainActivity? = when (this) {
-        is MainActivity -> this
-        is ContextWrapper -> baseContext.findMainActivity()
-        else -> null
-    }
 }
