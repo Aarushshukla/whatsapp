@@ -82,8 +82,12 @@ class MainActivity : ComponentActivity() {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == DELETE_REQUEST_CODE) {
             val success = resultCode == RESULT_OK
-            Log.d(TAG, "Delete request finished. success=$success")
+            Log.d(TAG, "Delete request finished in onActivityResult. requestCode=$requestCode, resultCode=$resultCode, success=$success")
             viewModel.onMediaDeleteResult(success)
+            if (success) {
+                Log.d(TAG, "Delete request approved. Refreshing media list from MediaStore.")
+                viewModel.refreshMedia()
+            }
         }
     }
 
@@ -151,15 +155,36 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun launchMediaDeleteRequest(uris: List<Uri>) {
-        if (uris.isEmpty()) return
+        Log.d(TAG, "launchMediaDeleteRequest invoked with ${uris.size} URIs.")
+        if (uris.isEmpty()) {
+            Log.w(TAG, "Skipping delete launch because URI list is empty.")
+            viewModel.onMediaDeleteResult(success = false)
+            return
+        }
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
             Log.w(TAG, "MediaStore.createDeleteRequest requires Android 11+.")
             viewModel.onMediaDeleteResult(success = false)
             return
         }
+        val validUris = uris
+            .filter { uri ->
+                val isValid = uri != Uri.EMPTY && uri.scheme == "content"
+                if (!isValid) {
+                    Log.w(TAG, "Skipping invalid delete URI: $uri")
+                }
+                isValid
+            }
+            .distinct()
+        if (validUris.isEmpty()) {
+            Log.w(TAG, "No valid content:// URIs available for MediaStore delete request.")
+            viewModel.onMediaDeleteResult(success = false)
+            return
+        }
+
         runCatching {
-            val request = MediaStore.createDeleteRequest(contentResolver, uris)
-            Log.d(TAG, "Launching delete request for ${uris.size} URIs.")
+            Log.d(TAG, "Creating MediaStore delete request for ${validUris.size} valid URIs.")
+            val request = MediaStore.createDeleteRequest(contentResolver, validUris)
+            Log.d(TAG, "Launching delete request intent sender with Activity context.")
             startIntentSenderForResult(
                 request.intentSender,
                 DELETE_REQUEST_CODE,
@@ -251,7 +276,10 @@ class MainActivity : ComponentActivity() {
 
         androidx.compose.runtime.LaunchedEffect(state.deleteRequestId) {
             if (state.pendingDeleteUris.isNotEmpty()) {
+                Log.d(TAG, "Delete request id changed to ${state.deleteRequestId}; launching system delete flow.")
                 launchMediaDeleteRequest(state.pendingDeleteUris)
+            } else {
+                Log.d(TAG, "Delete request id changed to ${state.deleteRequestId}, but pendingDeleteUris is empty.")
             }
         }
 
