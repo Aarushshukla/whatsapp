@@ -1,12 +1,12 @@
 package com.example.whatsappcleaner.ui.home
 
 import android.Manifest
+import android.app.Activity
 import android.content.ContentUris
 import android.content.Context
 import android.os.Build
 import android.provider.MediaStore
 import android.util.Log
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -66,7 +66,7 @@ fun DeleteTestScreen() {
     val deleteLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartIntentSenderForResult()
     ) { result ->
-        val approved = result.resultCode == ComponentActivity.RESULT_OK
+        val approved = result.resultCode == Activity.RESULT_OK
         Log.d("DELETE_DEBUG", "Delete launcher resultCode=${result.resultCode}, approved=$approved")
         status = if (approved) "Delete approved by system dialog" else "Delete cancelled"
         reloadItems()
