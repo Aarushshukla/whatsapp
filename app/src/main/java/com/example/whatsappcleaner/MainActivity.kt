@@ -10,6 +10,7 @@ import android.os.Bundle
 import android.provider.MediaStore
 import android.provider.Settings
 import android.util.Log
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.ActivityResultLauncher
@@ -59,30 +60,36 @@ class MainActivity : ComponentActivity() {
     private fun setupDeleteLauncher() {
         Log.d(TAG, "Initializing deleteLauncher with StartIntentSenderForResult contract.")
         deleteLauncher = registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
-            val approved = result.resultCode == RESULT_OK
-            if (approved) {
-                Log.d("DELETE_DEBUG", "Delete success")
-            } else {
-                Log.e("DELETE_DEBUG", "Delete cancelled")
-            }
-            Log.d(TAG, "Delete request finished. resultCode=${result.resultCode}, approved=$approved")
-            val pendingUris = viewModel.uiState.value.pendingDeleteUris
-            val deletedUris = if (approved) pendingUris.filterNot(::uriExists) else emptyList()
-            val notDeletedUris = if (approved) pendingUris.filter(::uriExists) else pendingUris
-
-            if (approved) {
-                Log.d(TAG, "Verified deletion results: deleted=${deletedUris.size}, notDeleted=${notDeletedUris.size}")
-                if (notDeletedUris.isNotEmpty()) {
-                    Log.w(TAG, "Some URIs were not removed after approval: ${notDeletedUris.joinToString()}")
+            try {
+                val approved = result.resultCode == RESULT_OK
+                if (approved) {
+                    Log.d("DELETE_DEBUG", "Delete success")
+                } else {
+                    Log.e("DELETE_DEBUG", "Delete cancelled")
                 }
-            } else {
-                Log.d(TAG, "Delete request was cancelled or denied by user.")
-            }
+                Log.d(TAG, "Delete request finished. resultCode=${result.resultCode}, approved=$approved")
+                val pendingUris = viewModel.uiState.value.pendingDeleteUris
+                val deletedUris = if (approved) pendingUris.filterNot(::uriExists) else emptyList()
+                val notDeletedUris = if (approved) pendingUris.filter(::uriExists) else pendingUris
 
-            viewModel.onMediaDeleteResult(approved && deletedUris.isNotEmpty())
-            if (approved) {
-                Log.d(TAG, "Delete request approved. Refreshing media list from MediaStore.")
-                viewModel.refreshMedia()
+                if (approved) {
+                    Log.d(TAG, "Verified deletion results: deleted=${deletedUris.size}, notDeleted=${notDeletedUris.size}")
+                    if (notDeletedUris.isNotEmpty()) {
+                        Log.w(TAG, "Some URIs were not removed after approval: ${notDeletedUris.joinToString()}")
+                    }
+                } else {
+                    Log.d(TAG, "Delete request was cancelled or denied by user.")
+                }
+
+                viewModel.onMediaDeleteResult(approved && deletedUris.isNotEmpty())
+                if (approved) {
+                    Log.d(TAG, "Delete request approved. Refreshing media list from MediaStore.")
+                    viewModel.refreshMedia()
+                }
+            } catch (error: Exception) {
+                Log.e(TAG, "Failed while handling delete launcher result.", error)
+                viewModel.onMediaDeleteResult(success = false)
+                showDeleteError("Unable to process delete result.")
             }
         }
         Log.d(TAG, "deleteLauncher initialized.")
@@ -184,6 +191,7 @@ class MainActivity : ComponentActivity() {
         if (uris.isEmpty()) {
             Log.e("DELETE_DEBUG", "Empty list")
             viewModel.onMediaDeleteResult(success = false)
+            showDeleteError("No files selected for deletion.")
             return
         }
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
@@ -192,36 +200,46 @@ class MainActivity : ComponentActivity() {
             return
         }
         val validUris = uris
-            .filter { uri ->
-                val isValid = uri != Uri.EMPTY && uri.scheme == "content"
-                if (!isValid) {
-                    Log.w("DELETE_DEBUG", "Skipping invalid delete URI: $uri")
+            .mapNotNull { uri ->
+                Log.d("DELETE_DEBUG", "Checking URI before delete request: $uri")
+                uri.takeIf { candidate ->
+                    val isValid = candidate != Uri.EMPTY && candidate.toString().startsWith("content://")
+                    if (!isValid) {
+                        Log.w("DELETE_DEBUG", "Skipping invalid delete URI: $candidate")
+                    }
+                    isValid
                 }
-                isValid
             }
             .distinct()
         if (validUris.isEmpty()) {
             Log.w("DELETE_DEBUG", "No valid content:// URIs available for MediaStore delete request.")
             viewModel.onMediaDeleteResult(success = false)
+            showDeleteError("No valid files were available for deletion.")
             return
         }
 
-        runCatching {
+        try {
             Log.d("DELETE_DEBUG", "Creating delete request for ${validUris.size} URIs")
             val request = MediaStore.createDeleteRequest(contentResolver, validUris)
             val intentSenderRequest = IntentSenderRequest.Builder(request.intentSender).build()
             if (!::deleteLauncher.isInitialized) {
                 Log.e("DELETE_DEBUG", "deleteLauncher is not initialized; cannot launch request")
                 viewModel.onMediaDeleteResult(success = false)
+                showDeleteError("Delete action is unavailable right now.")
                 return
             }
             Log.d("DELETE_DEBUG", "request launched")
             deleteLauncher.launch(intentSenderRequest)
             Log.d("DELETE_DEBUG", "deleteLauncher.launch() executed")
-        }.onFailure { error ->
+        } catch (error: Exception) {
             Log.e("DELETE_DEBUG", "Unable to launch MediaStore delete request", error)
             viewModel.onMediaDeleteResult(success = false)
+            showDeleteError("Unable to delete files right now.")
         }
+    }
+
+    private fun showDeleteError(message: String) {
+        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
     }
 
     private fun uriExists(uri: Uri): Boolean {
