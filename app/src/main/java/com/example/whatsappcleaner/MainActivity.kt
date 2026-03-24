@@ -3,10 +3,12 @@ package com.example.whatsappcleaner
 import android.Manifest
 import android.content.ActivityNotFoundException
 import android.content.Intent
+import android.content.IntentSender
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.MediaStore
 import android.provider.Settings
 import android.util.Log
 import androidx.activity.ComponentActivity
@@ -29,6 +31,7 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         private const val TAG = "MainActivity"
+        private const val DELETE_REQUEST_CODE = 4107
     }
 
     private val viewModel: HomeViewModel by viewModels()
@@ -73,6 +76,15 @@ class MainActivity : ComponentActivity() {
         }
             .onFailure { error -> Log.e(TAG, "Unable to refresh purchases on resume.", error) }
         syncPermissionState()
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == DELETE_REQUEST_CODE) {
+            val success = resultCode == RESULT_OK
+            Log.d(TAG, "Delete request finished. success=$success")
+            viewModel.onMediaDeleteResult(success)
+        }
     }
 
     private fun requiredPermissions(): Array<String> =
@@ -136,6 +148,33 @@ class MainActivity : ComponentActivity() {
                 runCatching { startActivity(Intent(Settings.ACTION_SETTINGS)) }
                     .onFailure { fallbackError -> Log.e(TAG, "Unable to open Android settings.", fallbackError) }
             }
+    }
+
+    private fun launchMediaDeleteRequest(uris: List<Uri>) {
+        if (uris.isEmpty()) return
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            Log.w(TAG, "MediaStore.createDeleteRequest requires Android 11+.")
+            viewModel.onMediaDeleteResult(success = false)
+            return
+        }
+        runCatching {
+            val request = MediaStore.createDeleteRequest(contentResolver, uris)
+            Log.d(TAG, "Launching delete request for ${uris.size} URIs.")
+            startIntentSenderForResult(
+                request.intentSender,
+                DELETE_REQUEST_CODE,
+                null,
+                0,
+                0,
+                0
+            )
+        }.onFailure { error ->
+            Log.e(TAG, "Unable to launch MediaStore delete request.", error)
+            if (error is IntentSender.SendIntentException) {
+                Log.e(TAG, "Delete request send intent exception.", error)
+            }
+            viewModel.onMediaDeleteResult(success = false)
+        }
     }
 
     private fun shareText(text: String?) {
@@ -210,6 +249,12 @@ class MainActivity : ComponentActivity() {
         val privacyPolicyUrl = "https://www.google.com/search?q=Cleanly+AI+privacy+policy"
         val faqUrl = "https://www.google.com/search?q=Cleanly+AI+FAQ"
 
+        androidx.compose.runtime.LaunchedEffect(state.deleteRequestId) {
+            if (state.pendingDeleteUris.isNotEmpty()) {
+                launchMediaDeleteRequest(state.pendingDeleteUris)
+            }
+        }
+
         WhatsCleanTheme(darkTheme = darkTheme) {
             WhatsCleanAppRoot(
                 state = state,
@@ -253,6 +298,9 @@ class MainActivity : ComponentActivity() {
                 onReportIssue = { sendEmail("support@cleanlyai.app", "Cleanly AI bug report") },
                 onPremiumFeatureRequested = viewModel::onPremiumFeatureRequested,
                 onDeleteClicked = viewModel::onDeleteClicked,
+                onDeleteMediaRequest = viewModel::requestMediaDeletion,
+                onUndoDelete = viewModel::undoLastDelete,
+                onDeleteSnackbarConsumed = viewModel::clearDeleteSnackbar,
                 onReviewClicked = viewModel::onReviewClicked,
                 onCleanupRecorded = viewModel::recordCleanupResult,
                 versionLabel = versionLabel

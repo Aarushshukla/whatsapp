@@ -1,6 +1,7 @@
 package com.example.whatsappcleaner.ui.home
 
 import android.app.Application
+import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -70,7 +71,11 @@ data class HomeUiState(
     val subscriptionState: SubscriptionState = SubscriptionState(),
     val paywallSource: String = "dashboard",
     val hasExceededFreeLimit: Boolean = false,
-    val lastCleanupBytes: Long = 0L
+    val lastCleanupBytes: Long = 0L,
+    val pendingDeleteUris: List<Uri> = emptyList(),
+    val deleteRequestId: Long = 0L,
+    val deleteSnackbarMessage: String? = null,
+    val lastDeletedItems: List<SimpleMediaItem> = emptyList()
 ) {
     val isProUser: Boolean get() = subscriptionState.isProUser
 }
@@ -401,6 +406,73 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     fun onDeleteClicked(origin: String) {
         analytics.trackDeleteClicked(origin)
+    }
+
+    fun requestMediaDeletion(items: List<SimpleMediaItem>, origin: String) {
+        val distinctItems = items.distinctBy { item -> item.uri }.filter { item -> item.uri != Uri.EMPTY }
+        if (distinctItems.isEmpty()) {
+            Log.w(TAG, "Skipping deletion request from $origin because there were no valid items.")
+            return
+        }
+        analytics.trackDeleteClicked(origin)
+        Log.d(TAG, "Requesting MediaStore delete for ${distinctItems.size} items from $origin")
+        _uiState.update { currentState ->
+            currentState.copy(
+                pendingDeleteUris = distinctItems.map { item -> item.uri },
+                deleteRequestId = currentState.deleteRequestId + 1L
+            )
+        }
+    }
+
+    fun onMediaDeleteResult(success: Boolean) {
+        val pendingUris = _uiState.value.pendingDeleteUris.toSet()
+        if (pendingUris.isEmpty()) {
+            Log.w(TAG, "Delete result received with no pending URIs.")
+            return
+        }
+        if (!success) {
+            Log.d(TAG, "Delete flow cancelled or failed by user.")
+            _uiState.update { currentState -> currentState.copy(pendingDeleteUris = emptyList()) }
+            return
+        }
+
+        Log.d(TAG, "Delete flow succeeded for ${pendingUris.size} items.")
+        _uiState.update { currentState ->
+            val removedItems = currentState.allItems.filter { item -> item.uri in pendingUris }
+            val updatedItems = currentState.allItems.filterNot { item -> item.uri in pendingUris }
+            currentState.copy(
+                allItems = updatedItems,
+                filteredItems = filterList(updatedItems, currentState.currentFilter, currentState.activeSuggestion, currentState.settings),
+                summaryInfo = if (updatedItems.isEmpty()) "No media found." else "Found ${updatedItems.size} files (${formatSize(updatedItems.sumOf { it.sizeKb.toLong() * 1024L })})",
+                totalFiles = updatedItems.size,
+                totalSize = updatedItems.sumOf { mediaItem -> mediaItem.sizeKb.toLong() * 1024L },
+                pendingDeleteUris = emptyList(),
+                deleteSnackbarMessage = "Deleted ${removedItems.size} files",
+                lastDeletedItems = removedItems
+            )
+        }
+    }
+
+    fun undoLastDelete() {
+        val restoredItems = _uiState.value.lastDeletedItems
+        if (restoredItems.isEmpty()) return
+        Log.d(TAG, "Undoing delete in UI for ${restoredItems.size} items.")
+        _uiState.update { currentState ->
+            val merged = (currentState.allItems + restoredItems).distinctBy { item -> item.uri }.sortedByDescending { item -> item.addedMillis }
+            currentState.copy(
+                allItems = merged,
+                filteredItems = filterList(merged, currentState.currentFilter, currentState.activeSuggestion, currentState.settings),
+                summaryInfo = if (merged.isEmpty()) "No media found." else "Found ${merged.size} files (${formatSize(merged.sumOf { it.sizeKb.toLong() * 1024L })})",
+                totalFiles = merged.size,
+                totalSize = merged.sumOf { mediaItem -> mediaItem.sizeKb.toLong() * 1024L },
+                deleteSnackbarMessage = null,
+                lastDeletedItems = emptyList()
+            )
+        }
+    }
+
+    fun clearDeleteSnackbar() {
+        _uiState.update { currentState -> currentState.copy(deleteSnackbarMessage = null, lastDeletedItems = emptyList()) }
     }
 
     fun onReviewClicked() {
