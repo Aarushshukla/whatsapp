@@ -20,8 +20,7 @@ class MediaStoreRepository(
         val projection = arrayOf(
             MediaStore.Images.Media._ID,
             MediaStore.Images.Media.DISPLAY_NAME,
-            MediaStore.Images.Media.SIZE,
-            MediaStore.Images.Media.MIME_TYPE,
+            MediaStore.Images.Media.SIZE
         )
 
         context.contentResolver.query(
@@ -34,13 +33,11 @@ class MediaStoreRepository(
             val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
             val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)
             val sizeColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.SIZE)
-            val mimeTypeColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.MIME_TYPE)
 
             while (cursor.moveToNext()) {
                 val id = cursor.getLong(idColumn)
                 val name = cursor.getString(nameColumn).orEmpty()
                 val size = cursor.getLong(sizeColumn)
-                val mimeType = cursor.getString(mimeTypeColumn)
 
                 val uri = ContentUris.withAppendedId(
                     MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
@@ -52,8 +49,7 @@ class MediaStoreRepository(
                         id = id,
                         uri = uri,
                         name = name,
-                        size = size,
-                        mimeType = mimeType
+                        size = size
                     )
                 )
             }
