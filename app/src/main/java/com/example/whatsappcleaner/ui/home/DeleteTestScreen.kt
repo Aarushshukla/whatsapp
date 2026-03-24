@@ -79,16 +79,11 @@ fun DeleteTestScreen() {
         reloadItems()
     }
 
-    fun deleteSelectedItems() {
-        val uris = selectedItems.map { it.uri }
-        Log.d("DELETE_DEBUG", "Delete clicked")
-        Log.d("DELETE_DEBUG", "Selected item count=${selectedItems.size}")
-        uris.forEachIndexed { index, uri ->
-            Log.d("DELETE_DEBUG", "Selected URI[$index]=$uri")
-        }
+    fun requestDelete(context: Context, uris: List<android.net.Uri>) {
+        Log.d("DELETE_DEBUG", "Delete called with ${uris.size} items")
 
         if (uris.isEmpty()) {
-            Log.e("DELETE_DEBUG", "No selected items. Skipping delete request")
+            Log.e("DELETE_DEBUG", "Empty URI list ❌")
             status = "No selected items"
             return
         }
@@ -97,23 +92,27 @@ fun DeleteTestScreen() {
             status = "Delete requires Android 11+"
             return
         }
-        val invalidUris = uris.filter { uri -> uri.scheme != "content" }
-        if (invalidUris.isNotEmpty()) {
-            invalidUris.forEach { uri -> Log.e("DELETE_DEBUG", "Invalid URI scheme for delete: $uri") }
-            status = "Invalid URI for delete"
-            return
+
+        uris.forEach {
+            Log.d("DELETE_DEBUG", "URI: $it")
         }
 
-        runCatching {
-            val pendingIntent = MediaStore.createDeleteRequest(context.contentResolver, uris)
-            Log.d("DELETE_DEBUG", "Delete request created for ${uris.size} URIs")
-            val request = IntentSenderRequest.Builder(pendingIntent.intentSender).build()
-            Log.d("DELETE_DEBUG", "Launching delete launcher")
+        try {
+            val pendingIntent = MediaStore.createDeleteRequest(
+                context.contentResolver,
+                uris
+            )
+            Log.d("DELETE_DEBUG", "Delete request created")
+
+            val request = IntentSenderRequest.Builder(
+                pendingIntent.intentSender
+            ).build()
+
             deleteLauncher.launch(request)
-            Log.d("DELETE_DEBUG", "deleteLauncher.launch() called")
-        }.onFailure { error ->
-            Log.e("DELETE_DEBUG", "Failed to create/launch delete request", error)
-            status = "Delete launch failed: ${error.message}"
+            Log.d("DELETE_DEBUG", "Delete launcher triggered 🚀")
+        } catch (e: Exception) {
+            Log.e("DELETE_DEBUG", "Delete error", e)
+            status = "Delete launch failed: ${e.message}"
         }
     }
 
@@ -150,7 +149,11 @@ fun DeleteTestScreen() {
 
             Button(
                 enabled = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && selectedItems.isNotEmpty(),
-                onClick = { deleteSelectedItems() }
+                onClick = {
+                    Log.d("DELETE_DEBUG", "Delete button clicked")
+                    val uris = selectedItems.map { it.uri }
+                    requestDelete(context, uris)
+                }
             ) {
                 Text("Delete selected")
             }
