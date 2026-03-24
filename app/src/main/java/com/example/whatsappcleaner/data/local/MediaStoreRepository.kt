@@ -1,13 +1,75 @@
 package com.example.whatsappcleaner.data
 
+import android.content.ContentUris
 import android.content.Context
+import android.net.Uri
+import android.provider.MediaStore
+import android.util.Log
 
 class MediaStoreRepository(
     private val context: Context
 ) {
 
-    // Temporary stub so app can run without Room.
-    suspend fun scanTodayWhatsAppMedia() {
-        // TODO: later add real MediaStore + storage logic here.
+    companion object {
+        private const val TAG = "MediaStoreRepository"
+    }
+
+    fun loadImages(): List<MediaItem> {
+        val list = mutableListOf<MediaItem>()
+
+        val projection = arrayOf(
+            MediaStore.Images.Media._ID,
+            MediaStore.Images.Media.DISPLAY_NAME,
+            MediaStore.Images.Media.SIZE,
+            MediaStore.Images.Media.RELATIVE_PATH
+        )
+
+        context.contentResolver.query(
+            MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+            projection,
+            null,
+            null,
+            "${MediaStore.Images.Media.DATE_ADDED} DESC"
+        )?.use { cursor ->
+            val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
+            val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)
+            val sizeColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.SIZE)
+            val pathColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.RELATIVE_PATH)
+
+            while (cursor.moveToNext()) {
+                val id = cursor.getLong(idColumn)
+                val name = cursor.getString(nameColumn).orEmpty()
+                val size = cursor.getLong(sizeColumn)
+                val path = cursor.getString(pathColumn).orEmpty()
+
+                val uri = ContentUris.withAppendedId(
+                    MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                    id
+                )
+
+                list.add(
+                    MediaItem(
+                        uri = uri,
+                        name = name,
+                        size = size,
+                        path = path
+                    )
+                )
+            }
+        }
+
+        return list
+    }
+
+    fun deleteMedia(uris: List<Uri>): Int {
+        if (uris.isEmpty()) return 0
+        var deletedCount = 0
+        uris.forEach { uri ->
+            val rows = runCatching { context.contentResolver.delete(uri, null, null) }
+                .onFailure { error -> Log.w(TAG, "Failed to delete URI: $uri", error) }
+                .getOrDefault(0)
+            if (rows > 0) deletedCount += 1
+        }
+        return deletedCount
     }
 }

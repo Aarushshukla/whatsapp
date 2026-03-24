@@ -164,8 +164,8 @@ class MainActivity : ComponentActivity() {
             }
     }
 
-    private fun launchMediaDeleteRequest(uris: List<Uri>) {
-        Log.d(TAG, "launchMediaDeleteRequest invoked with ${uris.size} URIs.")
+    private fun deleteMedia(uris: List<Uri>) {
+        Log.d(TAG, "deleteMedia invoked with ${uris.size} URIs.")
         uris.forEachIndexed { index, uri ->
             Log.d(TAG, "Delete candidate URI[$index]: $uri")
         }
@@ -289,7 +289,7 @@ class MainActivity : ComponentActivity() {
         androidx.compose.runtime.LaunchedEffect(state.deleteRequestId) {
             if (state.pendingDeleteUris.isNotEmpty()) {
                 Log.d(TAG, "Delete request id changed to ${state.deleteRequestId}; launching system delete flow.")
-                launchMediaDeleteRequest(state.pendingDeleteUris)
+                deleteMedia(state.pendingDeleteUris)
             } else {
                 Log.d(TAG, "Delete request id changed to ${state.deleteRequestId}, but pendingDeleteUris is empty.")
             }
