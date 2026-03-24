@@ -409,11 +409,13 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun requestMediaDeletion(items: List<SimpleMediaItem>, origin: String) {
+        Log.d(TAG, "requestMediaDeletion called from $origin with ${items.size} items.")
         val distinctItems = items.distinctBy { item -> item.uri }.filter { item -> item.uri != Uri.EMPTY }
         if (distinctItems.isEmpty()) {
             Log.w(TAG, "Skipping deletion request from $origin because there were no valid items.")
             return
         }
+        Log.d(TAG, "Prepared ${distinctItems.size} distinct items for deletion from $origin.")
         analytics.trackDeleteClicked(origin)
         Log.d(TAG, "Requesting MediaStore delete for ${distinctItems.size} items from $origin")
         _uiState.update { currentState ->
