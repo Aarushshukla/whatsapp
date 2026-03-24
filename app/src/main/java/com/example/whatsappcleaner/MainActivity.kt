@@ -3,7 +3,6 @@ package com.example.whatsappcleaner
 import android.Manifest
 import android.content.ActivityNotFoundException
 import android.content.Intent
-import android.content.IntentSender
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
@@ -14,6 +13,7 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.ActivityResultCallback
+import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -31,7 +31,6 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         private const val TAG = "MainActivity"
-        private const val DELETE_REQUEST_CODE = 4107
     }
 
     private val viewModel: HomeViewModel by viewModels()
@@ -53,6 +52,30 @@ class MainActivity : ComponentActivity() {
                 }
             }
         )
+
+    private val mediaDeleteLauncher =
+        registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
+            val approved = result.resultCode == RESULT_OK
+            Log.d(TAG, "Delete request finished. resultCode=${result.resultCode}, approved=$approved")
+            val pendingUris = viewModel.uiState.value.pendingDeleteUris
+            val deletedUris = if (approved) pendingUris.filterNot(::uriExists) else emptyList()
+            val notDeletedUris = if (approved) pendingUris.filter(::uriExists) else pendingUris
+
+            if (approved) {
+                Log.d(TAG, "Verified deletion results: deleted=${deletedUris.size}, notDeleted=${notDeletedUris.size}")
+                if (notDeletedUris.isNotEmpty()) {
+                    Log.w(TAG, "Some URIs were not removed after approval: ${notDeletedUris.joinToString()}")
+                }
+            } else {
+                Log.d(TAG, "Delete request was cancelled or denied by user.")
+            }
+
+            viewModel.onMediaDeleteResult(approved && deletedUris.isNotEmpty())
+            if (approved) {
+                Log.d(TAG, "Delete request approved. Refreshing media list from MediaStore.")
+                viewModel.refreshMedia()
+            }
+        }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -76,19 +99,6 @@ class MainActivity : ComponentActivity() {
         }
             .onFailure { error -> Log.e(TAG, "Unable to refresh purchases on resume.", error) }
         syncPermissionState()
-    }
-
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == DELETE_REQUEST_CODE) {
-            val success = resultCode == RESULT_OK
-            Log.d(TAG, "Delete request finished in onActivityResult. requestCode=$requestCode, resultCode=$resultCode, success=$success")
-            viewModel.onMediaDeleteResult(success)
-            if (success) {
-                Log.d(TAG, "Delete request approved. Refreshing media list from MediaStore.")
-                viewModel.refreshMedia()
-            }
-        }
     }
 
     private fun requiredPermissions(): Array<String> =
@@ -156,6 +166,9 @@ class MainActivity : ComponentActivity() {
 
     private fun launchMediaDeleteRequest(uris: List<Uri>) {
         Log.d(TAG, "launchMediaDeleteRequest invoked with ${uris.size} URIs.")
+        uris.forEachIndexed { index, uri ->
+            Log.d(TAG, "Delete candidate URI[$index]: $uri")
+        }
         if (uris.isEmpty()) {
             Log.w(TAG, "Skipping delete launch because URI list is empty.")
             viewModel.onMediaDeleteResult(success = false)
@@ -184,21 +197,20 @@ class MainActivity : ComponentActivity() {
         runCatching {
             Log.d(TAG, "Creating MediaStore delete request for ${validUris.size} valid URIs.")
             val request = MediaStore.createDeleteRequest(contentResolver, validUris)
-            Log.d(TAG, "Launching delete request intent sender with Activity context.")
-            startIntentSenderForResult(
-                request.intentSender,
-                DELETE_REQUEST_CODE,
-                null,
-                0,
-                0,
-                0
-            )
+            val intentSenderRequest = IntentSenderRequest.Builder(request.intentSender).build()
+            Log.d(TAG, "Launching delete request with ActivityResultLauncher from activity=${this@MainActivity}.")
+            mediaDeleteLauncher.launch(intentSenderRequest)
         }.onFailure { error ->
             Log.e(TAG, "Unable to launch MediaStore delete request.", error)
-            if (error is IntentSender.SendIntentException) {
-                Log.e(TAG, "Delete request send intent exception.", error)
-            }
             viewModel.onMediaDeleteResult(success = false)
+        }
+    }
+
+    private fun uriExists(uri: Uri): Boolean {
+        return runCatching {
+            contentResolver.openAssetFileDescriptor(uri, "r")?.use { true } ?: false
+        }.getOrElse {
+            false
         }
     }
 
