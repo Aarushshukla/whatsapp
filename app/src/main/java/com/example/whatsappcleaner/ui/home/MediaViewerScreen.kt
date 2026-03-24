@@ -25,6 +25,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -35,7 +36,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -63,13 +63,17 @@ fun MediaViewerScreen(
     spamItems: List<SimpleMediaItem>,
     duplicateItems: List<SimpleMediaItem>,
     onOpenInSystem: (SimpleMediaItem) -> Unit,
+    onDeleteItemsRequested: (List<SimpleMediaItem>) -> Unit,
+    pendingDeleteUris: Set<String>,
+    deleteSnackbarMessage: String?,
+    onUndoDelete: () -> Unit,
+    onDeleteSnackbarConsumed: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var tab by remember { mutableStateOf(MediaFilter.ALL) }
     var pendingDelete by remember { mutableStateOf<SimpleMediaItem?>(null) }
     var successMessage by remember { mutableStateOf<String?>(null) }
-    var removedItemIds by rememberSaveable { mutableStateOf(setOf<String>()) }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
@@ -77,6 +81,13 @@ fun MediaViewerScreen(
         if (successMessage != null) {
             delay(1800)
             successMessage = null
+        }
+    }
+    LaunchedEffect(deleteSnackbarMessage) {
+        deleteSnackbarMessage?.let { message ->
+            val result = snackbarHostState.showSnackbar(message = message, actionLabel = "Undo")
+            if (result == SnackbarResult.ActionPerformed) onUndoDelete()
+            onDeleteSnackbarConsumed()
         }
     }
 
@@ -87,7 +98,7 @@ fun MediaViewerScreen(
         MediaFilter.DUPLICATES -> duplicateItems
         else -> allItems
     }
-    val remainingVisibleItems = filtered.count { mediaItem -> mediaItem.uri.toString() !in removedItemIds }
+    val remainingVisibleItems = filtered.count { mediaItem -> mediaItem.uri.toString() !in pendingDeleteUris }
 
     Scaffold(
         topBar = {
@@ -154,7 +165,7 @@ fun MediaViewerScreen(
             } else {
                 items(filtered, key = { mediaItem -> mediaItem.uri.toString() }) { item ->
                     AnimatedVisibility(
-                        visible = item.uri.toString() !in removedItemIds,
+                        visible = item.uri.toString() !in pendingDeleteUris,
                         enter = fadeIn(animationSpec = tween(420)) + slideInVertically(
                             animationSpec = tween(420),
                             initialOffsetY = { offset -> offset / 3 }
@@ -181,12 +192,10 @@ fun MediaViewerScreen(
             title = { Text("Delete this file?", color = TextMain) },
             text = { Text("Are you sure you want to delete ${item.safeDisplayName()}?", color = TextSecondary) },
             confirmButton = {
-                LegitButton(text = "Open delete flow", onClick = {
+                LegitButton(text = "Delete now", onClick = {
                     pendingDelete = null
-                    removedItemIds = removedItemIds + item.uri.toString()
                     successMessage = "🎉 ${formatSize(item.sizeKb.toLong() * 1024L)} Freed!"
-                    onOpenInSystem(item)
-                    scope.launch { snackbarHostState.showSnackbar("Opened ${item.safeDisplayName()} for deletion") }
+                    onDeleteItemsRequested(listOf(item))
                 })
             },
             dismissButton = {

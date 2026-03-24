@@ -91,6 +91,9 @@ fun WhatsCleanAppRoot(
     onReportIssue: () -> Unit,
     onPremiumFeatureRequested: (PremiumFeature) -> Boolean,
     onDeleteClicked: (String) -> Unit,
+    onDeleteMediaRequest: (List<SimpleMediaItem>, String) -> Unit,
+    onUndoDelete: () -> Unit,
+    onDeleteSnackbarConsumed: () -> Unit,
     onReviewClicked: () -> Unit,
     onCleanupRecorded: (Long) -> Unit,
     versionLabel: String,
@@ -187,8 +190,13 @@ fun WhatsCleanAppRoot(
                     navController.navigateSingleTop(Routes.Paywall)
                 },
                 onDeleteConfirmed = { onDeleteClicked("home_delete") },
+                onDeleteItemsRequested = { items -> onDeleteMediaRequest(items, "home_delete") },
                 onOpenInSystem = onOpenInSystem,
                 onOpenSystemStorage = onOpenSystemStorage,
+                pendingDeleteUris = state.pendingDeleteUris.map { it.toString() }.toSet(),
+                deleteSnackbarMessage = state.deleteSnackbarMessage,
+                onUndoDelete = onUndoDelete,
+                onDeleteSnackbarConsumed = onDeleteSnackbarConsumed,
                 selectedFrequency = state.selectedFrequency,
                 onFrequencyChange = onFrequencyChange,
                 selectedTime = state.selectedTime,
@@ -270,6 +278,11 @@ fun WhatsCleanAppRoot(
                 spamItems = state.spamItems,
                 duplicateItems = state.duplicateItems,
                 onOpenInSystem = onOpenInSystem,
+                onDeleteItemsRequested = { items -> onDeleteMediaRequest(items, "media_viewer_swipe") },
+                pendingDeleteUris = state.pendingDeleteUris.map { it.toString() }.toSet(),
+                deleteSnackbarMessage = state.deleteSnackbarMessage,
+                onUndoDelete = onUndoDelete,
+                onDeleteSnackbarConsumed = onDeleteSnackbarConsumed,
                 onBack = { navController.popBackStack() }
             )
         }

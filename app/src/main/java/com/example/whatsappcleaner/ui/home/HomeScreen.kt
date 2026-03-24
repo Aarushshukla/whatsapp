@@ -82,6 +82,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
@@ -164,8 +165,13 @@ fun SimpleHomeScreen(
     onBulkDeleteClick: () -> Unit,
     onUpgradeToPro: () -> Unit,
     onDeleteConfirmed: () -> Unit,
+    onDeleteItemsRequested: (List<SimpleMediaItem>) -> Unit,
     onOpenInSystem: (SimpleMediaItem) -> Unit,
     onOpenSystemStorage: () -> Unit,
+    pendingDeleteUris: Set<String>,
+    deleteSnackbarMessage: String?,
+    onUndoDelete: () -> Unit,
+    onDeleteSnackbarConsumed: () -> Unit,
     selectedFrequency: ReminderFreq,
     onFrequencyChange: (ReminderFreq) -> Unit,
     selectedTime: ReminderTime,
@@ -192,6 +198,13 @@ fun SimpleHomeScreen(
         if (successMessage != null) {
             delay(1800)
             successMessage = null
+        }
+    }
+    LaunchedEffect(deleteSnackbarMessage) {
+        deleteSnackbarMessage?.let { message ->
+            val result = snackbarHostState.showSnackbar(message = message, actionLabel = "Undo")
+            if (result == SnackbarResult.ActionPerformed) onUndoDelete()
+            onDeleteSnackbarConsumed()
         }
     }
 
@@ -300,7 +313,15 @@ fun SimpleHomeScreen(
                         onJunkClick = onNavigateToJunk,
                         onStorageClick = onOpenSystemStorage,
                         onAnalyticsClick = onNavigateToAnalytics,
-                        onBulkDeleteClick = onBulkDeleteClick
+                        onBulkDeleteClick = {
+                            val selectedItems = items.filter { mediaItem -> mediaItem.uri.toString() in selected }
+                            if (selectedItems.isNotEmpty()) {
+                                onDeleteItemsRequested(selectedItems)
+                                selected = selected - selectedItems.map { mediaItem -> mediaItem.uri.toString() }.toSet()
+                            } else {
+                                onBulkDeleteClick()
+                            }
+                        }
                     )
                 }
                 item(span = { GridItemSpan(maxLineSpan) }) {
@@ -334,24 +355,30 @@ fun SimpleHomeScreen(
                     }
                 } else {
                     gridItems(items, key = { mediaItem -> mediaItem.uri.toString() }) { item ->
-                        MediaGridCard(
-                            item = item,
-                            selected = item.uri.toString() in selected,
-                            onSelect = {
-                                selected = if (item.uri.toString() in selected) {
-                                    selected - item.uri.toString()
-                                } else {
-                                    selected + item.uri.toString()
-                                }
-                            },
-                            onOpen = { onOpenInSystem(item) },
-                            onKeep = {
-                                val itemName = item.safeDisplayName()
-                                successMessage = "Kept ${itemName.take(18)}"
-                                scope.launch { snackbarHostState.showSnackbar("Kept $itemName") }
-                            },
-                            onDelete = { pendingDelete = item }
-                        )
+                        AnimatedVisibility(
+                            visible = item.uri.toString() !in pendingDeleteUris,
+                            enter = fadeIn(animationSpec = tween(240)),
+                            exit = fadeOut(animationSpec = tween(260)) + shrinkVertically(animationSpec = tween(260))
+                        ) {
+                            MediaGridCard(
+                                item = item,
+                                selected = item.uri.toString() in selected,
+                                onSelect = {
+                                    selected = if (item.uri.toString() in selected) {
+                                        selected - item.uri.toString()
+                                    } else {
+                                        selected + item.uri.toString()
+                                    }
+                                },
+                                onOpen = { onOpenInSystem(item) },
+                                onKeep = {
+                                    val itemName = item.safeDisplayName()
+                                    successMessage = "Kept ${itemName.take(18)}"
+                                    scope.launch { snackbarHostState.showSnackbar("Kept $itemName") }
+                                },
+                                onDelete = { pendingDelete = item }
+                            )
+                        }
                     }
                 }
             }
@@ -364,20 +391,19 @@ fun SimpleHomeScreen(
             title = { Text("Delete this file?", color = TextMain) },
             text = {
                 Text(
-                    "We’ll open ${item.safeDisplayName()} in the system viewer so you can delete it safely without changing app logic.",
+                    "Delete ${item.safeDisplayName()} from device storage?",
                     color = TextSecondary
                 )
             },
             confirmButton = {
                 LegitButton(
-                    text = "Open delete flow",
+                    text = "Delete now",
                     onClick = {
                         pendingDelete = null
                         selected = selected - item.uri.toString()
-                        successMessage = "${formatSize(item.sizeKb.toLong() * 1024L)} ready to clear"
+                        successMessage = "${formatSize(item.sizeKb.toLong() * 1024L)} queued"
                         onDeleteConfirmed()
-                        onOpenInSystem(item)
-                        scope.launch { snackbarHostState.showSnackbar("Opened ${item.safeDisplayName()} for deletion") }
+                        onDeleteItemsRequested(listOf(item))
                     }
                 )
             },
