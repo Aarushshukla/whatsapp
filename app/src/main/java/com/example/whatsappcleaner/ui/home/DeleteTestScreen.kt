@@ -38,13 +38,16 @@ fun DeleteTestScreen() {
     val context = LocalContext.current
     var status by remember { mutableStateOf("Idle") }
     var mediaItems by remember { mutableStateOf(emptyList<MediaItem>()) }
+    var selectedItems by remember { mutableStateOf(emptyList<MediaItem>()) }
 
     fun reloadItems() {
         Log.d("DELETE_DEBUG", "Reloading MediaStore items")
-        mediaItems = loadMediaStoreItems(context, limit = 10)
+        mediaItems = loadMediaStoreItems(context, limit = 30)
+        selectedItems = mediaItems.take(3)
         Log.d("DELETE_DEBUG", "Loaded ${mediaItems.size} items")
+        Log.d("DELETE_DEBUG", "Selected ${selectedItems.size} items for delete test")
         mediaItems.forEachIndexed { index, item ->
-            Log.d("DELETE_DEBUG", "Item[$index] id=${item.id}, uri=${item.uri}, mime=${item.mimeType}")
+            Log.d("DELETE_DEBUG", "Item[$index] id=${item.id}, uri=${item.uri}")
         }
     }
 
@@ -66,10 +69,52 @@ fun DeleteTestScreen() {
     val deleteLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartIntentSenderForResult()
     ) { result ->
-        val approved = result.resultCode == Activity.RESULT_OK
-        Log.d("DELETE_DEBUG", "Delete launcher resultCode=${result.resultCode}, approved=$approved")
-        status = if (approved) "Delete approved by system dialog" else "Delete cancelled"
+        if (result.resultCode == Activity.RESULT_OK) {
+            Log.d("DELETE_DEBUG", "Delete success")
+            status = "Delete success"
+        } else {
+            Log.e("DELETE_DEBUG", "Delete cancelled")
+            status = "Delete cancelled"
+        }
         reloadItems()
+    }
+
+    fun deleteSelectedItems() {
+        val uris = selectedItems.map { it.uri }
+        Log.d("DELETE_DEBUG", "Delete clicked")
+        Log.d("DELETE_DEBUG", "Selected item count=${selectedItems.size}")
+        uris.forEachIndexed { index, uri ->
+            Log.d("DELETE_DEBUG", "Selected URI[$index]=$uri")
+        }
+
+        if (uris.isEmpty()) {
+            Log.e("DELETE_DEBUG", "No selected items. Skipping delete request")
+            status = "No selected items"
+            return
+        }
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            Log.e("DELETE_DEBUG", "MediaStore delete popup requires Android 11+")
+            status = "Delete requires Android 11+"
+            return
+        }
+        val invalidUris = uris.filter { uri -> uri.scheme != "content" }
+        if (invalidUris.isNotEmpty()) {
+            invalidUris.forEach { uri -> Log.e("DELETE_DEBUG", "Invalid URI scheme for delete: $uri") }
+            status = "Invalid URI for delete"
+            return
+        }
+
+        runCatching {
+            val pendingIntent = MediaStore.createDeleteRequest(context.contentResolver, uris)
+            Log.d("DELETE_DEBUG", "Delete request created for ${uris.size} URIs")
+            val request = IntentSenderRequest.Builder(pendingIntent.intentSender).build()
+            Log.d("DELETE_DEBUG", "Launching delete launcher")
+            deleteLauncher.launch(request)
+            Log.d("DELETE_DEBUG", "deleteLauncher.launch() called")
+        }.onFailure { error ->
+            Log.e("DELETE_DEBUG", "Failed to create/launch delete request", error)
+            status = "Delete launch failed: ${error.message}"
+        }
     }
 
     LaunchedEffect(Unit) {
@@ -96,6 +141,7 @@ fun DeleteTestScreen() {
         Text(text = "DeleteTestScreen", style = MaterialTheme.typography.headlineSmall)
         Text(text = "Status: $status")
         Text(text = "Loaded items: ${mediaItems.size}")
+        Text(text = "Selected items: ${selectedItems.size}")
 
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Button(onClick = { reloadItems() }) {
@@ -103,34 +149,10 @@ fun DeleteTestScreen() {
             }
 
             Button(
-                enabled = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && mediaItems.isNotEmpty(),
-                onClick = {
-                    val deleteTargets = mediaItems.take(3)
-                    val uris = deleteTargets.map(MediaItem::uri)
-                    Log.d("DELETE_DEBUG", "Delete button pressed with ${uris.size} URIs")
-                    uris.forEachIndexed { index, uri ->
-                        Log.d("DELETE_DEBUG", "Delete target[$index]=$uri")
-                    }
-
-                    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
-                        status = "Delete request requires Android 11+"
-                        Log.w("DELETE_DEBUG", status)
-                        return@Button
-                    }
-
-                    runCatching {
-                        Log.d("DELETE_DEBUG", "Creating MediaStore delete request")
-                        val request = MediaStore.createDeleteRequest(context.contentResolver, uris)
-                        val intentSenderRequest = IntentSenderRequest.Builder(request.intentSender).build()
-                        Log.d("DELETE_DEBUG", "Launching StartIntentSenderForResult delete request")
-                        deleteLauncher.launch(intentSenderRequest)
-                    }.onFailure { error ->
-                        Log.e("DELETE_DEBUG", "Failed to launch delete request", error)
-                        status = "Delete launch failed: ${error.message}"
-                    }
-                }
+                enabled = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && selectedItems.isNotEmpty(),
+                onClick = { deleteSelectedItems() }
             ) {
-                Text("Delete first 3")
+                Text("Delete selected")
             }
         }
 
@@ -149,44 +171,47 @@ fun DeleteTestScreen() {
 }
 
 private fun loadMediaStoreItems(context: Context, limit: Int): List<MediaItem> {
-    val collection = MediaStore.Files.getContentUri(MediaStore.VOLUME_EXTERNAL)
-    val projection = arrayOf(
-        MediaStore.MediaColumns._ID,
-        MediaStore.MediaColumns.DISPLAY_NAME,
-        MediaStore.MediaColumns.SIZE,
-        MediaStore.MediaColumns.MIME_TYPE
-    )
-
     val output = mutableListOf<MediaItem>()
 
-    context.contentResolver.query(
-        collection,
-        projection,
-        null,
-        null,
-        "${MediaStore.MediaColumns.DATE_ADDED} DESC"
-    )?.use { cursor ->
-        val idColumn = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns._ID)
-        val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.DISPLAY_NAME)
-        val sizeColumn = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.SIZE)
-        val mimeColumn = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.MIME_TYPE)
+    fun loadFromCollection(collection: android.net.Uri) {
+        val projection = arrayOf(
+            MediaStore.MediaColumns._ID,
+            MediaStore.MediaColumns.DISPLAY_NAME,
+            MediaStore.MediaColumns.SIZE
+        )
 
-        while (cursor.moveToNext() && output.size < limit) {
-            val id = cursor.getLong(idColumn)
-            val uri = ContentUris.withAppendedId(collection, id)
-            output.add(
-                MediaItem(
-                    id = id,
-                    uri = uri,
-                    name = cursor.getString(nameColumn).orEmpty(),
-                    size = cursor.getLong(sizeColumn),
-                    mimeType = cursor.getString(mimeColumn)
+        context.contentResolver.query(
+            collection,
+            projection,
+            null,
+            null,
+            "${MediaStore.MediaColumns.DATE_ADDED} DESC"
+        )?.use { cursor ->
+            val idColumn = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns._ID)
+            val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.DISPLAY_NAME)
+            val sizeColumn = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.SIZE)
+
+            while (cursor.moveToNext() && output.size < limit) {
+                val id = cursor.getLong(idColumn)
+                val uri = ContentUris.withAppendedId(collection, id)
+                output.add(
+                    MediaItem(
+                        id = id,
+                        uri = uri,
+                        name = cursor.getString(nameColumn).orEmpty(),
+                        size = cursor.getLong(sizeColumn)
+                    )
                 )
-            )
+            }
         }
     }
 
-    return output
+    loadFromCollection(MediaStore.Images.Media.EXTERNAL_CONTENT_URI)
+    if (output.size < limit) {
+        loadFromCollection(MediaStore.Video.Media.EXTERNAL_CONTENT_URI)
+    }
+
+    return output.take(limit)
 }
 
 private fun requiredMediaReadPermissions(): Array<String> {
