@@ -2,6 +2,8 @@ package com.example.whatsappcleaner
 
 import android.Manifest
 import android.content.ActivityNotFoundException
+import android.content.Context
+import android.content.ContextWrapper
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -12,6 +14,7 @@ import android.provider.Settings
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.ActivityResultCallback
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -19,6 +22,7 @@ import androidx.activity.viewModels
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.whatsappcleaner.data.billing.SubscriptionRepository
@@ -35,6 +39,7 @@ class MainActivity : ComponentActivity() {
 
     private val viewModel: HomeViewModel by viewModels()
     private val subscriptionRepository by lazy(LazyThreadSafetyMode.NONE) { SubscriptionRepository.get(this) }
+    private lateinit var deleteLauncher: ActivityResultLauncher<IntentSenderRequest>
 
     private val requestPermissionLauncher =
         registerForActivityResult(
@@ -53,8 +58,9 @@ class MainActivity : ComponentActivity() {
             }
         )
 
-    private val mediaDeleteLauncher =
-        registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
+    private fun setupDeleteLauncher() {
+        Log.d(TAG, "Initializing deleteLauncher with StartIntentSenderForResult contract.")
+        deleteLauncher = registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
             val approved = result.resultCode == RESULT_OK
             Log.d(TAG, "Delete request finished. resultCode=${result.resultCode}, approved=$approved")
             val pendingUris = viewModel.uiState.value.pendingDeleteUris
@@ -76,10 +82,13 @@ class MainActivity : ComponentActivity() {
                 viewModel.refreshMedia()
             }
         }
+        Log.d(TAG, "deleteLauncher initialized.")
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Log.d(TAG, "onCreate called.")
+        setupDeleteLauncher()
         runCatching { subscriptionRepository.start(this) }
             .onFailure { error -> Log.e(TAG, "Unable to initialize subscriptions during onCreate.", error) }
         syncPermissionState()
@@ -198,8 +207,14 @@ class MainActivity : ComponentActivity() {
             Log.d(TAG, "Creating MediaStore delete request for ${validUris.size} valid URIs.")
             val request = MediaStore.createDeleteRequest(contentResolver, validUris)
             val intentSenderRequest = IntentSenderRequest.Builder(request.intentSender).build()
-            Log.d(TAG, "Launching delete request with ActivityResultLauncher from activity=${this@MainActivity}.")
-            mediaDeleteLauncher.launch(intentSenderRequest)
+            if (!::deleteLauncher.isInitialized) {
+                Log.e(TAG, "deleteLauncher is not initialized; cannot launch MediaStore delete request.")
+                viewModel.onMediaDeleteResult(success = false)
+                return
+            }
+            Log.d(TAG, "Launching delete request with deleteLauncher from activity=${this@MainActivity}.")
+            deleteLauncher.launch(intentSenderRequest)
+            Log.d(TAG, "deleteLauncher.launch() executed.")
         }.onFailure { error ->
             Log.e(TAG, "Unable to launch MediaStore delete request.", error)
             viewModel.onMediaDeleteResult(success = false)
@@ -278,6 +293,8 @@ class MainActivity : ComponentActivity() {
     @Composable
     private fun MainActivityContent(versionLabel: String) {
         val state by viewModel.uiState.collectAsStateWithLifecycle()
+        val context = LocalContext.current
+        val hostActivity = context.findMainActivity()
         val darkTheme = when (state.settings.themeMode) {
             AppThemeMode.DARK -> true
             AppThemeMode.LIGHT -> false
@@ -289,7 +306,12 @@ class MainActivity : ComponentActivity() {
         androidx.compose.runtime.LaunchedEffect(state.deleteRequestId) {
             if (state.pendingDeleteUris.isNotEmpty()) {
                 Log.d(TAG, "Delete request id changed to ${state.deleteRequestId}; launching system delete flow.")
-                deleteMedia(state.pendingDeleteUris)
+                if (hostActivity == null) {
+                    Log.e(TAG, "Unable to launch delete flow from Compose: MainActivity context was not found.")
+                    viewModel.onMediaDeleteResult(success = false)
+                } else {
+                    hostActivity.deleteMedia(state.pendingDeleteUris)
+                }
             } else {
                 Log.d(TAG, "Delete request id changed to ${state.deleteRequestId}, but pendingDeleteUris is empty.")
             }
@@ -346,5 +368,11 @@ class MainActivity : ComponentActivity() {
                 versionLabel = versionLabel
             )
         }
+    }
+
+    private tailrec fun Context.findMainActivity(): MainActivity? = when (this) {
+        is MainActivity -> this
+        is ContextWrapper -> baseContext.findMainActivity()
+        else -> null
     }
 }
