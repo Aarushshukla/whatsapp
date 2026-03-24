@@ -1,6 +1,7 @@
 package com.example.whatsappcleaner.data.local
 
 import android.content.ContentResolver
+import android.content.ContentUris
 import android.content.Context
 import android.net.Uri
 import android.os.Build
@@ -67,7 +68,7 @@ class MediaLoader(private val context: Context) {
                     val dateAddedSec = cursor.getLong(dateCol)
                     val relativePath = cursor.getString(pathCol) ?: ""
                     val mimeType = cursor.getString(mimeCol)
-                    val uri = Uri.withAppendedPath(collection, id.toString())
+                    val uri = ContentUris.withAppendedId(collection, id)
                     items.add(
                         SimpleMediaItem(
                             uri = uri,
