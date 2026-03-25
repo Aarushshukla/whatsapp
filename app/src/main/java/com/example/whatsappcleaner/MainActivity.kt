@@ -196,7 +196,20 @@ class MainActivity : ComponentActivity() {
         }
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
             Log.w("DELETE_DEBUG", "MediaStore.createDeleteRequest requires Android 11+.")
-            viewModel.onMediaDeleteResult(success = false)
+            val deletedCount = uris.distinct().count { uri ->
+                runCatching {
+                    contentResolver.delete(uri, null, null) > 0
+                }.onFailure { error ->
+                    Log.e("DELETE_DEBUG", "Failed deleting URI on legacy API: $uri", error)
+                }.getOrDefault(false)
+            }
+            Log.d("DELETE_DEBUG", "Legacy delete attempt complete. deletedCount=$deletedCount")
+            viewModel.onMediaDeleteResult(success = deletedCount > 0)
+            if (deletedCount > 0) {
+                viewModel.refreshMedia()
+            } else {
+                showDeleteError("Unable to delete selected files.")
+            }
             return
         }
         val validUris = uris
@@ -373,7 +386,7 @@ class MainActivity : ComponentActivity() {
                 onDeleteClicked = viewModel::onDeleteClicked,
                 onDeleteMediaRequest = { items, origin ->
                     Log.d("DELETE_DEBUG", "Delete button click from $origin with ${items.size} selected items")
-                    val uris = items.map { it.uri }
+                    val uris = items.mapNotNull { item -> item.uri.takeIf { uri -> uri != Uri.EMPTY } }
                     Log.d("DELETE_DEBUG", "URI list size=${uris.size}")
                     uris.forEachIndexed { index, uri -> Log.d("DELETE_DEBUG", "Delete URI[$index]=$uri") }
                     viewModel.requestMediaDeletion(items, origin)

@@ -93,7 +93,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -192,7 +191,8 @@ fun SimpleHomeScreen(
     val drawerState = androidx.compose.material3.rememberDrawerState(initialValue = androidx.compose.material3.DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
-    var selected by rememberSaveable { mutableStateOf(setOf<String>()) }
+    var selectedItems by remember { mutableStateOf<List<SimpleMediaItem>>(emptyList()) }
+    val selectedUris = remember(selectedItems) { selectedItems.map { mediaItem -> mediaItem.uri.toString() }.toSet() }
     var pendingDelete by remember { mutableStateOf<SimpleMediaItem?>(null) }
     var successMessage by remember { mutableStateOf<String?>(null) }
 
@@ -200,6 +200,11 @@ fun SimpleHomeScreen(
         if (successMessage != null) {
             delay(1800)
             successMessage = null
+        }
+    }
+    LaunchedEffect(items) {
+        selectedItems = selectedItems.filter { selectedItem ->
+            items.any { mediaItem -> mediaItem.uri == selectedItem.uri }
         }
     }
     LaunchedEffect(deleteSnackbarMessage) {
@@ -298,10 +303,10 @@ fun SimpleHomeScreen(
                 }
                 item(span = { GridItemSpan(maxLineSpan) }) {
                     QuickActionRow(
-                        selectedCount = selected.size,
+                        selectedCount = selectedItems.size,
                         isProUser = isProUser,
                         onReviewClick = {
-                            val firstSelected = items.firstOrNull { mediaItem -> mediaItem.uri.toString() in selected }
+                            val firstSelected = items.firstOrNull { mediaItem -> mediaItem.uri.toString() in selectedUris }
                             when {
                                 firstSelected != null -> {
                                     successMessage = "Review ready"
@@ -317,13 +322,13 @@ fun SimpleHomeScreen(
                         onAnalyticsClick = onNavigateToAnalytics,
                         onBulkDeleteClick = {
                             Log.d("DELETE_DEBUG", "Delete button clicked")
-                            val selectedItems = items.filter { mediaItem -> mediaItem.uri.toString() in selected }
-                            if (selectedItems.isNotEmpty()) {
-                                val uris = selectedItems.map { mediaItem -> mediaItem.uri }
+                            val itemsToDelete = items.filter { mediaItem -> mediaItem.uri.toString() in selectedUris }
+                            Log.d("DELETE_DEBUG", "Selected count=${itemsToDelete.size}")
+                            if (itemsToDelete.isNotEmpty()) {
+                                val uris = itemsToDelete.map { mediaItem -> mediaItem.uri }
                                 Log.d("DELETE_DEBUG", "URI list size=${uris.size}")
                                 uris.forEachIndexed { index, uri -> Log.d("DELETE_DEBUG", "Button URI[$index]=$uri") }
-                                onDeleteItemsRequested(selectedItems)
-                                selected = selected - selectedItems.map { mediaItem -> mediaItem.uri.toString() }.toSet()
+                                onDeleteItemsRequested(itemsToDelete)
                             } else {
                                 Log.d("DELETE_DEBUG", "Delete button clicked with empty selection")
                                 onBulkDeleteClick()
@@ -369,12 +374,12 @@ fun SimpleHomeScreen(
                         ) {
                             MediaGridCard(
                                 item = item,
-                                selected = item.uri.toString() in selected,
+                                selected = item.uri.toString() in selectedUris,
                                 onSelect = {
-                                    selected = if (item.uri.toString() in selected) {
-                                        selected - item.uri.toString()
+                                    selectedItems = if (selectedItems.any { selectedItem -> selectedItem.uri == item.uri }) {
+                                        selectedItems.filterNot { selectedItem -> selectedItem.uri == item.uri }
                                     } else {
-                                        selected + item.uri.toString()
+                                        selectedItems + item
                                     }
                                 },
                                 onOpen = { onOpenInSystem(item) },
@@ -407,7 +412,7 @@ fun SimpleHomeScreen(
                     text = "Delete now",
                     onClick = {
                         pendingDelete = null
-                        selected = selected - item.uri.toString()
+                        selectedItems = selectedItems.filterNot { selectedItem -> selectedItem.uri == item.uri }
                         successMessage = "${formatSize(item.sizeKb.toLong() * 1024L)} queued"
                         onDeleteConfirmed()
                         onDeleteItemsRequested(listOf(item))
@@ -716,7 +721,13 @@ private fun QuickActionRow(
                     ActionChip(icon = Icons.Default.Analytics, label = "Analytics", onClick = onAnalyticsClick, accent = AccentGreen)
                 }
                 item {
-                    ActionChip(icon = Icons.Default.DeleteOutline, label = if (isProUser) "Bulk delete" else "Bulk delete • Pro", onClick = onBulkDeleteClick, accent = AccentPurple)
+                    ActionChip(
+                        icon = Icons.Default.DeleteOutline,
+                        label = if (isProUser) "Bulk delete" else "Bulk delete • Pro",
+                        onClick = onBulkDeleteClick,
+                        accent = AccentPurple,
+                        enabled = selectedCount > 0
+                    )
                 }
                 item {
                     ActionChip(icon = Icons.Default.Storage, label = "Storage", onClick = onStorageClick, accent = AccentBlue)
@@ -727,12 +738,12 @@ private fun QuickActionRow(
 }
 
 @Composable
-private fun ActionChip(icon: ImageVector, label: String, onClick: () -> Unit, accent: Color) {
+private fun ActionChip(icon: ImageVector, label: String, onClick: () -> Unit, accent: Color, enabled: Boolean = true) {
     Row(
         modifier = Modifier
             .clip(RoundedCornerShape(20.dp))
             .background(accent.copy(alpha = 0.14f))
-            .clickable(onClick = onClick)
+            .clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically

@@ -442,6 +442,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.update { currentState ->
             val removedItems = currentState.allItems.filter { item -> item.uri in pendingUris }
             val updatedItems = currentState.allItems.filterNot { item -> item.uri in pendingUris }
+            val deletedCount = removedItems.size
+            val deleteMessage = if (deletedCount == 1) "1 item deleted" else "$deletedCount items deleted"
             currentState.copy(
                 allItems = updatedItems,
                 filteredItems = filterList(updatedItems, currentState.currentFilter, currentState.activeSuggestion, currentState.settings),
@@ -449,7 +451,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 totalFiles = updatedItems.size,
                 totalSize = updatedItems.sumOf { mediaItem -> mediaItem.sizeKb.toLong() * 1024L },
                 pendingDeleteUris = emptyList(),
-                deleteSnackbarMessage = "Deleted ${removedItems.size} files",
+                deleteSnackbarMessage = deleteMessage,
                 lastDeletedItems = removedItems
             )
         }
