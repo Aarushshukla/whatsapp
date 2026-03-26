@@ -433,8 +433,13 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
         if (!success) {
-            Log.d(TAG, "Delete flow cancelled or failed by user.")
-            _uiState.update { currentState -> currentState.copy(pendingDeleteUris = emptyList()) }
+            Log.d(TAG, "Delete flow failed.")
+            _uiState.update { currentState ->
+                currentState.copy(
+                    pendingDeleteUris = emptyList(),
+                    deleteSnackbarMessage = "Failed to delete files"
+                )
+            }
             return
         }
 
@@ -453,6 +458,18 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 pendingDeleteUris = emptyList(),
                 deleteSnackbarMessage = deleteMessage,
                 lastDeletedItems = removedItems
+            )
+        }
+    }
+
+    fun onMediaDeleteCancelled() {
+        val pendingUris = _uiState.value.pendingDeleteUris
+        if (pendingUris.isEmpty()) return
+        Log.d(TAG, "Delete flow cancelled by user.")
+        _uiState.update { currentState ->
+            currentState.copy(
+                pendingDeleteUris = emptyList(),
+                deleteSnackbarMessage = "Delete cancelled"
             )
         }
     }

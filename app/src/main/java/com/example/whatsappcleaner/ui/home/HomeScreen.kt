@@ -193,7 +193,8 @@ fun SimpleHomeScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     var selectedItems by remember { mutableStateOf<List<SimpleMediaItem>>(emptyList()) }
     val selectedUris = remember(selectedItems) { selectedItems.map { mediaItem -> mediaItem.uri.toString() }.toSet() }
-    var pendingDelete by remember { mutableStateOf<SimpleMediaItem?>(null) }
+    var pendingDeleteItems by remember { mutableStateOf<List<SimpleMediaItem>>(emptyList()) }
+    var isDeleting by remember { mutableStateOf(false) }
     var successMessage by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(successMessage) {
@@ -212,6 +213,11 @@ fun SimpleHomeScreen(
             val result = snackbarHostState.showSnackbar(message = message, actionLabel = "Undo")
             if (result == SnackbarResult.ActionPerformed) onUndoDelete()
             onDeleteSnackbarConsumed()
+        }
+    }
+    LaunchedEffect(pendingDeleteUris) {
+        if (pendingDeleteUris.isEmpty()) {
+            isDeleting = false
         }
     }
 
@@ -321,6 +327,7 @@ fun SimpleHomeScreen(
                         onStorageClick = onOpenSystemStorage,
                         onAnalyticsClick = onNavigateToAnalytics,
                         onBulkDeleteClick = {
+                            if (isDeleting) return@QuickActionRow
                             Log.d("DELETE_DEBUG", "Delete button clicked")
                             val itemsToDelete = items.filter { mediaItem -> mediaItem.uri.toString() in selectedUris }
                             Log.d("DELETE_DEBUG", "Selected count=${itemsToDelete.size}")
@@ -328,7 +335,7 @@ fun SimpleHomeScreen(
                                 val uris = itemsToDelete.map { mediaItem -> mediaItem.uri }
                                 Log.d("DELETE_DEBUG", "URI list size=${uris.size}")
                                 uris.forEachIndexed { index, uri -> Log.d("DELETE_DEBUG", "Button URI[$index]=$uri") }
-                                onDeleteItemsRequested(itemsToDelete)
+                                pendingDeleteItems = itemsToDelete
                             } else {
                                 Log.d("DELETE_DEBUG", "Delete button clicked with empty selection")
                                 onBulkDeleteClick()
@@ -388,7 +395,11 @@ fun SimpleHomeScreen(
                                     successMessage = "Kept ${itemName.take(18)}"
                                     scope.launch { snackbarHostState.showSnackbar("Kept $itemName") }
                                 },
-                                onDelete = { pendingDelete = item }
+                                onDelete = {
+                                    if (!isDeleting) {
+                                        pendingDeleteItems = listOf(item)
+                                    }
+                                }
                             )
                         }
                     }
@@ -397,30 +408,39 @@ fun SimpleHomeScreen(
         }
     }
 
-    pendingDelete?.let { item ->
+    if (pendingDeleteItems.isNotEmpty()) {
+        val deleteCount = pendingDeleteItems.size
         AlertDialog(
-            onDismissRequest = { pendingDelete = null },
-            title = { Text("Delete this file?", color = TextMain) },
+            onDismissRequest = { pendingDeleteItems = emptyList() },
+            title = { Text("Delete Files", color = TextMain) },
             text = {
                 Text(
-                    "Delete ${item.safeDisplayName()} from device storage?",
+                    "Are you sure you want to delete $deleteCount file(s)?",
                     color = TextSecondary
                 )
             },
             confirmButton = {
                 LegitButton(
-                    text = "Delete now",
+                    text = "Delete",
                     onClick = {
-                        pendingDelete = null
-                        selectedItems = selectedItems.filterNot { selectedItem -> selectedItem.uri == item.uri }
-                        successMessage = "${formatSize(item.sizeKb.toLong() * 1024L)} queued"
+                        val itemsToDelete = pendingDeleteItems
+                        pendingDeleteItems = emptyList()
+                        isDeleting = true
+                        selectedItems = selectedItems.filterNot { selectedItem ->
+                            itemsToDelete.any { itemToDelete -> itemToDelete.uri == selectedItem.uri }
+                        }
+                        successMessage = if (itemsToDelete.size == 1) {
+                            "${formatSize(itemsToDelete.first().sizeKb.toLong() * 1024L)} queued"
+                        } else {
+                            "$deleteCount files queued"
+                        }
                         onDeleteConfirmed()
-                        onDeleteItemsRequested(listOf(item))
+                        onDeleteItemsRequested(itemsToDelete)
                     }
                 )
             },
             dismissButton = {
-                LegitButton(text = "Cancel", onClick = { pendingDelete = null })
+                LegitButton(text = "Cancel", onClick = { pendingDeleteItems = emptyList() })
             },
             containerColor = SurfaceWhite,
             tonalElevation = 0.dp
