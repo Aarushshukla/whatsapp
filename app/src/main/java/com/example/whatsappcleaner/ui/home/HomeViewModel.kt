@@ -23,12 +23,14 @@ import com.example.whatsappcleaner.data.local.formatSize
 import com.example.whatsappcleaner.ui.settings.AppThemeMode
 import com.example.whatsappcleaner.ui.settings.ReminderFrequencyOption
 import com.example.whatsappcleaner.ui.settings.SettingsUiState
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 enum class PremiumFeature(val analyticsKey: String, val paywallSource: String) {
     SMART_CLEAN_ADVANCED("smart_clean_clicked", "smart_clean_advanced"),
@@ -88,6 +90,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     companion object {
         private const val TAG = "HomeViewModel"
+        private const val INITIAL_LOAD_LIMIT = 100
     }
 
     private val mediaLoader = MediaLoader(application)
@@ -100,6 +103,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
+    private var hasLoadedInitialCache = false
+    private var refreshInProgress = false
 
     init {
         loadPreferences()
@@ -128,66 +133,46 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun refreshMedia() {
+    fun refreshMedia(forceRefresh: Boolean = false) {
         if (!_uiState.value.permissionGranted) return
         viewModelScope.launch {
-            Log.d(TAG, "Refreshing media library.")
-            _uiState.update { currentState -> currentState.copy(summaryInfo = "Scanning...", isLoading = true) }
-            try {
-                val images = mediaLoader.loadAllDeviceMedia("image")
-                val videos = mediaLoader.loadAllDeviceMedia("video")
-                val allItems = (images + videos).sortedByDescending { mediaItem -> mediaItem.addedMillis }
-
-                val memeClassifier = MemeClassifier(getApplication())
-                val memes = allItems.filter { item -> isMeme(item, memeClassifier) }
-                memeClassifier.close()
-
-                val junkBreakdown = smartJunkAnalyzer.buildBreakdown(allItems)
-                val junkItems = smartJunkAnalyzer.findJunk(allItems)
-                val spamItems = spamMediaAnalyzer.findSpamMedia(allItems)
-                val baseReport = phoneRealityAnalyzer.generateReport(allItems)
-
-                val totalSize = allItems.sumOf { mediaItem -> mediaItem.sizeKb.toLong() * 1024L }
-                val summary = if (allItems.isEmpty()) {
-                    Log.d(TAG, "No media items found on device.")
-                    "No media found."
-                } else {
-                    Log.d(TAG, "Loaded ${allItems.size} media items.")
-                    "Found ${allItems.size} files (${formatSize(totalSize)})"
-                }
-
-                val today = System.currentTimeMillis() - 86400000
-                val largeItems = allItems.filter { mediaItem -> mediaItem.addedMillis > today && mediaItem.sizeKb > 5000 }
-                val screenshots = allItems.filter { mediaItem -> mediaItem.addedMillis > today && mediaItem.name.startsWith("Screenshot", true) }
-
+            if (refreshInProgress) {
+                Log.d(TAG, "Skipping refresh request because a scan is already in progress.")
+                return@launch
+            }
+            if (hasLoadedInitialCache && !forceRefresh && _uiState.value.allItems.isNotEmpty()) {
+                Log.d(TAG, "Using cached media list; skipping full rescan.")
                 _uiState.update { current ->
                     current.copy(
-                        allItems = allItems,
-                        filteredItems = filterList(allItems, current.currentFilter, current.activeSuggestion, current.settings),
-                        summaryInfo = summary,
-                        isLoading = false,
-                        largeTodayCount = largeItems.size,
-                        largeTodaySizeText = formatSize(largeItems.sumOf { i -> i.sizeKb.toLong() * 1024 }),
-                        screenshotTodayCount = screenshots.size,
-                        screenshotTodaySizeText = formatSize(screenshots.sumOf { i -> i.sizeKb.toLong() * 1024 }),
-                        memeCount = memes.size,
-                        memeItems = memes,
-                        junkCount = junkItems.size,
-                        duplicateCount = junkBreakdown.duplicates.size,
-                        spamCount = spamItems.size,
-                        totalFiles = allItems.size,
-                        totalSize = totalSize,
-                        duplicateItems = junkBreakdown.duplicates,
-                        spamItems = spamItems,
-                        largeFileItems = junkBreakdown.largeFiles,
-                        sentFileItems = junkBreakdown.sentFiles,
-                        report = baseReport.copy(
-                            memeCount = memes.size,
-                            duplicateCount = junkBreakdown.duplicates.size,
-                            spamCount = spamItems.size
-                        )
+                        filteredItems = filterList(current.allItems, current.currentFilter, current.activeSuggestion, current.settings),
+                        summaryInfo = "Found ${current.allItems.size} files (${formatSize(current.totalSize)})",
+                        isLoading = false
                     )
                 }
+                return@launch
+            }
+            refreshInProgress = true
+            Log.d(TAG, "Refreshing media library.")
+            _uiState.update { currentState -> currentState.copy(summaryInfo = "Scanning files...", isLoading = true) }
+            try {
+                val initialItems = withContext(Dispatchers.IO) {
+                    val images = mediaLoader.loadAllDeviceMedia("image", limit = INITIAL_LOAD_LIMIT)
+                    val videos = mediaLoader.loadAllDeviceMedia("video", limit = INITIAL_LOAD_LIMIT)
+                    (images + videos).sortedByDescending { mediaItem -> mediaItem.addedMillis }
+                }
+                applyLoadedMediaState(initialItems)
+                hasLoadedInitialCache = true
+
+                val allItems = withContext(Dispatchers.IO) {
+                    val images = mediaLoader.loadAllDeviceMedia("image")
+                    val videos = mediaLoader.loadAllDeviceMedia("video")
+                    (images + videos).sortedByDescending { mediaItem -> mediaItem.addedMillis }
+                }
+
+                if (allItems.size != initialItems.size) {
+                    applyLoadedMediaState(allItems)
+                }
+                hasLoadedInitialCache = true
             } catch (error: SecurityException) {
                 Log.e(TAG, "Media scan failed due to permission issue.", error)
                 _uiState.update { currentState ->
@@ -198,7 +183,69 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 _uiState.update { currentState ->
                     currentState.copy(summaryInfo = "Scan failed: ${error.message ?: "Unknown error"}", isLoading = false)
                 }
+            } finally {
+                refreshInProgress = false
             }
+        }
+    }
+
+    private suspend fun applyLoadedMediaState(allItems: List<SimpleMediaItem>) {
+        val memes = withContext(Dispatchers.IO) {
+            val classifier = MemeClassifier(getApplication())
+            try {
+                val memeItems = ArrayList<SimpleMediaItem>(allItems.size / 4)
+                allItems.forEach { item ->
+                    if (isMeme(item, classifier)) memeItems.add(item)
+                }
+                memeItems
+            } finally {
+                classifier.close()
+            }
+        }
+
+        val junkBreakdown = withContext(Dispatchers.Default) { smartJunkAnalyzer.buildBreakdown(allItems) }
+        val junkItems = withContext(Dispatchers.Default) { smartJunkAnalyzer.findJunk(allItems) }
+        val spamItems = withContext(Dispatchers.Default) { spamMediaAnalyzer.findSpamMedia(allItems) }
+        val baseReport = withContext(Dispatchers.Default) { phoneRealityAnalyzer.generateReport(allItems) }
+        val totalSize = allItems.sumOf { mediaItem -> mediaItem.sizeKb.toLong() * 1024L }
+        val summary = if (allItems.isEmpty()) {
+            Log.d(TAG, "No media items found on device.")
+            "No media found."
+        } else {
+            Log.d(TAG, "Loaded ${allItems.size} media items.")
+            "Found ${allItems.size} files (${formatSize(totalSize)})"
+        }
+        val today = System.currentTimeMillis() - 86400000
+        val largeItems = allItems.filter { mediaItem -> mediaItem.addedMillis > today && mediaItem.sizeKb > 5000 }
+        val screenshots = allItems.filter { mediaItem -> mediaItem.addedMillis > today && mediaItem.name.startsWith("Screenshot", true) }
+
+        _uiState.update { current ->
+            current.copy(
+                allItems = allItems,
+                filteredItems = filterList(allItems, current.currentFilter, current.activeSuggestion, current.settings),
+                summaryInfo = summary,
+                isLoading = false,
+                largeTodayCount = largeItems.size,
+                largeTodaySizeText = formatSize(largeItems.sumOf { i -> i.sizeKb.toLong() * 1024 }),
+                screenshotTodayCount = screenshots.size,
+                screenshotTodaySizeText = formatSize(screenshots.sumOf { i -> i.sizeKb.toLong() * 1024 }),
+                memeCount = memes.size,
+                memeItems = memes,
+                junkCount = junkItems.size,
+                duplicateCount = junkBreakdown.duplicates.size,
+                spamCount = spamItems.size,
+                totalFiles = allItems.size,
+                totalSize = totalSize,
+                duplicateItems = junkBreakdown.duplicates,
+                spamItems = spamItems,
+                largeFileItems = junkBreakdown.largeFiles,
+                sentFileItems = junkBreakdown.sentFiles,
+                report = baseReport.copy(
+                    memeCount = memes.size,
+                    duplicateCount = junkBreakdown.duplicates.size,
+                    spamCount = spamItems.size
+                )
+            )
         }
     }
 
@@ -249,11 +296,16 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             }
             MediaFilter.ALL -> items
         }
+        val duplicateKeys = items
+            .groupBy { mediaItem -> "${mediaItem.name.lowercase()}_${mediaItem.sizeKb}" }
+            .filterValues { groupedItems -> groupedItems.size > 1 }
+            .keys
+
         result = result.filter { item ->
             val passesSize = item.sizeKb >= settings.fileSizeFilterMb * 1024 || !settings.showOnlyLargeFiles
             val passesScreenshots = settings.includeScreenshots || !item.name.startsWith("Screenshot", true)
             val passesMemes = settings.includeMemes || !(item.name.contains("meme", ignoreCase = true) || item.path.contains("meme", ignoreCase = true))
-            val isDuplicateCandidate = items.count { other -> other.name.equals(item.name, true) && other.sizeKb == item.sizeKb } > 1
+            val isDuplicateCandidate = duplicateKeys.contains("${item.name.lowercase()}_${item.sizeKb}")
             val passesDuplicates = settings.includeDuplicates || !isDuplicateCandidate
             passesSize && passesScreenshots && passesMemes && passesDuplicates
         }
