@@ -299,6 +299,8 @@ fun SimpleHomeScreen(
                             MediaFilter.IMAGES -> MediaFilter.VIDEOS
                             MediaFilter.VIDEOS -> MediaFilter.MEMES
                             MediaFilter.MEMES -> MediaFilter.ALL
+                            MediaFilter.DUPLICATES -> MediaFilter.ALL
+                            MediaFilter.OTHER -> MediaFilter.ALL
                         }
                         onFilterChange(nextFilter)
                     }

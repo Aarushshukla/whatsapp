@@ -92,11 +92,12 @@ fun MediaViewerScreen(
     }
 
     val filtered = when (tab) {
+        MediaFilter.ALL -> allItems
         MediaFilter.IMAGES -> allItems.filter { mediaItem -> mediaItem.mimeType?.startsWith("image") == true }
         MediaFilter.VIDEOS -> allItems.filter { mediaItem -> mediaItem.mimeType?.startsWith("video") == true }
         MediaFilter.MEMES -> allItems.filter { mediaItem -> mediaItem.name.contains("meme", true) || mediaItem.path.contains("meme", true) }
         MediaFilter.DUPLICATES -> duplicateItems
-        else -> allItems
+        MediaFilter.OTHER -> allItems
     }
     val remainingVisibleItems = filtered.count { mediaItem -> mediaItem.uri.toString() !in pendingDeleteUris }
 
