@@ -27,10 +27,25 @@ data class SimpleMediaItem(
 
 class MediaLoader(private val context: Context) {
 
-    fun loadAllDeviceMedia(mediaType: String): List<SimpleMediaItem> =
-        queryMediaStore(mediaType = mediaType, minDate = 0L, maxDate = System.currentTimeMillis())
+    fun loadAllDeviceMedia(
+        mediaType: String,
+        limit: Int? = null,
+        offset: Int = 0
+    ): List<SimpleMediaItem> = queryMediaStore(
+        mediaType = mediaType,
+        minDate = 0L,
+        maxDate = System.currentTimeMillis(),
+        limit = limit,
+        offset = offset
+    )
 
-    fun queryMediaStore(mediaType: String, minDate: Long, maxDate: Long): List<SimpleMediaItem> {
+    fun queryMediaStore(
+        mediaType: String,
+        minDate: Long,
+        maxDate: Long,
+        limit: Int? = null,
+        offset: Int = 0
+    ): List<SimpleMediaItem> {
         val resolver: ContentResolver = context.contentResolver
         val collection = if (mediaType == "video") {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -56,16 +71,27 @@ class MediaLoader(private val context: Context) {
 
         val selection = "${MediaStore.MediaColumns.DATE_ADDED} BETWEEN ? AND ?"
         val selectionArgs = arrayOf((minDate / 1000).toString(), (maxDate / 1000).toString())
+        val sortOrder = buildString {
+            append("${MediaStore.MediaColumns.DATE_ADDED} DESC")
+            if (limit != null) {
+                append(" LIMIT ")
+                append(limit)
+                if (offset > 0) {
+                    append(" OFFSET ")
+                    append(offset)
+                }
+            }
+        }
 
         val items = mutableListOf<SimpleMediaItem>()
         try {
-            Log.d("MediaLoader", "Querying $mediaType media between $minDate and $maxDate")
+            Log.d("MediaLoader", "Querying $mediaType media between $minDate and $maxDate, limit=$limit, offset=$offset")
             resolver.query(
                 collection,
                 projection,
                 selection,
                 selectionArgs,
-                "${MediaStore.MediaColumns.DATE_ADDED} DESC"
+                sortOrder
             )?.use { cursor ->
                 val idCol = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns._ID)
                 val nameCol = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.DISPLAY_NAME)

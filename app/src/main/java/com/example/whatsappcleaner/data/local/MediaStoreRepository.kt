@@ -14,7 +14,7 @@ class MediaStoreRepository(
         private const val TAG = "MediaStoreRepository"
     }
 
-    fun loadImages(): List<MediaItem> {
+    fun loadImages(limit: Int = 100, offset: Int = 0): List<MediaItem> {
         val list = mutableListOf<MediaItem>()
 
         val projection = arrayOf(
@@ -23,12 +23,22 @@ class MediaStoreRepository(
             MediaStore.Images.Media.SIZE
         )
 
+        val sortOrder = buildString {
+            append("${MediaStore.Images.Media.DATE_ADDED} DESC")
+            append(" LIMIT ")
+            append(limit)
+            if (offset > 0) {
+                append(" OFFSET ")
+                append(offset)
+            }
+        }
+
         context.contentResolver.query(
             MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
             projection,
             null,
             null,
-            "${MediaStore.Images.Media.DATE_ADDED} DESC"
+            sortOrder
         )?.use { cursor ->
             val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
             val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)
