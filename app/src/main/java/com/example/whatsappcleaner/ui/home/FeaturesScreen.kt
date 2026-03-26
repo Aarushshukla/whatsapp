@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.Mood
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -52,6 +53,7 @@ private data class FeatureCardModel(
     val onClick: () -> Unit
 )
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FeaturesScreen(
     onBack: () -> Unit,
@@ -123,6 +125,7 @@ fun FeaturesScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FeaturePlaceholderScreen(title: String, onBack: () -> Unit) {
     Scaffold(
