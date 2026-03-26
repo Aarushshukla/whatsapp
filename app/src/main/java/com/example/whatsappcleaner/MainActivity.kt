@@ -80,10 +80,12 @@ class MainActivity : ComponentActivity() {
                     Log.d(TAG, "Delete request was cancelled or denied by user.")
                 }
 
-                viewModel.onMediaDeleteResult(approved && deletedUris.isNotEmpty())
                 if (approved) {
+                    viewModel.onMediaDeleteResult(deletedUris.isNotEmpty())
                     Log.d(TAG, "Delete request approved. Refreshing media list from MediaStore.")
                     viewModel.refreshMedia()
+                } else {
+                    viewModel.onMediaDeleteCancelled()
                 }
             } catch (error: Exception) {
                 Log.e(TAG, "Failed while handling delete launcher result.", error)
