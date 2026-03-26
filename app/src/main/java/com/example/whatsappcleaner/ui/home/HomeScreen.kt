@@ -6,6 +6,8 @@
 package com.example.whatsappcleaner.ui.home
 
 import android.net.Uri
+import android.os.Environment
+import android.os.StatFs
 import android.util.Log
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
@@ -61,7 +63,9 @@ import androidx.compose.material.icons.filled.Mood
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VideoLibrary
@@ -186,9 +190,9 @@ fun SimpleHomeScreen(
     onSuggestionChange: (SuggestionType) -> Unit,
     totalFiles: Int,
     totalSize: Long,
-    oldFilesCount: Int
+    oldFilesCount: Int,
+    onNavigateToFeatures: () -> Unit
 ) {
-    val drawerState = androidx.compose.material3.rememberDrawerState(initialValue = androidx.compose.material3.DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     var selectedItems by remember { mutableStateOf<List<SimpleMediaItem>>(emptyList()) }
@@ -221,187 +225,132 @@ fun SimpleHomeScreen(
         }
     }
 
-    val reviewCount = largeTodayCount + screenshotTodayCount + duplicateCount + spamCount
-    val storageProgress = if (totalFiles == 0) 0f else reviewCount.toFloat() / totalFiles.toFloat()
+    val statFs = remember { runCatching { StatFs(Environment.getDataDirectory().path) }.getOrNull() }
+    val totalDeviceBytes = statFs?.totalBytes ?: 0L
+    val freeBytes = statFs?.availableBytes ?: 0L
+    val usedBytes = (totalDeviceBytes - freeBytes).coerceAtLeast(0L)
+    val storageProgress = if (totalDeviceBytes == 0L) 0f else usedBytes.toFloat() / totalDeviceBytes.toFloat()
 
-    ModalNavigationDrawer(
-        drawerState = drawerState,
-        drawerContent = {
-            ModalDrawerSheet {
-                AppDrawer { destination ->
-                    scope.launch { drawerState.close() }
-                    when (destination) {
-                        "home" -> Unit
-                        "smart_clean" -> onNavigateToSmartClean()
-                        "analytics_screen" -> onNavigateToAnalytics()
-                        "settings" -> onNavigateToSettings()
-                        else -> onNavigateToPhoneReality()
-                    }
-                }
+    Scaffold(
+        containerColor = PrimaryBackground,
+        snackbarHost = { SnackbarHost(snackbarHostState) }
+    ) { padding ->
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(2),
+            modifier = Modifier
+                .padding(padding)
+                .fillMaxSize(),
+            contentPadding = PaddingValues(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                GradientHeroButton(
+                    text = "Smart Scan / Clean Now",
+                    onClick = onNavigateToSmartClean,
+                    modifier = Modifier.fillMaxWidth(),
+                    icon = Icons.Default.AutoAwesome
+                )
             }
-        }
-    ) {
-        Scaffold(
-            containerColor = PrimaryBackground,
-            snackbarHost = { SnackbarHost(snackbarHostState) }
-        ) { padding ->
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(2),
-                modifier = Modifier
-                    .padding(padding)
-                    .fillMaxSize(),
-                contentPadding = PaddingValues(16.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    DashboardHeader(
-                        summaryInfo = summaryInfo,
-                        remindersEnabled = remindersEnabled,
-                        onRemindersToggle = onRemindersToggle,
-                        selectedFrequency = selectedFrequency,
-                        selectedTime = selectedTime,
-                        isProUser = isProUser,
-                        onMenuClick = { scope.launch { drawerState.open() } },
-                        onRefreshClick = onRefreshClick,
-                        onStorageClick = onOpenSystemStorage,
-                        onInsightsClick = onNavigateToPhoneReality,
-                        onSettingsClick = onNavigateToSettings,
-                        onUpgradeToPro = onUpgradeToPro
-                    )
-                }
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    AnimatedSuccessBanner(message = successMessage)
-                }
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    StorageOverviewCard(
-                        totalFiles = totalFiles,
-                        totalSize = totalSize,
-                        largeTodayCount = largeTodayCount,
-                        largeTodaySizeText = largeTodaySizeText,
-                        screenshotTodayCount = screenshotTodayCount,
-                        screenshotTodaySizeText = screenshotTodaySizeText,
-                        oldFilesCount = oldFilesCount,
-                        progress = storageProgress,
-                        onClick = onNavigateToAnalytics
-                    )
-                }
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    GradientHeroButton(
-                        text = if (isProUser) "Smart Clean Advanced" else "Unlock Smart Clean Pro",
-                        onClick = onNavigateToSmartClean,
-                        modifier = Modifier.fillMaxWidth(),
-                        icon = Icons.Default.AutoAwesome
-                    )
-                }
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    SectionTitle(title = "Insights", subtitle = "Tap any card to drill into the data.")
-                }
-                gridItems(
-                    items = listOf(
-                        InsightCardModel("Duplicates", "$duplicateCount review items", Icons.Default.AutoDelete, AccentBlue, onNavigateToDuplicates),
-                        InsightCardModel("Spam Shield", "$spamCount suspicious files", Icons.Default.Shield, AccentPurple, onNavigateToSpam),
-                        InsightCardModel("Meme Radar", "$memeCount memes detected", Icons.Default.Mood, AccentGreen, onNavigateToMemeAnalyzer),
-                        InsightCardModel("Reality Check", "$junkCount junk • $oldFilesCount old", Icons.Default.Analytics, AccentBlue, onNavigateToPhoneReality)
-                    )
-                ) { model ->
-                    InsightCard(model = model)
-                }
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    QuickActionRow(
-                        selectedCount = selectedItems.size,
-                        isProUser = isProUser,
-                        onReviewClick = {
-                            val firstSelected = items.firstOrNull { mediaItem -> mediaItem.uri.toString() in selectedUris }
-                            when {
-                                firstSelected != null -> {
-                                    successMessage = "Review ready"
-                                    onOpenInSystem(firstSelected)
-                                }
-
-                                items.isNotEmpty() -> onNavigateToMediaViewer()
-                                else -> Unit
-                            }
-                        },
-                        onJunkClick = onNavigateToJunk,
-                        onStorageClick = onOpenSystemStorage,
-                        onAnalyticsClick = onNavigateToAnalytics,
-                        onBulkDeleteClick = {
-                            if (isDeleting) return@QuickActionRow
-                            Log.d("DELETE_DEBUG", "Delete button clicked")
-                            val itemsToDelete = items.filter { mediaItem -> mediaItem.uri.toString() in selectedUris }
-                            Log.d("DELETE_DEBUG", "Selected count=${itemsToDelete.size}")
-                            if (itemsToDelete.isNotEmpty()) {
-                                val uris = itemsToDelete.map { mediaItem -> mediaItem.uri }
-                                Log.d("DELETE_DEBUG", "URI list size=${uris.size}")
-                                uris.forEachIndexed { index, uri -> Log.d("DELETE_DEBUG", "Button URI[$index]=$uri") }
-                                pendingDeleteItems = itemsToDelete
-                            } else {
-                                Log.d("DELETE_DEBUG", "Delete button clicked with empty selection")
-                                onBulkDeleteClick()
-                            }
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                MainActionsCard(
+                    remindersEnabled = remindersEnabled,
+                    onRemindersToggle = onRemindersToggle,
+                    onRefreshClick = onRefreshClick,
+                    onExploreFeatures = onNavigateToFeatures
+                )
+            }
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                AnimatedSuccessBanner(message = successMessage)
+            }
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                StorageOverviewCard(
+                    totalFiles = totalFiles,
+                    totalSize = totalSize,
+                    largeTodayCount = largeTodayCount,
+                    largeTodaySizeText = largeTodaySizeText,
+                    screenshotTodayCount = screenshotTodayCount,
+                    screenshotTodaySizeText = screenshotTodaySizeText,
+                    oldFilesCount = oldFilesCount,
+                    progress = storageProgress,
+                    usedSpace = formatSize(usedBytes),
+                    freeSpace = formatSize(freeBytes),
+                    onClick = onNavigateToAnalytics
+                )
+            }
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                QuickActionRow(
+                    selectedCount = selectedItems.size,
+                    onDeleteClick = {
+                        if (isDeleting) return@QuickActionRow
+                        val itemsToDelete = items.filter { mediaItem -> mediaItem.uri.toString() in selectedUris }
+                        if (itemsToDelete.isNotEmpty()) {
+                            pendingDeleteItems = itemsToDelete
+                        } else {
+                            onBulkDeleteClick()
                         }
-                    )
-                }
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    SuggestionStrip(
-                        activeSuggestion = activeSuggestion,
-                        largeTodayCount = largeTodayCount,
-                        screenshotTodayCount = screenshotTodayCount,
-                        onSuggestionChange = onSuggestionChange
-                    )
-                }
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    SectionTitle(title = "Browse media", subtitle = "Filter the live scan and review what matters now.")
-                }
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    FilterTabs(currentFilter = currentFilter, onFilterChange = onFilterChange)
-                }
-
-                if (isLoading) {
-                    repeat(6) {
-                        item { MediaGridShimmer() }
+                    },
+                    onSelectAllClick = {
+                        selectedItems = if (selectedItems.size == items.size) emptyList() else items
+                    },
+                    onFilterClick = {
+                        val nextFilter = when (currentFilter) {
+                            MediaFilter.ALL -> MediaFilter.IMAGES
+                            MediaFilter.IMAGES -> MediaFilter.VIDEOS
+                            MediaFilter.VIDEOS -> MediaFilter.MEMES
+                            MediaFilter.MEMES -> MediaFilter.ALL
+                        }
+                        onFilterChange(nextFilter)
                     }
-                } else if (items.isEmpty()) {
-                    item(span = { GridItemSpan(maxLineSpan) }) {
-                        LegitCard {
-                            FriendlyState(
-                                icon = Icons.Default.CheckCircle,
-                                title = "Nothing to clean right now",
-                                message = "Refresh later to rescan your photos, videos, memes, and quick-win suggestions."
-                            )
-                        }
+                )
+            }
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                FilterTabs(currentFilter = currentFilter, onFilterChange = onFilterChange)
+            }
+
+            if (isLoading) {
+                repeat(6) {
+                    item { MediaGridShimmer() }
+                }
+            } else if (items.isEmpty()) {
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    LegitCard {
+                        FriendlyState(
+                            icon = Icons.Default.CheckCircle,
+                            title = "Nothing to clean right now",
+                            message = "Refresh later to rescan your photos, videos, memes, and quick-win suggestions."
+                        )
                     }
-                } else {
-                    gridItems(items, key = { mediaItem -> mediaItem.uri.toString() }) { item ->
-                        AnimatedVisibility(
-                            visible = item.uri.toString() !in pendingDeleteUris,
-                            enter = fadeIn(animationSpec = tween(240)),
-                            exit = fadeOut(animationSpec = tween(260)) + shrinkVertically(animationSpec = tween(260))
-                        ) {
-                            MediaGridCard(
-                                item = item,
-                                selected = item.uri.toString() in selectedUris,
-                                onSelect = {
-                                    selectedItems = if (selectedItems.any { selectedItem -> selectedItem.uri == item.uri }) {
-                                        selectedItems.filterNot { selectedItem -> selectedItem.uri == item.uri }
-                                    } else {
-                                        selectedItems + item
-                                    }
-                                },
-                                onOpen = { onOpenInSystem(item) },
-                                onKeep = {
-                                    val itemName = item.safeDisplayName()
-                                    successMessage = "Kept ${itemName.take(18)}"
-                                    scope.launch { snackbarHostState.showSnackbar("Kept $itemName") }
-                                },
-                                onDelete = {
-                                    if (!isDeleting) {
-                                        pendingDeleteItems = listOf(item)
-                                    }
+                }
+            } else {
+                gridItems(items, key = { mediaItem -> mediaItem.uri.toString() }) { item ->
+                    AnimatedVisibility(
+                        visible = item.uri.toString() !in pendingDeleteUris,
+                        enter = fadeIn(animationSpec = tween(240)),
+                        exit = fadeOut(animationSpec = tween(260)) + shrinkVertically(animationSpec = tween(260))
+                    ) {
+                        MediaGridCard(
+                            item = item,
+                            selected = item.uri.toString() in selectedUris,
+                            onSelect = {
+                                selectedItems = if (selectedItems.any { selectedItem -> selectedItem.uri == item.uri }) {
+                                    selectedItems.filterNot { selectedItem -> selectedItem.uri == item.uri }
+                                } else {
+                                    selectedItems + item
                                 }
-                            )
-                        }
+                            },
+                            onOpen = { onOpenInSystem(item) },
+                            onKeep = {
+                                val itemName = item.safeDisplayName()
+                                successMessage = "Kept ${itemName.take(18)}"
+                                scope.launch { snackbarHostState.showSnackbar("Kept $itemName") }
+                            },
+                            onDelete = {
+                                if (!isDeleting) {
+                                    pendingDeleteItems = listOf(item)
+                                }
+                            }
+                        )
                     }
                 }
             }
@@ -445,6 +394,51 @@ fun SimpleHomeScreen(
             containerColor = SurfaceWhite,
             tonalElevation = 0.dp
         )
+    }
+}
+
+
+@Composable
+private fun MainActionsCard(
+    remindersEnabled: Boolean,
+    onRemindersToggle: (Boolean) -> Unit,
+    onRefreshClick: () -> Unit,
+    onExploreFeatures: () -> Unit
+) {
+    LegitCard {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Daily reminders", color = TextMain, fontWeight = FontWeight.SemiBold)
+                Switch(
+                    checked = remindersEnabled,
+                    onCheckedChange = onRemindersToggle,
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = Color.White,
+                        checkedTrackColor = AccentBlue,
+                        uncheckedTrackColor = SurfaceMuted
+                    )
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                QuickPill(
+                    icon = Icons.Default.Refresh,
+                    label = "Refresh",
+                    onClick = onRefreshClick
+                )
+                QuickPill(
+                    icon = Icons.Default.AutoAwesome,
+                    label = "Explore Features →",
+                    onClick = onExploreFeatures
+                )
+            }
+        }
     }
 }
 
@@ -586,6 +580,8 @@ private fun StorageOverviewCard(
     screenshotTodaySizeText: String,
     oldFilesCount: Int,
     progress: Float,
+    usedSpace: String,
+    freeSpace: String,
     onClick: () -> Unit
 ) {
     Card(
@@ -610,10 +606,10 @@ private fun StorageOverviewCard(
         ) {
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Storage overview", style = MaterialTheme.typography.titleLarge, color = TextMain)
-                Text("$totalFiles files • ${formatSize(totalSize)}", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+                Text("Used $usedSpace • Free $freeSpace", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
                 StatLine(Icons.Default.CleaningServices, "$largeTodayCount large today", largeTodaySizeText.ifBlank { "Ready for review" })
                 StatLine(Icons.Default.Image, "$screenshotTodayCount screenshots", screenshotTodaySizeText.ifBlank { "Quick wins available" })
-                StatLine(Icons.Default.Analytics, "$oldFilesCount older files", "Tap for analytics")
+                StatLine(Icons.Default.Analytics, "$totalFiles files • ${formatSize(totalSize)}", "$oldFilesCount older files")
             }
             StorageRing(
                 progress = progress,
@@ -720,55 +716,34 @@ private fun InsightCard(model: InsightCardModel) {
 @Composable
 private fun QuickActionRow(
     selectedCount: Int,
-    isProUser: Boolean,
-    onReviewClick: () -> Unit,
-    onJunkClick: () -> Unit,
-    onStorageClick: () -> Unit,
-    onAnalyticsClick: () -> Unit,
-    onBulkDeleteClick: () -> Unit
+    onDeleteClick: () -> Unit,
+    onSelectAllClick: () -> Unit,
+    onFilterClick: () -> Unit
 ) {
     LegitCard {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("Quick actions", style = MaterialTheme.typography.titleMedium, color = TextMain)
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                item {
-                    ActionChip(icon = Icons.Default.Visibility, label = "Review ($selectedCount)", onClick = onReviewClick, accent = AccentBlue)
-                }
-                item {
-                    ActionChip(icon = Icons.Default.CleaningServices, label = "Junk", onClick = onJunkClick, accent = AccentPurple)
-                }
-                item {
-                    ActionChip(icon = Icons.Default.Analytics, label = "Analytics", onClick = onAnalyticsClick, accent = AccentGreen)
-                }
-                item {
-                    ActionChip(
-                        icon = Icons.Default.DeleteOutline,
-                        label = if (isProUser) "Bulk delete" else "Bulk delete • Pro",
-                        onClick = onBulkDeleteClick,
-                        accent = AccentPurple,
-                        enabled = selectedCount > 0
-                    )
-                }
-                item {
-                    ActionChip(icon = Icons.Default.Storage, label = "Storage", onClick = onStorageClick, accent = AccentBlue)
-                }
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                IconActionButton(Icons.Default.DeleteOutline, "Delete selected ($selectedCount)", selectedCount > 0, onDeleteClick)
+                IconActionButton(Icons.Default.SelectAll, "Select all", true, onSelectAllClick)
+                IconActionButton(Icons.Default.Sort, "Sort / filter", true, onFilterClick)
             }
         }
     }
 }
 
 @Composable
-private fun ActionChip(icon: ImageVector, label: String, onClick: () -> Unit, accent: Color, enabled: Boolean = true) {
+private fun IconActionButton(icon: ImageVector, label: String, enabled: Boolean, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .clip(RoundedCornerShape(20.dp))
-            .background(accent.copy(alpha = 0.14f))
+            .background(AccentBlue.copy(alpha = 0.14f))
             .clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(icon, contentDescription = null, tint = accent, modifier = Modifier.size(18.dp))
+        Icon(icon, contentDescription = null, tint = AccentBlue, modifier = Modifier.size(18.dp))
         Text(label, color = TextMain, style = MaterialTheme.typography.labelLarge)
     }
 }

@@ -27,6 +27,8 @@ import com.example.whatsappcleaner.data.billing.BillingProduct
 import com.example.whatsappcleaner.data.local.SimpleMediaItem
 import com.example.whatsappcleaner.ui.components.FriendlyState
 import com.example.whatsappcleaner.ui.home.AnalyticsScreen
+import com.example.whatsappcleaner.ui.home.FeaturePlaceholderScreen
+import com.example.whatsappcleaner.ui.home.FeaturesScreen
 import com.example.whatsappcleaner.ui.home.HomeUiState
 import com.example.whatsappcleaner.ui.home.JunkFilesScreen
 import com.example.whatsappcleaner.ui.home.MediaFilter
@@ -52,6 +54,9 @@ private object Routes {
     const val Analytics = "analytics_screen"
     const val Spam = "spam_screen"
     const val MediaViewer = "media_viewer"
+    const val Features = "features"
+    const val WhatsAppCleaner = "whatsapp_cleaner"
+    const val ScreenshotsCleaner = "screenshots_cleaner"
     const val Paywall = "paywall"
     const val Settings = "settings"
 }
@@ -210,7 +215,28 @@ fun WhatsCleanAppRoot(
                 onSuggestionChange = onSuggestionChange,
                 totalFiles = state.totalFiles,
                 totalSize = state.totalSize,
-                oldFilesCount = state.report.oldFiles
+                oldFilesCount = state.report.oldFiles,
+                onNavigateToFeatures = { navController.navigateSingleTop(Routes.Features) }
+            )
+        }
+
+        composable(Routes.Features) {
+            FeaturesScreen(
+                onBack = { navController.popBackStack() },
+                onDuplicatesClick = {
+                    if (onPremiumFeatureRequested(PremiumFeature.DUPLICATE_DETECTION)) {
+                        navController.navigateSingleTop(Routes.SmartClean)
+                    } else navController.navigateSingleTop(Routes.Paywall)
+                },
+                onMemeRadarClick = {
+                    if (onPremiumFeatureRequested(PremiumFeature.MEME_DETECTION)) {
+                        navController.navigateSingleTop(Routes.MemeScreen)
+                    } else navController.navigateSingleTop(Routes.Paywall)
+                },
+                onSpamShieldClick = { navController.navigateSingleTop(Routes.Spam) },
+                onWhatsAppCleanerClick = { navController.navigateSingleTop(Routes.WhatsAppCleaner) },
+                onScreenshotsCleanerClick = { navController.navigateSingleTop(Routes.ScreenshotsCleaner) },
+                onLargeFilesClick = { navController.navigateSingleTop(Routes.JunkScreen) }
             )
         }
 
@@ -285,6 +311,14 @@ fun WhatsCleanAppRoot(
                 onDeleteSnackbarConsumed = onDeleteSnackbarConsumed,
                 onBack = { navController.popBackStack() }
             )
+        }
+
+        composable(Routes.WhatsAppCleaner) {
+            FeaturePlaceholderScreen(title = "WhatsApp Cleaner", onBack = { navController.popBackStack() })
+        }
+
+        composable(Routes.ScreenshotsCleaner) {
+            FeaturePlaceholderScreen(title = "Screenshots Cleaner", onBack = { navController.popBackStack() })
         }
 
         composable(Routes.Paywall) {
