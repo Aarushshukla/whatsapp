@@ -4,7 +4,6 @@ import android.content.ContentResolver
 import android.content.ContentUris
 import android.content.Context
 import android.net.Uri
-import android.os.Build
 import android.provider.MediaStore
 import android.util.Log
 
@@ -27,6 +26,10 @@ data class SimpleMediaItem(
 
 class MediaLoader(private val context: Context) {
 
+    companion object {
+        private const val TAG = "MediaLoader"
+    }
+
     fun loadAllDeviceMedia(
         mediaType: String,
         limit: Int? = null,
@@ -48,17 +51,9 @@ class MediaLoader(private val context: Context) {
     ): List<SimpleMediaItem> {
         val resolver: ContentResolver = context.contentResolver
         val collection = if (mediaType == "video") {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
-            } else {
-                MediaStore.Video.Media.EXTERNAL_CONTENT_URI
-            }
+            MediaStore.Video.Media.EXTERNAL_CONTENT_URI
         } else {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
-            } else {
-                MediaStore.Images.Media.EXTERNAL_CONTENT_URI
-            }
+            MediaStore.Images.Media.EXTERNAL_CONTENT_URI
         }
 
         val projection = arrayOf(
@@ -85,7 +80,7 @@ class MediaLoader(private val context: Context) {
 
         val items = mutableListOf<SimpleMediaItem>()
         try {
-            Log.d("MediaLoader", "Querying $mediaType media between $minDate and $maxDate, limit=$limit, offset=$offset")
+            Log.d(TAG, "Querying $mediaType media between $minDate and $maxDate, limit=$limit, offset=$offset")
             resolver.query(
                 collection,
                 projection,
@@ -106,6 +101,7 @@ class MediaLoader(private val context: Context) {
                     val dateAddedSec = cursor.getLong(dateCol)
                     val mimeType = cursor.getString(mimeCol)
                     val uri = ContentUris.withAppendedId(collection, id)
+                    Log.d(TAG, "Resolved MediaStore URI format for deletion: $uri (id=$id, type=$mediaType)")
                     items.add(
                         SimpleMediaItem(
                             uri = uri,
@@ -120,9 +116,9 @@ class MediaLoader(private val context: Context) {
                 }
             }
         } catch (error: SecurityException) {
-            Log.e("MediaLoader", "Permission denied while loading $mediaType media", error)
+            Log.e(TAG, "Permission denied while loading $mediaType media", error)
         } catch (error: Exception) {
-            Log.e("MediaLoader", "Error loading $mediaType media", error)
+            Log.e(TAG, "Error loading $mediaType media", error)
         }
         return items
     }
