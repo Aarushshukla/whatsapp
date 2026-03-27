@@ -222,7 +222,7 @@ class MainActivity : ComponentActivity() {
             .mapNotNull { uri ->
                 Log.d("DELETE_DEBUG", "Checking URI before delete request: $uri")
                 uri.takeIf { candidate ->
-                    val isValid = candidate != Uri.EMPTY && candidate.toString().startsWith("content://")
+                    val isValid = isValidMediaStoreUri(candidate)
                     if (!isValid) {
                         Log.w("DELETE_DEBUG", "Skipping invalid delete URI: $candidate")
                     }
@@ -231,9 +231,9 @@ class MainActivity : ComponentActivity() {
             }
             .distinct()
         if (validUris.isEmpty()) {
-            Log.w("DELETE_DEBUG", "No valid content:// URIs available for MediaStore delete request.")
+            Log.w("DELETE_DEBUG", "No valid MediaStore URIs available for delete request.")
             viewModel.onMediaDeleteResult(success = false)
-            showDeleteError("No valid files were available for deletion.")
+            showDeleteError("This file cannot be deleted due to system restrictions")
             return
         }
 
@@ -325,11 +325,19 @@ class MainActivity : ComponentActivity() {
             showDeleteError("Failed to delete file(s).")
             return
         }
-        viewModel.onMediaDeleteResult(success = true)
+        viewModel.onMediaDeleteResult(success = true, deletedCount = deletedCount)
         viewModel.refreshMedia()
         if (deletedCount < totalCount) {
             showDeleteError("Some files could not be deleted.")
         }
+    }
+
+    private fun isValidMediaStoreUri(uri: Uri): Boolean {
+        if (uri == Uri.EMPTY) return false
+        val normalized = uri.toString()
+        if (normalized.startsWith("content://com.whatsapp")) return false
+        if (normalized.startsWith("file://")) return false
+        return normalized.startsWith("content://media/external/")
     }
 
     private fun showDeleteError(message: String) {
@@ -468,11 +476,20 @@ class MainActivity : ComponentActivity() {
                 onDeleteClicked = viewModel::onDeleteClicked,
                 onDeleteMediaRequest = { items, origin ->
                     Log.d("DELETE_DEBUG", "Delete button click from $origin with ${items.size} selected items")
-                    val uris = items.mapNotNull { item -> item.uri.takeIf { uri -> uri != Uri.EMPTY } }
-                    Log.d("DELETE_DEBUG", "URI list size=${uris.size}")
-                    uris.forEachIndexed { index, uri -> Log.d("DELETE_DEBUG", "Delete URI[$index]=$uri") }
-                    viewModel.requestMediaDeletion(items, origin)
-                    activity.deleteMedia(uris)
+                    val rawUris = items.map { item -> item.uri }
+                    rawUris.forEachIndexed { index, uri -> Log.d("DELETE_DEBUG", "Raw URI[$index]=$uri") }
+
+                    val validItems = items.filter { item -> isValidMediaStoreUri(item.uri) }
+                    val validUris = validItems.map { item -> item.uri }.distinct()
+                    Log.d("DELETE_DEBUG", "Valid MediaStore URI list size=${validUris.size}")
+                    validUris.forEachIndexed { index, uri -> Log.d("DELETE_DEBUG", "Valid delete URI[$index]=$uri") }
+
+                    if (validUris.isEmpty()) {
+                        showDeleteError("This file cannot be deleted due to system restrictions")
+                    } else {
+                        viewModel.requestMediaDeletion(validItems, origin)
+                        activity.deleteMedia(validUris)
+                    }
                 },
                 onUndoDelete = viewModel::undoLastDelete,
                 onDeleteSnackbarConsumed = viewModel::clearDeleteSnackbar,
