@@ -483,7 +483,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun onMediaDeleteResult(success: Boolean) {
+    fun onMediaDeleteResult(success: Boolean, deletedCount: Int = 0) {
         val pendingUris = _uiState.value.pendingDeleteUris.toSet()
         if (pendingUris.isEmpty()) {
             Log.w(TAG, "Delete result received with no pending URIs.")
@@ -500,24 +500,21 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
 
-        Log.d(TAG, "Delete flow succeeded for ${pendingUris.size} items.")
+        Log.d(TAG, "Delete flow completed. requested=${pendingUris.size}, deleted=$deletedCount")
         _uiState.update { currentState ->
-            val removedItems = currentState.allItems.filter { item -> item.uri in pendingUris }
-            val updatedItems = currentState.allItems.filterNot { item -> item.uri in pendingUris }
-            val deletedCount = removedItems.size
-            val deleteMessage = if (deletedCount == 1) "1 item deleted" else "$deletedCount items deleted"
+            val deleteMessage = if (deletedCount <= 0) {
+                "No files were deleted"
+            } else if (deletedCount == 1) {
+                "1 item deleted"
+            } else {
+                "$deletedCount items deleted"
+            }
             currentState.copy(
-                allItems = updatedItems,
-                filteredItems = filterList(updatedItems, currentState.currentFilter, currentState.activeSuggestion, currentState.settings),
-                summaryInfo = if (updatedItems.isEmpty()) "No media found." else "Found ${updatedItems.size} files (${formatSize(updatedItems.sumOf { it.sizeKb.toLong() * 1024L })})",
-                totalFiles = updatedItems.size,
-                totalSize = updatedItems.sumOf { mediaItem -> mediaItem.sizeKb.toLong() * 1024L },
                 pendingDeleteUris = emptyList(),
                 deleteSnackbarMessage = deleteMessage,
-                lastDeletedItems = removedItems
+                lastDeletedItems = emptyList()
             )
         }
-        _items.update { currentItems -> currentItems.filterNot { item -> item.uri in pendingUris } }
     }
 
     fun onMediaDeleteCancelled() {
@@ -533,23 +530,12 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun undoLastDelete() {
-        val restoredItems = _uiState.value.lastDeletedItems
-        if (restoredItems.isEmpty()) return
-        Log.d(TAG, "Undoing delete in UI for ${restoredItems.size} items.")
+        Log.d(TAG, "Undo delete requested, but UI-only restoration is disabled.")
         _uiState.update { currentState ->
-            val merged = (currentState.allItems + restoredItems).distinctBy { item -> item.uri }.sortedByDescending { item -> item.addedMillis }
             currentState.copy(
-                allItems = merged,
-                filteredItems = filterList(merged, currentState.currentFilter, currentState.activeSuggestion, currentState.settings),
-                summaryInfo = if (merged.isEmpty()) "No media found." else "Found ${merged.size} files (${formatSize(merged.sumOf { it.sizeKb.toLong() * 1024L })})",
-                totalFiles = merged.size,
-                totalSize = merged.sumOf { mediaItem -> mediaItem.sizeKb.toLong() * 1024L },
                 deleteSnackbarMessage = null,
                 lastDeletedItems = emptyList()
             )
-        }
-        _items.update { currentItems ->
-            (currentItems + restoredItems).distinctBy { item -> item.uri }.sortedByDescending { item -> item.addedMillis }
         }
     }
 
