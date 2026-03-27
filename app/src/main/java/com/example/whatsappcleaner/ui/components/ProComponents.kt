@@ -146,12 +146,25 @@ fun LegitCard(
     content: @Composable ColumnScope.() -> Unit
 ) {
     Card(
-        colors = CardDefaults.cardColors(containerColor = SurfaceWhite),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
         shape = RoundedCornerShape(20.dp),
-        modifier = modifier.fillMaxWidth(),
-        content = content
-    )
+        modifier = modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier
+                .background(
+                    brush = Brush.linearGradient(
+                        colors = listOf(
+                            SurfaceWhite,
+                            SurfaceWhite.copy(alpha = 0.94f)
+                        )
+                    )
+                )
+        ) {
+            content()
+        }
+    }
 }
 
 fun Modifier.shimmerEffect(): Modifier = composed {
