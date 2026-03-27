@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -31,11 +32,15 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.whatsappcleaner.ui.components.LegitCard
 import com.example.whatsappcleaner.ui.theme.AccentBlue
@@ -77,12 +82,19 @@ fun FeaturesScreen(
         containerColor = PrimaryBackground,
         topBar = {
             TopAppBar(
-                title = { Text("Features", color = TextMain) },
+                title = {
+                    Column {
+                        Text("Features", color = TextMain, fontWeight = FontWeight.Bold)
+                        Text("Advanced cleanup modules", color = TextSecondary, style = MaterialTheme.typography.labelMedium)
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = TextMain)
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = PrimaryBackground),
+                modifier = Modifier.statusBarsPadding()
             )
         }
     ) { padding ->
@@ -99,12 +111,15 @@ fun FeaturesScreen(
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .shadow(8.dp, RoundedCornerShape(24.dp))
                         .clickable(onClick = model.onClick),
-                    shape = RoundedCornerShape(20.dp),
+                    shape = RoundedCornerShape(24.dp),
                     colors = CardDefaults.cardColors(containerColor = SurfaceWhite)
                 ) {
                     Column(
-                        modifier = Modifier.padding(16.dp),
+                        modifier = Modifier
+                            .background(Brush.verticalGradient(listOf(SurfaceWhite, SurfaceWhite.copy(alpha = 0.92f))))
+                            .padding(20.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Icon(

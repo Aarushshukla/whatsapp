@@ -11,6 +11,7 @@ import android.os.StatFs
 import android.util.Log
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -40,6 +41,8 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -108,6 +111,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -115,6 +119,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.statusBarsPadding
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
@@ -237,15 +242,37 @@ fun SimpleHomeScreen(
     val freeBytes = statFs?.availableBytes ?: 0L
     val usedBytes = (totalDeviceBytes - freeBytes).coerceAtLeast(0L)
     val storageProgress = if (totalDeviceBytes == 0L) 0f else usedBytes.toFloat() / totalDeviceBytes.toFloat()
+    var contentVisible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        delay(90)
+        contentVisible = true
+    }
 
     Scaffold(
         containerColor = PrimaryBackground,
         topBar = {
             TopAppBar(
-                title = { Text("Cleaner", color = TextMain, fontWeight = FontWeight.SemiBold) },
+                title = {
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text("Cleaner", color = TextMain, fontWeight = FontWeight.Bold)
+                        Text(
+                            text = summaryInfo,
+                            color = TextSecondary,
+                            style = MaterialTheme.typography.labelMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                },
                 navigationIcon = {
-                    IconButton(onClick = onNavigateToSettings) {
-                        Icon(Icons.Default.Menu, contentDescription = "Menu", tint = TextMain)
+                    IconButton(
+                        onClick = onNavigateToSettings,
+                        modifier = Modifier
+                            .padding(start = 4.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(SurfaceWhite.copy(alpha = 0.75f))
+                    ) {
+                        Icon(Icons.Default.Menu, contentDescription = "Menu", tint = TextMain, modifier = Modifier.size(22.dp))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -253,6 +280,7 @@ fun SimpleHomeScreen(
                     titleContentColor = TextMain,
                     navigationIconContentColor = TextMain
                 ),
+                windowInsets = WindowInsets.systemBars,
                 modifier = Modifier.statusBarsPadding()
             )
         },
@@ -268,38 +296,55 @@ fun SimpleHomeScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             item(span = { GridItemSpan(maxLineSpan) }) {
-                GradientHeroButton(
-                    text = "Smart Scan / Clean Now",
-                    onClick = onNavigateToSmartClean,
-                    modifier = Modifier.fillMaxWidth(),
-                    icon = Icons.Default.AutoAwesome
-                )
+                AnimatedVisibility(
+                    visible = contentVisible,
+                    enter = fadeIn(tween(360)) + slideInVertically(initialOffsetY = { it / 3 })
+                ) {
+                    GradientHeroButton(
+                        text = "Smart Scan / Clean Now",
+                        onClick = onNavigateToSmartClean,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(72.dp),
+                        icon = Icons.Default.AutoAwesome
+                    )
+                }
             }
             item(span = { GridItemSpan(maxLineSpan) }) {
-                MainActionsCard(
-                    remindersEnabled = remindersEnabled,
-                    onRemindersToggle = onRemindersToggle,
-                    onRefreshClick = onRefreshClick,
-                    onExploreFeatures = onNavigateToFeatures
-                )
+                AnimatedVisibility(
+                    visible = contentVisible,
+                    enter = fadeIn(tween(420)) + slideInVertically(initialOffsetY = { it / 2 })
+                ) {
+                    MainActionsCard(
+                        remindersEnabled = remindersEnabled,
+                        onRemindersToggle = onRemindersToggle,
+                        onRefreshClick = onRefreshClick,
+                        onExploreFeatures = onNavigateToFeatures
+                    )
+                }
             }
             item(span = { GridItemSpan(maxLineSpan) }) {
                 AnimatedSuccessBanner(message = successMessage)
             }
             item(span = { GridItemSpan(maxLineSpan) }) {
-                StorageOverviewCard(
-                    totalFiles = totalFiles,
-                    totalSize = totalSize,
-                    largeTodayCount = largeTodayCount,
-                    largeTodaySizeText = largeTodaySizeText,
-                    screenshotTodayCount = screenshotTodayCount,
-                    screenshotTodaySizeText = screenshotTodaySizeText,
-                    oldFilesCount = oldFilesCount,
-                    progress = storageProgress,
-                    usedSpace = formatSize(usedBytes),
-                    freeSpace = formatSize(freeBytes),
-                    onClick = onNavigateToAnalytics
-                )
+                AnimatedVisibility(
+                    visible = contentVisible,
+                    enter = fadeIn(tween(480)) + slideInVertically(initialOffsetY = { it / 2 })
+                ) {
+                    StorageOverviewCard(
+                        totalFiles = totalFiles,
+                        totalSize = totalSize,
+                        largeTodayCount = largeTodayCount,
+                        largeTodaySizeText = largeTodaySizeText,
+                        screenshotTodayCount = screenshotTodayCount,
+                        screenshotTodaySizeText = screenshotTodaySizeText,
+                        oldFilesCount = oldFilesCount,
+                        progress = storageProgress,
+                        usedSpace = formatSize(usedBytes),
+                        freeSpace = formatSize(freeBytes),
+                        onClick = onNavigateToAnalytics
+                    )
+                }
             }
             item(span = { GridItemSpan(maxLineSpan) }) {
                 QuickActionRow(
@@ -331,6 +376,12 @@ fun SimpleHomeScreen(
             }
             item(span = { GridItemSpan(maxLineSpan) }) {
                 FilterTabs(currentFilter = currentFilter, onFilterChange = onFilterChange)
+            }
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                SectionTitle(
+                    title = "Loaded files",
+                    subtitle = "${items.size} files ready to review and clean"
+                )
             }
 
             if (isLoading) {
@@ -431,7 +482,7 @@ private fun MainActionsCard(
     onExploreFeatures: () -> Unit
 ) {
     LegitCard {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -459,7 +510,7 @@ private fun MainActionsCard(
                 )
                 QuickPill(
                     icon = Icons.Default.AutoAwesome,
-                    label = "Explore Features →",
+                    label = "Explore Features",
                     onClick = onExploreFeatures
                 )
             }
@@ -748,9 +799,9 @@ private fun QuickActionRow(
     LegitCard {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("Quick actions", style = MaterialTheme.typography.titleMedium, color = TextMain)
-            Row(
+            FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 IconActionButton(Icons.Default.DeleteOutline, "Delete selected ($selectedCount)", selectedCount > 0, onDeleteClick)
                 IconActionButton(Icons.Default.SelectAll, "Select all", true, onSelectAllClick)
@@ -773,14 +824,14 @@ private fun IconActionButton(icon: ImageVector, label: String, enabled: Boolean,
         modifier = Modifier
             .scale(scale)
             .clip(RoundedCornerShape(20.dp))
-            .background(AccentBlue.copy(alpha = 0.14f))
+            .background(if (enabled) AccentBlue.copy(alpha = 0.14f) else SurfaceMuted.copy(alpha = 0.5f))
             .clickable(interactionSource = interactionSource, indication = null, enabled = enabled, onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 12.dp),
+            .padding(horizontal = 12.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(icon, contentDescription = null, tint = AccentBlue, modifier = Modifier.size(18.dp))
-        Text(label, color = TextMain, style = MaterialTheme.typography.labelLarge)
+        Icon(icon, contentDescription = null, tint = if (enabled) AccentBlue else TextSecondary, modifier = Modifier.size(16.dp))
+        Text(label, color = if (enabled) TextMain else TextSecondary, style = MaterialTheme.typography.labelLarge)
     }
 }
 
@@ -896,22 +947,23 @@ private fun PremiumSnackbarHost(snackbarHostState: SnackbarHostState) {
     SnackbarHost(hostState = snackbarHostState) { data: SnackbarData ->
         AnimatedVisibility(
             visible = true,
-            enter = fadeIn(animationSpec = tween(240)) + slideInVertically(initialOffsetY = { it / 2 }),
-            exit = fadeOut(animationSpec = tween(200)) + slideOutVertically(targetOffsetY = { it / 2 })
+            enter = fadeIn(animationSpec = tween(280)) + slideInVertically(initialOffsetY = { it }),
+            exit = fadeOut(animationSpec = tween(220)) + slideOutVertically(targetOffsetY = { it / 2 })
         ) {
             Snackbar(
-                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                shape = RoundedCornerShape(20.dp),
                 containerColor = Color(0xFF1E293B),
                 contentColor = Color.White,
                 action = {
                     data.visuals.actionLabel?.let { label ->
                         TextButton(onClick = { data.performAction() }) {
-                            Text(label, color = Color.White)
+                            Text(label.uppercase(), color = AccentBlue, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
             ) {
-                Text(data.visuals.message)
+                Text(data.visuals.message, style = MaterialTheme.typography.titleSmall)
             }
         }
     }
@@ -934,6 +986,11 @@ private fun MediaGridCard(
         animationSpec = tween(220),
         label = "media_scale"
     )
+    val selectedBorder by animateColorAsState(
+        targetValue = if (selected) AccentBlue else DividerColor.copy(alpha = 0.5f),
+        animationSpec = tween(260),
+        label = "selected_border"
+    )
     val mediaSource = remember(item.uri) { item.uri.takeIf { uri -> uri != Uri.EMPTY } }
     val model = remember(mediaSource, item.mimeType) {
         mediaSource?.let { source ->
@@ -952,14 +1009,16 @@ private fun MediaGridCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
+            .shadow(if (selected) 10.dp else 4.dp, RoundedCornerShape(22.dp))
             .scale(scale)
+            .border(width = 1.6.dp, color = selectedBorder, shape = RoundedCornerShape(22.dp))
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
                 onClick = onSelect
             ),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = SurfaceWhite),
+        shape = RoundedCornerShape(22.dp),
+        colors = CardDefaults.cardColors(containerColor = if (selected) SurfaceWhite.copy(alpha = 0.95f) else SurfaceWhite),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
