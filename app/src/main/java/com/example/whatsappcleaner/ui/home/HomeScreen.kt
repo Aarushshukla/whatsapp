@@ -48,6 +48,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -212,6 +213,7 @@ fun SimpleHomeScreen(
     var pendingDeleteItems by remember { mutableStateOf<List<SimpleMediaItem>>(emptyList()) }
     var isDeleting by remember { mutableStateOf(false) }
     var successMessage by remember { mutableStateOf<String?>(null) }
+    val gridState = rememberLazyGridState()
 
     LaunchedEffect(successMessage) {
         if (successMessage != null) {
@@ -291,6 +293,7 @@ fun SimpleHomeScreen(
             modifier = Modifier
                 .padding(padding)
                 .fillMaxSize(),
+            state = gridState,
             contentPadding = PaddingValues(16.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -399,7 +402,7 @@ fun SimpleHomeScreen(
                     }
                 }
             } else {
-                gridItems(items, key = { mediaItem -> mediaItem.uri.toString() }) { item ->
+                gridItems(items, key = { mediaItem -> mediaItem.id }) { item ->
                     AnimatedVisibility(
                         visible = item.uri.toString() !in pendingDeleteUris,
                         enter = fadeIn(animationSpec = tween(240)),
@@ -1125,11 +1128,19 @@ private fun MiniActionButton(
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.95f else 1f,
+        animationSpec = tween(160),
+        label = "mini_action_scale"
+    )
     Row(
         modifier = modifier
+            .scale(scale)
             .clip(RoundedCornerShape(16.dp))
             .background(accent.copy(alpha = 0.12f))
-            .clickable(onClick = onClick)
+            .clickable(interactionSource = interactionSource, indication = null, onClick = onClick)
             .padding(horizontal = 8.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically

@@ -100,8 +100,8 @@ class MainActivity : ComponentActivity() {
 
                 if (approved) {
                     viewModel.onMediaDeleteResult(deletedUris.isNotEmpty())
-                    Log.d(TAG, "Delete request approved. Refreshing media list from MediaStore.")
-                    viewModel.refreshMedia()
+                    Log.d(TAG, "Delete request approved. Scheduling silent background sync.")
+                    viewModel.refreshMedia(forceRefresh = true, showLoading = false)
                 } else {
                     viewModel.onMediaDeleteCancelled()
                 }
@@ -405,6 +405,7 @@ class MainActivity : ComponentActivity() {
     @Composable
     private fun MainActivityContent(activity: MainActivity, versionLabel: String) {
         val state by viewModel.uiState.collectAsStateWithLifecycle()
+        val mediaItems by viewModel.items.collectAsStateWithLifecycle()
         val darkTheme = when (state.settings.themeMode) {
             AppThemeMode.DARK -> true
             AppThemeMode.LIGHT -> false
@@ -413,7 +414,7 @@ class MainActivity : ComponentActivity() {
         val privacyPolicyUrl = "https://www.google.com/search?q=Cleanly+AI+privacy+policy"
         val faqUrl = "https://www.google.com/search?q=Cleanly+AI+FAQ"
 
-        androidx.compose.runtime.LaunchedEffect(state.deleteRequestId) {
+        androidx.compose.runtime.LaunchedEffect(state.deleteRequestId, mediaItems.size) {
             if (state.pendingDeleteUris.isEmpty()) {
                 Log.d(TAG, "Delete request id changed to ${state.deleteRequestId}, but pendingDeleteUris is empty.")
             }

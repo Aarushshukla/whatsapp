@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
@@ -76,6 +77,7 @@ fun MediaViewerScreen(
     var successMessage by remember { mutableStateOf<String?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    val listState = rememberLazyListState()
 
     LaunchedEffect(successMessage) {
         if (successMessage != null) {
@@ -91,13 +93,15 @@ fun MediaViewerScreen(
         }
     }
 
-    val filtered = when (tab) {
-        MediaFilter.ALL -> allItems
-        MediaFilter.IMAGES -> allItems.filter { mediaItem -> mediaItem.mimeType?.startsWith("image") == true }
-        MediaFilter.VIDEOS -> allItems.filter { mediaItem -> mediaItem.mimeType?.startsWith("video") == true }
-        MediaFilter.MEMES -> allItems.filter { mediaItem -> mediaItem.name.contains("meme", true) || mediaItem.path.contains("meme", true) }
-        MediaFilter.DUPLICATES -> duplicateItems
-        MediaFilter.OTHER -> allItems
+    val filtered = remember(tab, allItems, duplicateItems) {
+        when (tab) {
+            MediaFilter.ALL -> allItems
+            MediaFilter.IMAGES -> allItems.filter { mediaItem -> mediaItem.mimeType?.startsWith("image") == true }
+            MediaFilter.VIDEOS -> allItems.filter { mediaItem -> mediaItem.mimeType?.startsWith("video") == true }
+            MediaFilter.MEMES -> allItems.filter { mediaItem -> mediaItem.name.contains("meme", true) || mediaItem.path.contains("meme", true) }
+            MediaFilter.DUPLICATES -> duplicateItems
+            MediaFilter.OTHER -> allItems
+        }
     }
     val remainingVisibleItems = filtered.count { mediaItem -> mediaItem.uri.toString() !in pendingDeleteUris }
 
@@ -122,6 +126,7 @@ fun MediaViewerScreen(
             modifier = Modifier
                 .padding(padding)
                 .fillMaxSize(),
+            state = listState,
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
@@ -164,7 +169,7 @@ fun MediaViewerScreen(
                     FriendlyState(Icons.Default.PermMedia, "No media here yet", "Try another category or refresh the scan.")
                 }
             } else {
-                items(filtered, key = { mediaItem -> mediaItem.uri.toString() }) { item ->
+                items(filtered, key = { mediaItem -> mediaItem.id }) { item ->
                     AnimatedVisibility(
                         visible = item.uri.toString() !in pendingDeleteUris,
                         enter = fadeIn(animationSpec = tween(420)) + slideInVertically(

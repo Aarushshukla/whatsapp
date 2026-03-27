@@ -103,6 +103,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
+    private val _items = MutableStateFlow<List<SimpleMediaItem>>(emptyList())
+    val items: StateFlow<List<SimpleMediaItem>> = _items.asStateFlow()
     private var hasLoadedInitialCache = false
     private var refreshInProgress = false
 
@@ -133,7 +135,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun refreshMedia(forceRefresh: Boolean = false) {
+    fun refreshMedia(forceRefresh: Boolean = false, showLoading: Boolean = true) {
         if (!_uiState.value.permissionGranted) return
         viewModelScope.launch {
             if (refreshInProgress) {
@@ -153,7 +155,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             }
             refreshInProgress = true
             Log.d(TAG, "Refreshing media library.")
-            _uiState.update { currentState -> currentState.copy(summaryInfo = "Scanning files...", isLoading = true) }
+            if (showLoading) {
+                _uiState.update { currentState -> currentState.copy(summaryInfo = "Scanning files...", isLoading = true) }
+            }
             try {
                 val initialItems = withContext(Dispatchers.IO) {
                     val images = mediaLoader.loadAllDeviceMedia("image", limit = INITIAL_LOAD_LIMIT)
@@ -247,6 +251,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 )
             )
         }
+        _items.value = allItems
     }
 
     private suspend fun isMeme(item: SimpleMediaItem, classifier: MemeClassifier): Boolean {
@@ -512,6 +517,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 lastDeletedItems = removedItems
             )
         }
+        _items.update { currentItems -> currentItems.filterNot { item -> item.uri in pendingUris } }
     }
 
     fun onMediaDeleteCancelled() {
@@ -541,6 +547,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 deleteSnackbarMessage = null,
                 lastDeletedItems = emptyList()
             )
+        }
+        _items.update { currentItems ->
+            (currentItems + restoredItems).distinctBy { item -> item.uri }.sortedByDescending { item -> item.addedMillis }
         }
     }
 
