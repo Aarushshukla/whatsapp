@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.Button
@@ -18,6 +19,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
+import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -104,40 +106,20 @@ fun WhatsCleanAppRoot(
     versionLabel: String,
     modifier: Modifier = Modifier
 ) {
+    if (state.isLoading && state.filteredItems.isEmpty() && state.permissionGranted) {
+        FullScreenLoading(modifier = modifier)
+        return
+    }
     if (!state.permissionGranted) {
         PermissionGate(onRequestPermission = onRequestPermission, modifier = modifier)
         return
     }
     val navController = rememberNavController()
 
-    NavHost(
+    AnimatedNavHost(
         navController = navController,
         startDestination = Routes.Home,
-        modifier = modifier,
-        enterTransition = {
-            slideIntoContainer(
-                towards = AnimatedContentTransitionScope.SlideDirection.Start,
-                animationSpec = tween(450)
-            ) + fadeIn(animationSpec = tween(450))
-        },
-        exitTransition = {
-            slideOutOfContainer(
-                towards = AnimatedContentTransitionScope.SlideDirection.Start,
-                animationSpec = tween(450)
-            ) + fadeOut(animationSpec = tween(450))
-        },
-        popEnterTransition = {
-            slideIntoContainer(
-                towards = AnimatedContentTransitionScope.SlideDirection.End,
-                animationSpec = tween(450)
-            ) + fadeIn(animationSpec = tween(450))
-        },
-        popExitTransition = {
-            slideOutOfContainer(
-                towards = AnimatedContentTransitionScope.SlideDirection.End,
-                animationSpec = tween(450)
-            ) + fadeOut(animationSpec = tween(450))
-        }
+        modifier = modifier
     ) {
         composable(Routes.Home) {
             SimpleHomeScreen(
@@ -363,6 +345,61 @@ fun WhatsCleanAppRoot(
                 onInviteFriends = onInviteFriends
             )
         }
+    }
+}
+
+@Composable
+private fun AnimatedNavHost(
+    navController: NavHostController,
+    startDestination: String,
+    modifier: Modifier = Modifier,
+    builder: NavGraphBuilder.() -> Unit
+) {
+    NavHost(
+        navController = navController,
+        startDestination = startDestination,
+        modifier = modifier,
+        enterTransition = {
+            slideIntoContainer(
+                towards = AnimatedContentTransitionScope.SlideDirection.Start,
+                animationSpec = tween(450)
+            ) + fadeIn(animationSpec = tween(450))
+        },
+        exitTransition = {
+            slideOutOfContainer(
+                towards = AnimatedContentTransitionScope.SlideDirection.Start,
+                animationSpec = tween(450)
+            ) + fadeOut(animationSpec = tween(450))
+        },
+        popEnterTransition = {
+            slideIntoContainer(
+                towards = AnimatedContentTransitionScope.SlideDirection.End,
+                animationSpec = tween(450)
+            ) + fadeIn(animationSpec = tween(450))
+        },
+        popExitTransition = {
+            slideOutOfContainer(
+                towards = AnimatedContentTransitionScope.SlideDirection.End,
+                animationSpec = tween(450)
+            ) + fadeOut(animationSpec = tween(450))
+        },
+        builder = builder
+    )
+}
+
+@Composable
+private fun FullScreenLoading(modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        CircularProgressIndicator()
+        Text(
+            text = "Preparing Cleaner…",
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.padding(top = 16.dp)
+        )
     }
 }
 

@@ -18,6 +18,7 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -82,12 +83,17 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarData
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.SnackbarResult
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
@@ -109,6 +115,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.statusBarsPadding
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import coil.request.videoFrameMillis
@@ -233,7 +240,23 @@ fun SimpleHomeScreen(
 
     Scaffold(
         containerColor = PrimaryBackground,
-        snackbarHost = { SnackbarHost(snackbarHostState) }
+        topBar = {
+            TopAppBar(
+                title = { Text("Cleaner", color = TextMain, fontWeight = FontWeight.SemiBold) },
+                navigationIcon = {
+                    IconButton(onClick = onNavigateToSettings) {
+                        Icon(Icons.Default.Menu, contentDescription = "Menu", tint = TextMain)
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = PrimaryBackground,
+                    titleContentColor = TextMain,
+                    navigationIconContentColor = TextMain
+                ),
+                modifier = Modifier.statusBarsPadding()
+            )
+        },
+        snackbarHost = { PremiumSnackbarHost(snackbarHostState = snackbarHostState) }
     ) { padding ->
         LazyVerticalGrid(
             columns = GridCells.Fixed(2),
@@ -242,7 +265,7 @@ fun SimpleHomeScreen(
                 .fillMaxSize(),
             contentPadding = PaddingValues(16.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             item(span = { GridItemSpan(maxLineSpan) }) {
                 GradientHeroButton(
@@ -725,7 +748,10 @@ private fun QuickActionRow(
     LegitCard {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("Quick actions", style = MaterialTheme.typography.titleMedium, color = TextMain)
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 IconActionButton(Icons.Default.DeleteOutline, "Delete selected ($selectedCount)", selectedCount > 0, onDeleteClick)
                 IconActionButton(Icons.Default.SelectAll, "Select all", true, onSelectAllClick)
                 IconActionButton(Icons.Default.Sort, "Sort / filter", true, onFilterClick)
@@ -736,11 +762,19 @@ private fun QuickActionRow(
 
 @Composable
 private fun IconActionButton(icon: ImageVector, label: String, enabled: Boolean, onClick: () -> Unit) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.95f else 1f,
+        animationSpec = tween(180),
+        label = "action_button_scale"
+    )
     Row(
         modifier = Modifier
+            .scale(scale)
             .clip(RoundedCornerShape(20.dp))
             .background(AccentBlue.copy(alpha = 0.14f))
-            .clickable(enabled = enabled, onClick = onClick)
+            .clickable(interactionSource = interactionSource, indication = null, enabled = enabled, onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -835,17 +869,51 @@ private fun SuggestionStrip(
 
 @Composable
 private fun SuggestionChip(label: String, selected: Boolean, icon: ImageVector, onClick: () -> Unit) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.95f else 1f,
+        animationSpec = tween(180),
+        label = "suggestion_chip_scale"
+    )
     Row(
         modifier = Modifier
+            .scale(scale)
             .clip(RoundedCornerShape(999.dp))
             .background(if (selected) AccentGreen.copy(alpha = 0.18f) else SurfaceMuted)
-            .clickable(onClick = onClick)
+            .clickable(interactionSource = interactionSource, indication = null, onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(icon, contentDescription = null, tint = if (selected) AccentGreen else TextSecondary, modifier = Modifier.size(16.dp))
         Text(label, color = if (selected) AccentGreen else TextSecondary, style = MaterialTheme.typography.labelLarge)
+    }
+}
+
+@Composable
+private fun PremiumSnackbarHost(snackbarHostState: SnackbarHostState) {
+    SnackbarHost(hostState = snackbarHostState) { data: SnackbarData ->
+        AnimatedVisibility(
+            visible = true,
+            enter = fadeIn(animationSpec = tween(240)) + slideInVertically(initialOffsetY = { it / 2 }),
+            exit = fadeOut(animationSpec = tween(200)) + slideOutVertically(targetOffsetY = { it / 2 })
+        ) {
+            Snackbar(
+                shape = RoundedCornerShape(16.dp),
+                containerColor = Color(0xFF1E293B),
+                contentColor = Color.White,
+                action = {
+                    data.visuals.actionLabel?.let { label ->
+                        TextButton(onClick = { data.performAction() }) {
+                            Text(label, color = Color.White)
+                        }
+                    }
+                }
+            ) {
+                Text(data.visuals.message)
+            }
+        }
     }
 }
 
