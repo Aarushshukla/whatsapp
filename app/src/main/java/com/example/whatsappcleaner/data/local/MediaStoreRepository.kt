@@ -19,8 +19,7 @@ class MediaStoreRepository(
 
         val projection = arrayOf(
             MediaStore.Images.Media._ID,
-            MediaStore.Images.Media.DISPLAY_NAME,
-            MediaStore.Images.Media.SIZE
+            MediaStore.Images.Media.DISPLAY_NAME
         )
 
         val sortOrder = buildString {
@@ -42,14 +41,11 @@ class MediaStoreRepository(
         )?.use { cursor ->
             val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
             val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)
-            val sizeColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.SIZE)
 
             while (cursor.moveToNext()) {
                 val id = cursor.getLong(idColumn)
                 val name = cursor.getString(nameColumn).orEmpty()
-                val size = cursor.getLong(sizeColumn)
-
-                val uri = ContentUris.withAppendedId(
+                val contentUri = ContentUris.withAppendedId(
                     MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
                     id
                 )
@@ -57,9 +53,8 @@ class MediaStoreRepository(
                 list.add(
                     MediaItem(
                         id = id,
-                        uri = uri,
-                        name = name,
-                        size = size
+                        uri = contentUri,
+                        name = name
                     )
                 )
             }
