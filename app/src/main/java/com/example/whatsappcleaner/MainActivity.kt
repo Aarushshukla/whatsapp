@@ -63,7 +63,7 @@ class MainActivity : ComponentActivity() {
         Log.d(TAG, "Initializing deleteLauncher with StartIntentSenderForResult contract.")
         deleteLauncher = registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
             try {
-                val approved = result.resultCode == RESULT_OK
+                val approved = result.resultCode == android.app.Activity.RESULT_OK
                 if (approved) {
                     Log.d("DELETE_DEBUG", "Delete success")
                 } else {
@@ -73,8 +73,11 @@ class MainActivity : ComponentActivity() {
                 val pendingUris = viewModel.uiState.value.pendingDeleteUris
                 Log.d(
                     TAG,
-                    "Delete launcher callback. sdk=${Build.VERSION.SDK_INT}, recoverableFlow=$pendingDeleteFromRecoverableFlow, pending=${pendingUris.size}"
+                    "Delete launcher callback. resultCode=${result.resultCode}, sdk=${Build.VERSION.SDK_INT}, recoverableFlow=$pendingDeleteFromRecoverableFlow, pending=${pendingUris.size}"
                 )
+                pendingUris.forEachIndexed { index, uri ->
+                    Log.d("DELETE_DEBUG", "Delete result URI[$index]=$uri, resultCode=${result.resultCode}")
+                }
                 if (approved && pendingDeleteFromRecoverableFlow) {
                     val retryDeletedCount = pendingUris.distinct().count { uri ->
                         runCatching { contentResolver.delete(uri, null, null) > 0 }
@@ -99,7 +102,7 @@ class MainActivity : ComponentActivity() {
                 }
 
                 if (approved) {
-                    viewModel.onMediaDeleteResult(deletedUris.isNotEmpty())
+                    viewModel.onMediaDeleteResult(success = deletedUris.isNotEmpty(), deletedCount = deletedUris.size)
                     Log.d(TAG, "Delete request approved. Scheduling silent background sync.")
                     viewModel.refreshMedia(forceRefresh = true, showLoading = false)
                 } else {

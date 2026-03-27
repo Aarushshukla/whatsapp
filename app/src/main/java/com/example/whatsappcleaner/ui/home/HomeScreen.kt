@@ -95,7 +95,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberSwipeToDismissBoxState
@@ -228,8 +227,7 @@ fun SimpleHomeScreen(
     }
     LaunchedEffect(deleteSnackbarMessage) {
         deleteSnackbarMessage?.let { message ->
-            val result = snackbarHostState.showSnackbar(message = message, actionLabel = "Undo")
-            if (result == SnackbarResult.ActionPerformed) onUndoDelete()
+            snackbarHostState.showSnackbar(message = message)
             onDeleteSnackbarConsumed()
         }
     }
@@ -403,34 +401,28 @@ fun SimpleHomeScreen(
                 }
             } else {
                 gridItems(items, key = { mediaItem -> mediaItem.id }) { item ->
-                    AnimatedVisibility(
-                        visible = item.uri.toString() !in pendingDeleteUris,
-                        enter = fadeIn(animationSpec = tween(240)),
-                        exit = fadeOut(animationSpec = tween(260)) + shrinkVertically(animationSpec = tween(260))
-                    ) {
-                        MediaGridCard(
-                            item = item,
-                            selected = item.uri.toString() in selectedUris,
-                            onSelect = {
-                                selectedItems = if (selectedItems.any { selectedItem -> selectedItem.uri == item.uri }) {
-                                    selectedItems.filterNot { selectedItem -> selectedItem.uri == item.uri }
-                                } else {
-                                    selectedItems + item
-                                }
-                            },
-                            onOpen = { onOpenInSystem(item) },
-                            onKeep = {
-                                val itemName = item.safeDisplayName()
-                                successMessage = "Kept ${itemName.take(18)}"
-                                scope.launch { snackbarHostState.showSnackbar("Kept $itemName") }
-                            },
-                            onDelete = {
-                                if (!isDeleting) {
-                                    pendingDeleteItems = listOf(item)
-                                }
+                    MediaGridCard(
+                        item = item,
+                        selected = item.uri.toString() in selectedUris,
+                        onSelect = {
+                            selectedItems = if (selectedItems.any { selectedItem -> selectedItem.uri == item.uri }) {
+                                selectedItems.filterNot { selectedItem -> selectedItem.uri == item.uri }
+                            } else {
+                                selectedItems + item
                             }
-                        )
-                    }
+                        },
+                        onOpen = { onOpenInSystem(item) },
+                        onKeep = {
+                            val itemName = item.safeDisplayName()
+                            successMessage = "Kept ${itemName.take(18)}"
+                            scope.launch { snackbarHostState.showSnackbar("Kept $itemName") }
+                        },
+                        onDelete = {
+                            if (!isDeleting) {
+                                pendingDeleteItems = listOf(item)
+                            }
+                        }
+                    )
                 }
             }
         }
@@ -456,11 +448,6 @@ fun SimpleHomeScreen(
                         isDeleting = true
                         selectedItems = selectedItems.filterNot { selectedItem ->
                             itemsToDelete.any { itemToDelete -> itemToDelete.uri == selectedItem.uri }
-                        }
-                        successMessage = if (itemsToDelete.size == 1) {
-                            "${formatSize(itemsToDelete.first().sizeKb.toLong() * 1024L)} queued"
-                        } else {
-                            "$deleteCount files queued"
                         }
                         onDeleteConfirmed()
                         onDeleteItemsRequested(itemsToDelete)

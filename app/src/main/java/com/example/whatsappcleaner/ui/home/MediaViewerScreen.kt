@@ -6,8 +6,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
-import androidx.compose.animation.shrinkVertically
-import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -26,7 +24,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -42,7 +39,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.whatsappcleaner.data.local.SimpleMediaItem
-import com.example.whatsappcleaner.data.local.formatSize
 import com.example.whatsappcleaner.ui.components.FriendlyState
 import com.example.whatsappcleaner.ui.components.LegitButton
 import com.example.whatsappcleaner.ui.components.LegitCard
@@ -57,6 +53,7 @@ import kotlinx.coroutines.launch
 
 private fun SimpleMediaItem.safeDisplayName(): String = name.ifBlank { "Media file" }
 
+@Suppress("UNUSED_PARAMETER")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MediaViewerScreen(
@@ -87,8 +84,7 @@ fun MediaViewerScreen(
     }
     LaunchedEffect(deleteSnackbarMessage) {
         deleteSnackbarMessage?.let { message ->
-            val result = snackbarHostState.showSnackbar(message = message, actionLabel = "Undo")
-            if (result == SnackbarResult.ActionPerformed) onUndoDelete()
+            snackbarHostState.showSnackbar(message = message)
             onDeleteSnackbarConsumed()
         }
     }
@@ -103,7 +99,6 @@ fun MediaViewerScreen(
             MediaFilter.OTHER -> allItems
         }
     }
-    val remainingVisibleItems = filtered.count { mediaItem -> mediaItem.uri.toString() !in pendingDeleteUris }
 
     Scaffold(
         topBar = {
@@ -164,29 +159,20 @@ fun MediaViewerScreen(
                     onFilterChange = { selectedFilter -> tab = selectedFilter }
                 )
             }
-            if (remainingVisibleItems == 0) {
+            if (filtered.isEmpty()) {
                 item {
                     FriendlyState(Icons.Default.PermMedia, "No media here yet", "Try another category or refresh the scan.")
                 }
             } else {
                 items(filtered, key = { mediaItem -> mediaItem.id }) { item ->
-                    AnimatedVisibility(
-                        visible = item.uri.toString() !in pendingDeleteUris,
-                        enter = fadeIn(animationSpec = tween(420)) + slideInVertically(
-                            animationSpec = tween(420),
-                            initialOffsetY = { offset -> offset / 3 }
-                        ),
-                        exit = fadeOut(animationSpec = tween(320)) + shrinkVertically(animationSpec = tween(320))
-                    ) {
-                        MediaSwipeRow(
-                            item = item,
-                            selected = false,
-                            onClick = { onOpenInSystem(item) },
-                            onDelete = { pendingDelete = item },
-                            onKeep = { scope.launch { snackbarHostState.showSnackbar("Kept ${item.safeDisplayName()}") } },
-                            onOpen = { onOpenInSystem(item) }
-                        )
-                    }
+                    MediaSwipeRow(
+                        item = item,
+                        selected = false,
+                        onClick = { onOpenInSystem(item) },
+                        onDelete = { pendingDelete = item },
+                        onKeep = { scope.launch { snackbarHostState.showSnackbar("Kept ${item.safeDisplayName()}") } },
+                        onOpen = { onOpenInSystem(item) }
+                    )
                 }
             }
         }
@@ -200,7 +186,6 @@ fun MediaViewerScreen(
             confirmButton = {
                 LegitButton(text = "Delete now", onClick = {
                     pendingDelete = null
-                    successMessage = "🎉 ${formatSize(item.sizeKb.toLong() * 1024L)} Freed!"
                     onDeleteItemsRequested(listOf(item))
                 })
             },
