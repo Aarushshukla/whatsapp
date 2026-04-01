@@ -2,6 +2,7 @@ package com.example.whatsappcleaner.ui.home
 
 import android.app.Application
 import android.net.Uri
+import android.os.Build
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -76,10 +77,17 @@ data class HomeUiState(
     val lastCleanupBytes: Long = 0L,
     val pendingDeleteUris: List<Uri> = emptyList(),
     val deleteRequestId: Long = 0L,
+    val isDeleteInProgress: Boolean = false,
     val deleteSnackbarMessage: String? = null,
     val lastDeletedItems: List<SimpleMediaItem> = emptyList()
 ) {
     val isProUser: Boolean get() = subscriptionState.isProUser
+}
+
+sealed class DeleteExecution {
+    data class NeedsUserApproval(val uris: List<Uri>) : DeleteExecution()
+    data object StartedInBackground : DeleteExecution()
+    data object Ignored : DeleteExecution()
 }
 
 fun generateTimeOptions(): List<ReminderTime> = (0..23).map { hour ->
@@ -465,25 +473,83 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         analytics.trackDeleteClicked(origin)
     }
 
-    fun requestMediaDeletion(items: List<SimpleMediaItem>, origin: String) {
+    fun requestMediaDeletion(items: List<SimpleMediaItem>, origin: String, sdkInt: Int): DeleteExecution {
         Log.d(TAG, "requestMediaDeletion called from $origin with ${items.size} items.")
+        if (_uiState.value.isDeleteInProgress) {
+            _uiState.update { currentState ->
+                currentState.copy(deleteSnackbarMessage = "Delete already in progress")
+            }
+            return DeleteExecution.Ignored
+        }
         val distinctItems = items.distinctBy { item -> item.uri }.filter { item -> item.uri != Uri.EMPTY }
         if (distinctItems.isEmpty()) {
             Log.w(TAG, "Skipping deletion request from $origin because there were no valid items.")
-            return
+            _uiState.update { currentState ->
+                currentState.copy(deleteSnackbarMessage = "No valid files selected")
+            }
+            return DeleteExecution.Ignored
         }
         Log.d(TAG, "Prepared ${distinctItems.size} distinct items for deletion from $origin.")
         analytics.trackDeleteClicked(origin)
-        Log.d(TAG, "Requesting MediaStore delete for ${distinctItems.size} items from $origin")
+        val uris = distinctItems.map { item -> item.uri }
+        Log.d(TAG, "Requesting MediaStore delete for ${distinctItems.size} items from $origin.")
         _uiState.update { currentState ->
             currentState.copy(
-                pendingDeleteUris = distinctItems.map { item -> item.uri },
-                deleteRequestId = currentState.deleteRequestId + 1L
+                pendingDeleteUris = uris,
+                deleteRequestId = currentState.deleteRequestId + 1L,
+                isDeleteInProgress = true
             )
+        }
+        return if (sdkInt >= Build.VERSION_CODES.R) {
+            DeleteExecution.NeedsUserApproval(uris)
+        } else {
+            deleteMediaDirectly()
+            DeleteExecution.StartedInBackground
         }
     }
 
-    fun onMediaDeleteResult(success: Boolean, deletedCount: Int = 0) {
+    private fun deleteMediaDirectly() {
+        val pendingUris = _uiState.value.pendingDeleteUris.distinct()
+        if (pendingUris.isEmpty()) {
+            _uiState.update { currentState -> currentState.copy(isDeleteInProgress = false) }
+            return
+        }
+        viewModelScope.launch {
+            val deletedUris = withContext(Dispatchers.IO) {
+                val resolver = getApplication<Application>().contentResolver
+                pendingUris.filter { uri ->
+                    runCatching { resolver.delete(uri, null, null) > 0 }
+                        .onFailure { error -> Log.e(TAG, "Direct delete failed for uri=$uri", error) }
+                        .getOrDefault(false)
+                }
+            }
+            onMediaDeleteResult(success = deletedUris.isNotEmpty(), deletedCount = deletedUris.size, deletedUris = deletedUris)
+        }
+    }
+
+    fun onDeleteRequestResult(approved: Boolean) {
+        if (!approved) {
+            onMediaDeleteCancelled()
+            return
+        }
+        val pendingUris = _uiState.value.pendingDeleteUris.distinct()
+        if (pendingUris.isEmpty()) {
+            _uiState.update { currentState -> currentState.copy(isDeleteInProgress = false) }
+            return
+        }
+        viewModelScope.launch {
+            val deletedUris = withContext(Dispatchers.IO) { pendingUris.filterNot(::uriExists) }
+            onMediaDeleteResult(success = deletedUris.isNotEmpty(), deletedCount = deletedUris.size, deletedUris = deletedUris)
+        }
+    }
+
+    private fun uriExists(uri: Uri): Boolean {
+        val resolver = getApplication<Application>().contentResolver
+        return runCatching { resolver.openAssetFileDescriptor(uri, "r")?.use { true } ?: false }
+            .getOrElse { false }
+    }
+
+    fun onMediaDeleteResult(success: Boolean, deletedCount: Int = 0, deletedUris: List<Uri> = emptyList()) {
         val pendingUris = _uiState.value.pendingDeleteUris.toSet()
         if (pendingUris.isEmpty()) {
             Log.w(TAG, "Delete result received with no pending URIs.")
@@ -494,6 +560,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             _uiState.update { currentState ->
                 currentState.copy(
                     pendingDeleteUris = emptyList(),
+                    isDeleteInProgress = false,
                     deleteSnackbarMessage = "Failed to delete files"
                 )
             }
@@ -511,10 +578,19 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             }
             currentState.copy(
                 pendingDeleteUris = emptyList(),
+                isDeleteInProgress = false,
+                allItems = currentState.allItems.filterNot { item -> deletedUris.contains(item.uri) },
+                filteredItems = filterList(
+                    currentState.allItems.filterNot { item -> deletedUris.contains(item.uri) },
+                    currentState.currentFilter,
+                    currentState.activeSuggestion,
+                    currentState.settings
+                ),
                 deleteSnackbarMessage = deleteMessage,
                 lastDeletedItems = emptyList()
             )
         }
+        refreshMedia(forceRefresh = true, showLoading = false)
     }
 
     fun onMediaDeleteCancelled() {
@@ -524,6 +600,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.update { currentState ->
             currentState.copy(
                 pendingDeleteUris = emptyList(),
+                isDeleteInProgress = false,
                 deleteSnackbarMessage = "Delete cancelled"
             )
         }

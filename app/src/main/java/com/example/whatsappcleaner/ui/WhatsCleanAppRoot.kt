@@ -181,6 +181,7 @@ fun WhatsCleanAppRoot(
                 onOpenInSystem = onOpenInSystem,
                 onOpenSystemStorage = onOpenSystemStorage,
                 pendingDeleteUris = state.pendingDeleteUris.map { it.toString() }.toSet(),
+                isDeleteInProgress = state.isDeleteInProgress,
                 deleteSnackbarMessage = state.deleteSnackbarMessage,
                 onUndoDelete = onUndoDelete,
                 onDeleteSnackbarConsumed = onDeleteSnackbarConsumed,
