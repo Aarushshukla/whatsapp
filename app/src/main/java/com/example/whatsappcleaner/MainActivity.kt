@@ -80,6 +80,7 @@ class MainActivity : ComponentActivity() {
                 }
                 if (approved && pendingDeleteFromRecoverableFlow) {
                     val retryDeletedCount = pendingUris.distinct().count { uri ->
+                        Log.d("DELETE_DEBUG", "Retry delete on approved URI: $uri")
                         runCatching { contentResolver.delete(uri, null, null) > 0 }
                             .onFailure { error ->
                                 Log.e(TAG, "Retry delete failed after RecoverableSecurityException approval. uri=$uri", error)
@@ -273,6 +274,7 @@ class MainActivity : ComponentActivity() {
         var deletedCount = 0
         validUris.forEach { uri ->
             try {
+                Log.d("DELETE_DEBUG", "Deleting URI on Android 10 flow: $uri")
                 val rows = contentResolver.delete(uri, null, null)
                 Log.d(TAG, "Android 10 delete result. uri=$uri, rows=$rows")
                 if (rows > 0) deletedCount++
@@ -306,6 +308,7 @@ class MainActivity : ComponentActivity() {
     private fun deleteOnAndroid9AndBelow(validUris: List<Uri>) {
         Log.d(TAG, "Android 9 and below flow started for ${validUris.size} URIs")
         val deletedCount = validUris.count { uri ->
+            Log.d("DELETE_DEBUG", "Deleting URI on Android 9- flow: $uri")
             runCatching {
                 val rows = contentResolver.delete(uri, null, null)
                 Log.d(TAG, "Android 9- delete result. uri=$uri, rows=$rows")

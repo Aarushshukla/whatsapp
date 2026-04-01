@@ -50,14 +50,19 @@ class MediaLoader(private val context: Context) {
         offset: Int = 0
     ): List<SimpleMediaItem> {
         val resolver: ContentResolver = context.contentResolver
-        val collection = if (mediaType == "video") {
+        val collectionUri = if (mediaType == "video") {
             MediaStore.Video.Media.EXTERNAL_CONTENT_URI
         } else {
             MediaStore.Images.Media.EXTERNAL_CONTENT_URI
         }
+        val idColumnName = if (mediaType == "video") {
+            MediaStore.Video.Media._ID
+        } else {
+            MediaStore.Images.Media._ID
+        }
 
         val projection = arrayOf(
-            MediaStore.MediaColumns._ID,
+            idColumnName,
             MediaStore.MediaColumns.DISPLAY_NAME,
             MediaStore.MediaColumns.SIZE,
             MediaStore.MediaColumns.DATE_ADDED,
@@ -82,13 +87,13 @@ class MediaLoader(private val context: Context) {
         try {
             Log.d(TAG, "Querying $mediaType media between $minDate and $maxDate, limit=$limit, offset=$offset")
             resolver.query(
-                collection,
+                collectionUri,
                 projection,
                 selection,
                 selectionArgs,
                 sortOrder
             )?.use { cursor ->
-                val idCol = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns._ID)
+                val idCol = cursor.getColumnIndexOrThrow(idColumnName)
                 val nameCol = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.DISPLAY_NAME)
                 val sizeCol = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.SIZE)
                 val dateCol = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.DATE_ADDED)
@@ -100,7 +105,7 @@ class MediaLoader(private val context: Context) {
                     val sizeBytes = cursor.getLong(sizeCol)
                     val dateAddedSec = cursor.getLong(dateCol)
                     val mimeType = cursor.getString(mimeCol)
-                    val uri = ContentUris.withAppendedId(collection, id)
+                    val uri = ContentUris.withAppendedId(collectionUri, id)
                     Log.d(TAG, "Resolved MediaStore URI format for deletion: $uri (id=$id, type=$mediaType)")
                     items.add(
                         SimpleMediaItem(
