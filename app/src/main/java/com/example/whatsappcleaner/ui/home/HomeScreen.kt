@@ -186,6 +186,7 @@ fun SimpleHomeScreen(
     onOpenInSystem: (SimpleMediaItem) -> Unit,
     onOpenSystemStorage: () -> Unit,
     pendingDeleteUris: Set<String>,
+    isDeleteInProgress: Boolean,
     deleteSnackbarMessage: String?,
     onUndoDelete: () -> Unit,
     onDeleteSnackbarConsumed: () -> Unit,
@@ -210,7 +211,6 @@ fun SimpleHomeScreen(
     var selectedItems by remember { mutableStateOf<List<SimpleMediaItem>>(emptyList()) }
     val selectedUris = remember(selectedItems) { selectedItems.map { mediaItem -> mediaItem.uri.toString() }.toSet() }
     var pendingDeleteItems by remember { mutableStateOf<List<SimpleMediaItem>>(emptyList()) }
-    var isDeleting by remember { mutableStateOf(false) }
     var successMessage by remember { mutableStateOf<String?>(null) }
     val gridState = rememberLazyGridState()
 
@@ -233,7 +233,7 @@ fun SimpleHomeScreen(
     }
     LaunchedEffect(pendingDeleteUris) {
         if (pendingDeleteUris.isEmpty()) {
-            isDeleting = false
+            pendingDeleteItems = emptyList()
         }
     }
 
@@ -351,7 +351,7 @@ fun SimpleHomeScreen(
                 QuickActionRow(
                     selectedCount = selectedItems.size,
                     onDeleteClick = {
-                        if (isDeleting) return@QuickActionRow
+                        if (isDeleteInProgress) return@QuickActionRow
                         val itemsToDelete = items.filter { mediaItem -> mediaItem.uri.toString() in selectedUris }
                         if (itemsToDelete.isNotEmpty()) {
                             pendingDeleteItems = itemsToDelete
@@ -418,7 +418,7 @@ fun SimpleHomeScreen(
                             scope.launch { snackbarHostState.showSnackbar("Kept $itemName") }
                         },
                         onDelete = {
-                            if (!isDeleting) {
+                            if (!isDeleteInProgress) {
                                 pendingDeleteItems = listOf(item)
                             }
                         }
@@ -442,10 +442,10 @@ fun SimpleHomeScreen(
             confirmButton = {
                 LegitButton(
                     text = "Delete",
+                    enabled = !isDeleteInProgress,
                     onClick = {
                         val itemsToDelete = pendingDeleteItems
                         pendingDeleteItems = emptyList()
-                        isDeleting = true
                         selectedItems = selectedItems.filterNot { selectedItem ->
                             itemsToDelete.any { itemToDelete -> itemToDelete.uri == selectedItem.uri }
                         }

@@ -3,7 +3,6 @@ package com.example.whatsappcleaner
 import android.Manifest
 import android.content.ActivityNotFoundException
 import android.content.Intent
-import android.app.RecoverableSecurityException
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
@@ -27,6 +26,7 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.whatsappcleaner.data.billing.SubscriptionRepository
 import com.example.whatsappcleaner.ui.WhatsCleanAppRoot
+import com.example.whatsappcleaner.ui.home.DeleteExecution
 import com.example.whatsappcleaner.ui.home.HomeViewModel
 import com.example.whatsappcleaner.ui.settings.AppThemeMode
 import com.example.whatsappcleaner.ui.theme.WhatsCleanTheme
@@ -40,8 +40,6 @@ class MainActivity : ComponentActivity() {
     private val viewModel: HomeViewModel by viewModels()
     private val subscriptionRepository by lazy(LazyThreadSafetyMode.NONE) { SubscriptionRepository.get(this) }
     private lateinit var deleteLauncher: ActivityResultLauncher<IntentSenderRequest>
-    private var pendingDeleteFromRecoverableFlow: Boolean = false
-
     private val requestPermissionLauncher =
         registerForActivityResult(
             ActivityResultContracts.RequestMultiplePermissions(),
@@ -64,51 +62,8 @@ class MainActivity : ComponentActivity() {
         deleteLauncher = registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
             try {
                 val approved = result.resultCode == android.app.Activity.RESULT_OK
-                if (approved) {
-                    Log.d("DELETE_DEBUG", "Delete success")
-                } else {
-                    Log.e("DELETE_DEBUG", "Delete cancelled")
-                }
                 Log.d(TAG, "Delete request finished. resultCode=${result.resultCode}, approved=$approved")
-                val pendingUris = viewModel.uiState.value.pendingDeleteUris
-                Log.d(
-                    TAG,
-                    "Delete launcher callback. resultCode=${result.resultCode}, sdk=${Build.VERSION.SDK_INT}, recoverableFlow=$pendingDeleteFromRecoverableFlow, pending=${pendingUris.size}"
-                )
-                pendingUris.forEachIndexed { index, uri ->
-                    Log.d("DELETE_DEBUG", "Delete result URI[$index]=$uri, resultCode=${result.resultCode}")
-                }
-                if (approved && pendingDeleteFromRecoverableFlow) {
-                    val retryDeletedCount = pendingUris.distinct().count { uri ->
-                        Log.d("DELETE_DEBUG", "Retry delete on approved URI: $uri")
-                        runCatching { contentResolver.delete(uri, null, null) > 0 }
-                            .onFailure { error ->
-                                Log.e(TAG, "Retry delete failed after RecoverableSecurityException approval. uri=$uri", error)
-                            }
-                            .getOrDefault(false)
-                    }
-                    Log.d(TAG, "Recoverable retry delete result. deletedCount=$retryDeletedCount")
-                }
-                val deletedUris = if (approved) pendingUris.filterNot(::uriExists) else emptyList()
-                val notDeletedUris = if (approved) pendingUris.filter(::uriExists) else pendingUris
-                pendingDeleteFromRecoverableFlow = false
-
-                if (approved) {
-                    Log.d(TAG, "Verified deletion results: deleted=${deletedUris.size}, notDeleted=${notDeletedUris.size}")
-                    if (notDeletedUris.isNotEmpty()) {
-                        Log.w(TAG, "Some URIs were not removed after approval: ${notDeletedUris.joinToString()}")
-                    }
-                } else {
-                    Log.d(TAG, "Delete request was cancelled or denied by user.")
-                }
-
-                if (approved) {
-                    viewModel.onMediaDeleteResult(success = deletedUris.isNotEmpty(), deletedCount = deletedUris.size)
-                    Log.d(TAG, "Delete request approved. Scheduling silent background sync.")
-                    viewModel.refreshMedia(forceRefresh = true, showLoading = false)
-                } else {
-                    viewModel.onMediaDeleteCancelled()
-                }
+                viewModel.onDeleteRequestResult(approved)
             } catch (error: Exception) {
                 Log.e(TAG, "Failed while handling delete launcher result.", error)
                 viewModel.onMediaDeleteResult(success = false)
@@ -208,7 +163,7 @@ class MainActivity : ComponentActivity() {
             }
     }
 
-    fun deleteMedia(uris: List<Uri>) {
+    private fun launchDeleteRequest(uris: List<Uri>) {
         Log.d("DELETE_DEBUG", "deleteMedia called. sdk=${Build.VERSION.SDK_INT}, uriCount=${uris.size}")
         uris.forEachIndexed { index, uri ->
             Log.d("DELETE_DEBUG", "URI[$index]=$uri")
@@ -238,100 +193,26 @@ class MainActivity : ComponentActivity() {
             return
         }
 
-        val sdkInt = Build.VERSION.SDK_INT
-        when {
-            sdkInt >= Build.VERSION_CODES.R -> {
-                try {
-                    Log.d("DELETE_DEBUG", "Android 11+ flow: MediaStore.createDeleteRequest for ${validUris.size} URIs")
-                    val request = MediaStore.createDeleteRequest(contentResolver, validUris)
-                    val intentSenderRequest = IntentSenderRequest.Builder(request.intentSender).build()
-                    if (!::deleteLauncher.isInitialized) {
-                        Log.e("DELETE_DEBUG", "deleteLauncher is not initialized; cannot launch request")
-                        viewModel.onMediaDeleteResult(success = false)
-                        showDeleteError("Delete action is unavailable right now.")
-                        return
-                    }
-                    pendingDeleteFromRecoverableFlow = false
-                    deleteLauncher.launch(intentSenderRequest)
-                    Log.d("DELETE_DEBUG", "deleteLauncher.launch() executed for Android 11+ delete request")
-                } catch (error: Exception) {
-                    Log.e("DELETE_DEBUG", "Unable to launch MediaStore delete request", error)
-                    viewModel.onMediaDeleteResult(success = false)
-                    showDeleteError("Unable to delete files right now.")
-                }
-            }
-            sdkInt == Build.VERSION_CODES.Q -> {
-                deleteOnAndroid10(validUris)
-            }
-            else -> {
-                deleteOnAndroid9AndBelow(validUris)
-            }
-        }
-    }
-
-    private fun deleteOnAndroid10(validUris: List<Uri>) {
-        Log.d(TAG, "Android 10 flow started for ${validUris.size} URIs")
-        var deletedCount = 0
-        validUris.forEach { uri ->
-            try {
-                Log.d("DELETE_DEBUG", "Deleting URI on Android 10 flow: $uri")
-                val rows = contentResolver.delete(uri, null, null)
-                Log.d(TAG, "Android 10 delete result. uri=$uri, rows=$rows")
-                if (rows > 0) deletedCount++
-            } catch (recoverable: RecoverableSecurityException) {
-                Log.w(TAG, "RecoverableSecurityException while deleting uri=$uri. Launching user action.")
-                if (!::deleteLauncher.isInitialized) {
-                    Log.e(TAG, "deleteLauncher not initialized for RecoverableSecurityException flow")
-                    viewModel.onMediaDeleteResult(success = false)
-                    showDeleteError("Delete action is unavailable right now.")
-                    return
-                }
-                pendingDeleteFromRecoverableFlow = true
-                runCatching {
-                    val intentSenderRequest =
-                        IntentSenderRequest.Builder(recoverable.userAction.actionIntent.intentSender).build()
-                    deleteLauncher.launch(intentSenderRequest)
-                }.onFailure { error ->
-                    Log.e(TAG, "Unable to launch RecoverableSecurityException intent sender for uri=$uri", error)
-                    pendingDeleteFromRecoverableFlow = false
-                    viewModel.onMediaDeleteResult(success = false)
-                    showDeleteError("Unable to request permission to delete file.")
-                }
-                return
-            } catch (error: Exception) {
-                Log.e(TAG, "Android 10 delete failed. uri=$uri", error)
-            }
-        }
-        finalizeDirectDeleteResult(deletedCount, validUris.size, "Android 10 direct delete")
-    }
-
-    private fun deleteOnAndroid9AndBelow(validUris: List<Uri>) {
-        Log.d(TAG, "Android 9 and below flow started for ${validUris.size} URIs")
-        val deletedCount = validUris.count { uri ->
-            Log.d("DELETE_DEBUG", "Deleting URI on Android 9- flow: $uri")
-            runCatching {
-                val rows = contentResolver.delete(uri, null, null)
-                Log.d(TAG, "Android 9- delete result. uri=$uri, rows=$rows")
-                rows > 0
-            }.onFailure { error ->
-                Log.e(TAG, "Android 9- delete failed. uri=$uri", error)
-            }.getOrDefault(false)
-        }
-        finalizeDirectDeleteResult(deletedCount, validUris.size, "Android 9- direct delete")
-    }
-
-    private fun finalizeDirectDeleteResult(deletedCount: Int, totalCount: Int, source: String) {
-        Log.d(TAG, "$source completed. deleted=$deletedCount/$totalCount")
-        if (deletedCount <= 0) {
-            Log.w(TAG, "$source failed. No files deleted.")
-            viewModel.onMediaDeleteResult(success = false)
-            showDeleteError("Failed to delete file(s).")
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            Log.w(TAG, "launchDeleteRequest called on unsupported sdk=${Build.VERSION.SDK_INT}")
             return
         }
-        viewModel.onMediaDeleteResult(success = true, deletedCount = deletedCount)
-        viewModel.refreshMedia()
-        if (deletedCount < totalCount) {
-            showDeleteError("Some files could not be deleted.")
+        try {
+            Log.d("DELETE_DEBUG", "Android 11+ flow: MediaStore.createDeleteRequest for ${validUris.size} URIs")
+            val request = MediaStore.createDeleteRequest(contentResolver, validUris)
+            val intentSenderRequest = IntentSenderRequest.Builder(request.intentSender).build()
+            if (!::deleteLauncher.isInitialized) {
+                Log.e("DELETE_DEBUG", "deleteLauncher is not initialized; cannot launch request")
+                viewModel.onMediaDeleteResult(success = false)
+                showDeleteError("Delete action is unavailable right now.")
+                return
+            }
+            deleteLauncher.launch(intentSenderRequest)
+            Log.d("DELETE_DEBUG", "deleteLauncher.launch() executed for Android 11+ delete request")
+        } catch (error: Exception) {
+            Log.e("DELETE_DEBUG", "Unable to launch MediaStore delete request", error)
+            viewModel.onMediaDeleteResult(success = false)
+            showDeleteError("Unable to delete files right now.")
         }
     }
 
@@ -345,14 +226,6 @@ class MainActivity : ComponentActivity() {
 
     private fun showDeleteError(message: String) {
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
-    }
-
-    private fun uriExists(uri: Uri): Boolean {
-        return runCatching {
-            contentResolver.openAssetFileDescriptor(uri, "r")?.use { true } ?: false
-        }.getOrElse {
-            false
-        }
     }
 
     private fun shareText(text: String?) {
@@ -490,8 +363,11 @@ class MainActivity : ComponentActivity() {
                     if (validUris.isEmpty()) {
                         showDeleteError("This file cannot be deleted due to system restrictions")
                     } else {
-                        viewModel.requestMediaDeletion(validItems, origin)
-                        activity.deleteMedia(validUris)
+                        when (val execution = viewModel.requestMediaDeletion(validItems, origin, Build.VERSION.SDK_INT)) {
+                            is DeleteExecution.NeedsUserApproval -> activity.launchDeleteRequest(execution.uris)
+                            DeleteExecution.StartedInBackground -> Unit
+                            DeleteExecution.Ignored -> Unit
+                        }
                     }
                 },
                 onUndoDelete = viewModel::undoLastDelete,
