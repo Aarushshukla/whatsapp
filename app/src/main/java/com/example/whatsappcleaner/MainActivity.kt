@@ -13,7 +13,6 @@ import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.ActivityResultCallback
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -49,7 +48,24 @@ class MainActivity : ComponentActivity() {
 
     private val viewModel: HomeViewModel by viewModels()
     private val subscriptionRepository by lazy(LazyThreadSafetyMode.NONE) { SubscriptionRepository.get(this) }
-    private lateinit var deleteLauncher: ActivityResultLauncher<IntentSenderRequest>
+    private val deleteLauncher =
+        registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
+            try {
+                Log.d("DELETE_FLOW", "Step 4: Result code = ${result.resultCode}")
+                Log.d(TAG, "Delete request finished. resultCode=${result.resultCode}")
+                if (result.resultCode == android.app.Activity.RESULT_OK) {
+                    Log.d("DELETE_FLOW", "Step 4.1: User confirmed (Allow pressed)")
+                    viewModel.onMediaDeleteSuccess()
+                } else {
+                    Log.d("DELETE_FLOW", "Step 4.2: User cancelled or failed")
+                    viewModel.onMediaDeleteCancelled()
+                }
+            } catch (error: Exception) {
+                Log.e(TAG, "Failed while handling delete launcher result.", error)
+                viewModel.onMediaDeleteFailed()
+                showDeleteError("Unable to process delete result.")
+            }
+        }
     private val requestPermissionLauncher =
         registerForActivityResult(
             ActivityResultContracts.RequestMultiplePermissions(),
@@ -67,33 +83,10 @@ class MainActivity : ComponentActivity() {
             }
         )
 
-    private fun setupDeleteLauncher() {
-        Log.d(TAG, "Initializing deleteLauncher with StartIntentSenderForResult contract.")
-        deleteLauncher = registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
-            try {
-                Log.d("DELETE_FLOW", "Step 4: Result code = ${result.resultCode}")
-                Log.d(TAG, "Delete request finished. resultCode=${result.resultCode}")
-                if (result.resultCode == android.app.Activity.RESULT_OK) {
-                    Log.d("DELETE_FLOW", "Step 4.1: User confirmed (Allow pressed)")
-                    viewModel.onMediaDeleteSuccess()
-                } else {
-                    Log.d("DELETE_FLOW", "Step 4.2: User cancelled or failed")
-                    viewModel.onMediaDeleteCancelled()
-                }
-            } catch (error: Exception) {
-                Log.e(TAG, "Failed while handling delete launcher result.", error)
-                viewModel.onMediaDeleteFailed()
-                showDeleteError("Unable to process delete result.")
-            }
-        }
-        Log.d(TAG, "deleteLauncher initialized.")
-    }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
         Log.d(TAG, "onCreate called.")
-        setupDeleteLauncher()
         runCatching { subscriptionRepository.start(this) }
             .onFailure { error -> Log.e(TAG, "Unable to initialize subscriptions during onCreate.", error) }
         syncPermissionState()
@@ -206,13 +199,7 @@ class MainActivity : ComponentActivity() {
             Log.d("DELETE_DEBUG", "Android 11+ flow: MediaStore.createDeleteRequest for ${validUris.size} URIs")
             val request = MediaStore.createDeleteRequest(contentResolver, validUris)
             val intentSenderRequest = IntentSenderRequest.Builder(request.intentSender).build()
-            if (!::deleteLauncher.isInitialized) {
-                Log.e("DELETE_DEBUG", "deleteLauncher is not initialized; cannot launch request")
-                viewModel.onMediaDeleteFailed()
-                showDeleteError("Delete action is unavailable right now.")
-                return
-            }
-            Log.d("DELETE_DEBUG", "Launching delete request with uriCount=${validUris.size}")
+            Log.d("DELETE_DEBUG", "About to call deleteLauncher.launch() with uriCount=${validUris.size}")
             deleteLauncher.launch(intentSenderRequest)
             Log.d("DELETE_FLOW", "Step 3.1: deleteLauncher launched")
             Log.d("DELETE_DEBUG", "deleteLauncher.launch() executed for Android 11+ delete request")
