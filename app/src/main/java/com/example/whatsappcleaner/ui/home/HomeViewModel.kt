@@ -2,6 +2,7 @@ package com.example.whatsappcleaner.ui.home
 
 import android.app.Application
 import android.content.ContentUris
+import android.content.Context
 import android.net.Uri
 import android.os.Build
 import android.util.Log
@@ -487,6 +488,14 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         val distinctItems = items
             .distinctBy { item -> item.id }
             .mapNotNull(::normalizeDeleteTarget)
+            .filter { item ->
+                val uriValue = item.uri.toString()
+                val isMediaUri = uriValue.startsWith("content://media/")
+                if (!isMediaUri) {
+                    Log.w(TAG, "Skipping non-MediaStore URI during delete request: $uriValue")
+                }
+                isMediaUri
+            }
         if (distinctItems.isEmpty()) {
             Log.w(TAG, "Skipping deletion request from $origin because there were no valid items.")
             _uiState.update { currentState ->
@@ -552,24 +561,33 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
         viewModelScope.launch {
-            val deletedIds = withContext(Dispatchers.IO) { pendingUris.filterNot(::uriExists) }
-                .let { verifiedUris ->
-                    if (verifiedUris.isEmpty()) pendingIds else {
-                        val idByUri = _uiState.value.allItems.associateBy({ it.uri }, { it.id })
-                        verifiedUris.mapNotNull { uri -> idByUri[uri] }.toSet().ifEmpty { pendingIds }
-                    }
-                }
-            onMediaDeleteResult(success = true, deletedCount = deletedIds.size, deletedIds = deletedIds)
+            val allDeleted = withContext(Dispatchers.IO) {
+                pendingUris.all { uri -> isDeleted(getApplication(), uri) }
+            }
+            if (allDeleted) {
+                onMediaDeleteResult(success = true, deletedCount = pendingIds.size, deletedIds = pendingIds)
+            } else {
+                Log.w(TAG, "Delete verification failed. Some URIs are still readable after RESULT_OK.")
+                onMediaDeleteResult(success = false, failureMessage = "Some items could not be deleted")
+            }
         }
     }
 
-    private fun uriExists(uri: Uri): Boolean {
-        val resolver = getApplication<Application>().contentResolver
-        return runCatching { resolver.openAssetFileDescriptor(uri, "r")?.use { true } ?: false }
-            .getOrElse { false }
+    private fun isDeleted(context: Context, uri: Uri): Boolean {
+        return try {
+            context.contentResolver.openInputStream(uri)?.close()
+            false
+        } catch (error: Exception) {
+            true
+        }
     }
 
-    fun onMediaDeleteResult(success: Boolean, deletedCount: Int = 0, deletedIds: Set<Long> = emptySet()) {
+    fun onMediaDeleteResult(
+        success: Boolean,
+        deletedCount: Int = 0,
+        deletedIds: Set<Long> = emptySet(),
+        failureMessage: String = "Failed to delete files"
+    ) {
         val pendingIds = _uiState.value.pendingDeleteIds
         if (pendingIds.isEmpty()) {
             Log.w(TAG, "Delete result received with no pending IDs.")
@@ -582,7 +600,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     pendingDeleteIds = emptySet(),
                     pendingDeleteUris = emptyList(),
                     isDeleteInProgress = false,
-                    deleteSnackbarMessage = "Failed to delete files"
+                    deleteSnackbarMessage = failureMessage
                 )
             }
             return
