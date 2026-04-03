@@ -181,18 +181,7 @@ class MainActivity : ComponentActivity() {
             showDeleteError("No files selected for deletion.")
             return
         }
-        val validUris = uris
-            .mapNotNull { uri ->
-                Log.d("DELETE_DEBUG", "Checking URI before delete request: $uri")
-                uri.takeIf { candidate ->
-                    val isValid = isValidMediaStoreUri(candidate)
-                    if (!isValid) {
-                        Log.w("DELETE_DEBUG", "Skipping invalid delete URI: $candidate")
-                    }
-                    isValid
-                }
-            }
-            .distinct()
+        val validUris = uris.distinct()
         if (validUris.isEmpty()) {
             Log.w("DELETE_DEBUG", "No valid MediaStore URIs available for delete request.")
             viewModel.onMediaDeleteFailed()
@@ -210,6 +199,7 @@ class MainActivity : ComponentActivity() {
                 showDeleteError("Delete action is unavailable right now.")
                 return
             }
+            Log.d("DELETE_DEBUG", "Launching delete request with uriCount=${validUris.size}")
             deleteLauncher.launch(intentSenderRequest)
             Log.d("DELETE_DEBUG", "deleteLauncher.launch() executed for Android 11+ delete request")
         } catch (error: Exception) {
@@ -389,7 +379,6 @@ class MainActivity : ComponentActivity() {
                     when (val execution = viewModel.requestMediaDeletion(items, origin, Build.VERSION.SDK_INT)) {
                         is DeleteExecution.NeedsUserApproval -> {
                             val validUris = execution.uris
-                                .filter(::isValidMediaStoreUri)
                                 .distinct()
                             if (validUris.isEmpty()) {
                                 showDeleteError("This file cannot be deleted due to system restrictions")
@@ -402,7 +391,6 @@ class MainActivity : ComponentActivity() {
                         }
                         is DeleteExecution.StartedInBackground -> {
                             val validUris = execution.uris
-                                .filter(::isValidMediaStoreUri)
                                 .distinct()
                             deleteDirectlyForLegacyAndroid(validUris)
                         }
