@@ -69,7 +69,7 @@ class MainActivity : ComponentActivity() {
                 if (result.resultCode == android.app.Activity.RESULT_OK) {
                     viewModel.onMediaDeleteSuccess()
                 } else {
-                    viewModel.onMediaDeleteFailed()
+                    viewModel.onMediaDeleteCancelled()
                 }
             } catch (error: Exception) {
                 Log.e(TAG, "Failed while handling delete launcher result.", error)
@@ -240,8 +240,7 @@ class MainActivity : ComponentActivity() {
                 }.toSet()
             }
             if (deletedIds.isEmpty()) {
-                viewModel.onMediaDeleteFailed()
-                showDeleteError("Failed to delete files")
+                viewModel.onMediaDeleteCancelled()
             } else {
                 viewModel.onMediaDeleteSuccess(deletedIds)
             }
