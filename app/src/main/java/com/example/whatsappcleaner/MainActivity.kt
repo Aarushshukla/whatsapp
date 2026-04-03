@@ -190,17 +190,33 @@ class MainActivity : ComponentActivity() {
             return
         }
 
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            try {
+                Log.d("DELETE_FLOW", "Step 3: Launching system delete request")
+                Log.d("DELETE_DEBUG", "MediaStore.createDeleteRequest flow for ${validUris.size} URIs")
+                val request = MediaStore.createDeleteRequest(contentResolver, validUris)
+                val intentSenderRequest = IntentSenderRequest.Builder(request.intentSender).build()
+                Log.d("DELETE_DEBUG", "About to call deleteLauncher.launch() with uriCount=${validUris.size}")
+                deleteLauncher.launch(intentSenderRequest)
+                Log.d("DELETE_FLOW", "Step 3.1: deleteLauncher launched")
+                Log.d("DELETE_DEBUG", "deleteLauncher.launch() executed for MediaStore delete request")
+            } catch (error: Exception) {
+                Log.e("DELETE_DEBUG", "Unable to launch MediaStore delete request", error)
+                viewModel.onMediaDeleteFailed()
+                showDeleteError("Unable to delete files right now.")
+            }
+            return
+        }
+
         try {
-            Log.d("DELETE_FLOW", "Step 3: Launching system delete request")
-            Log.d("DELETE_DEBUG", "MediaStore.createDeleteRequest flow for ${validUris.size} URIs")
-            val request = MediaStore.createDeleteRequest(contentResolver, validUris)
-            val intentSenderRequest = IntentSenderRequest.Builder(request.intentSender).build()
-            Log.d("DELETE_DEBUG", "About to call deleteLauncher.launch() with uriCount=${validUris.size}")
-            deleteLauncher.launch(intentSenderRequest)
-            Log.d("DELETE_FLOW", "Step 3.1: deleteLauncher launched")
-            Log.d("DELETE_DEBUG", "deleteLauncher.launch() executed for MediaStore delete request")
+            var deletedCount = 0
+            validUris.forEach { uri ->
+                deletedCount += contentResolver.delete(uri, null, null)
+            }
+            Log.d("DELETE_DEBUG", "contentResolver.delete flow completed. deletedCount=$deletedCount")
+            viewModel.onMediaDeleteSuccess()
         } catch (error: Exception) {
-            Log.e("DELETE_DEBUG", "Unable to launch MediaStore delete request", error)
+            Log.e("DELETE_DEBUG", "Unable to delete media via contentResolver.delete", error)
             viewModel.onMediaDeleteFailed()
             showDeleteError("Unable to delete files right now.")
         }
