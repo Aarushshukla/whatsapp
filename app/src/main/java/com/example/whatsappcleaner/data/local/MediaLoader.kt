@@ -101,11 +101,19 @@ class MediaLoader(private val context: Context) {
 
                 while (cursor.moveToNext()) {
                     val id = cursor.getLong(idCol)
+                    if (id <= 0L) {
+                        Log.w(TAG, "Skipping MediaStore row with invalid _ID=$id for type=$mediaType")
+                        continue
+                    }
                     val displayName = cursor.getString(nameCol) ?: "Media"
                     val sizeBytes = cursor.getLong(sizeCol)
                     val dateAddedSec = cursor.getLong(dateCol)
                     val mimeType = cursor.getString(mimeCol)
                     val uri = ContentUris.withAppendedId(collectionUri, id)
+                    if (!uri.toString().startsWith("content://media/")) {
+                        Log.w(TAG, "Skipping non-MediaStore URI built from _ID=$id: $uri")
+                        continue
+                    }
                     Log.d(TAG, "Resolved MediaStore URI format for deletion: $uri (id=$id, type=$mediaType)")
                     items.add(
                         SimpleMediaItem(
