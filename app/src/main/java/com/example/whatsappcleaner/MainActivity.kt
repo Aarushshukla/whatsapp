@@ -71,10 +71,13 @@ class MainActivity : ComponentActivity() {
         Log.d(TAG, "Initializing deleteLauncher with StartIntentSenderForResult contract.")
         deleteLauncher = registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
             try {
+                Log.d("DELETE_FLOW", "Step 4: Result code = ${result.resultCode}")
                 Log.d(TAG, "Delete request finished. resultCode=${result.resultCode}")
                 if (result.resultCode == android.app.Activity.RESULT_OK) {
+                    Log.d("DELETE_FLOW", "Step 4.1: User confirmed (Allow pressed)")
                     viewModel.onMediaDeleteSuccess()
                 } else {
+                    Log.d("DELETE_FLOW", "Step 4.2: User cancelled or failed")
                     viewModel.onMediaDeleteCancelled()
                 }
             } catch (error: Exception) {
@@ -177,6 +180,8 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun launchDeleteRequest(uris: List<Uri>) {
+        Log.d("DELETE_FLOW", "Step 2: URIs size = ${uris.size}")
+        uris.forEach { uri -> Log.d("DELETE_FLOW", "URI = $uri") }
         Log.d("DELETE_DEBUG", "deleteMedia called. sdk=${Build.VERSION.SDK_INT}, uriCount=${uris.size}")
         uris.forEachIndexed { index, uri ->
             Log.d("DELETE_DEBUG", "URI[$index]=$uri")
@@ -188,6 +193,7 @@ class MainActivity : ComponentActivity() {
             return
         }
         val validUris = uris.distinct()
+        Log.d("DELETE_FLOW", "Filtered valid URIs count = ${validUris.size}")
         if (validUris.isEmpty()) {
             Log.w("DELETE_DEBUG", "No valid MediaStore URIs available for delete request.")
             viewModel.onMediaDeleteFailed()
@@ -196,6 +202,7 @@ class MainActivity : ComponentActivity() {
         }
 
         try {
+            Log.d("DELETE_FLOW", "Step 3: Launching system delete request")
             Log.d("DELETE_DEBUG", "Android 11+ flow: MediaStore.createDeleteRequest for ${validUris.size} URIs")
             val request = MediaStore.createDeleteRequest(contentResolver, validUris)
             val intentSenderRequest = IntentSenderRequest.Builder(request.intentSender).build()
@@ -207,6 +214,7 @@ class MainActivity : ComponentActivity() {
             }
             Log.d("DELETE_DEBUG", "Launching delete request with uriCount=${validUris.size}")
             deleteLauncher.launch(intentSenderRequest)
+            Log.d("DELETE_FLOW", "Step 3.1: deleteLauncher launched")
             Log.d("DELETE_DEBUG", "deleteLauncher.launch() executed for Android 11+ delete request")
         } catch (error: Exception) {
             Log.e("DELETE_DEBUG", "Unable to launch MediaStore delete request", error)
@@ -379,6 +387,7 @@ class MainActivity : ComponentActivity() {
                 onPremiumFeatureRequested = viewModel::onPremiumFeatureRequested,
                 onDeleteClicked = viewModel::onDeleteClicked,
                 onDeleteMediaRequest = { items, origin ->
+                    Log.d("DELETE_FLOW", "Step 1: Delete button clicked")
                     Log.d("DELETE_DEBUG", "Delete button click from $origin with ${items.size} selected items")
                     val rawUris = items.map { item -> item.uri }
                     rawUris.forEachIndexed { index, uri -> Log.d("DELETE_DEBUG", "Raw URI[$index]=$uri") }
