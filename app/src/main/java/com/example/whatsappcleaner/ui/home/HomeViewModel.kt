@@ -506,6 +506,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             }
             true
         }
+        Log.d("DELETE_FLOW", "Filtered valid URIs count = ${validItems.size}")
         if (validItems.isEmpty()) {
             Log.w(TAG, "Skipping deletion request from $origin because there were no valid items.")
             _uiState.update { currentState ->
@@ -579,6 +580,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             onMediaDeleteFailed()
             return
         }
+        Log.d("DELETE_FLOW", "Step 5: Updating UI after delete")
+        Log.d("DELETE_FLOW", "Step 5.1: Deleted IDs count = ${resolvedDeletedIds.size}")
         Log.d(TAG, "Delete flow completed. requested=${pendingIds.size}, deleted=${resolvedDeletedIds.size}")
         viewModelScope.launch {
             applyDeletionToState(resolvedDeletedIds)
@@ -588,6 +591,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     fun onMediaDeleteFailed() {
         val pendingIds = _uiState.value.pendingDeleteIds
         if (pendingIds.isEmpty()) return
+        Log.d("DELETE_FLOW", "ERROR: Delete failed triggered")
         Log.d(TAG, "Delete flow failed.")
         _uiState.update { currentState ->
             currentState.copy(
@@ -700,6 +704,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             )
         }
         _uiState.value = updatedState
+        Log.d("DELETE_FLOW", "Step 5.2: Remaining items = ${updatedState.allItems.size}")
         _items.update { currentItems -> currentItems.filterNot { item -> item.id in deletedIds } }
     }
 
