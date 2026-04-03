@@ -61,9 +61,8 @@ class MainActivity : ComponentActivity() {
         Log.d(TAG, "Initializing deleteLauncher with StartIntentSenderForResult contract.")
         deleteLauncher = registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
             try {
-                val approved = result.resultCode == android.app.Activity.RESULT_OK
-                Log.d(TAG, "Delete request finished. resultCode=${result.resultCode}, approved=$approved")
-                viewModel.onDeleteRequestResult(approved)
+                Log.d(TAG, "Delete request finished. resultCode=${result.resultCode}")
+                viewModel.onDeleteRequestResult(result.resultCode)
             } catch (error: Exception) {
                 Log.e(TAG, "Failed while handling delete launcher result.", error)
                 viewModel.onMediaDeleteResult(success = false)

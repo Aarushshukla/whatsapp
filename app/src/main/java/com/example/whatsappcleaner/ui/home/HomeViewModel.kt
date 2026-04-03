@@ -1,9 +1,11 @@
 package com.example.whatsappcleaner.ui.home
 
 import android.app.Application
+import android.content.ContentUris
 import android.net.Uri
 import android.os.Build
 import android.util.Log
+import android.provider.MediaStore
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.whatsappcleaner.ai.ImageCategory
@@ -75,6 +77,7 @@ data class HomeUiState(
     val paywallSource: String = "dashboard",
     val hasExceededFreeLimit: Boolean = false,
     val lastCleanupBytes: Long = 0L,
+    val pendingDeleteIds: Set<Long> = emptySet(),
     val pendingDeleteUris: List<Uri> = emptyList(),
     val deleteRequestId: Long = 0L,
     val isDeleteInProgress: Boolean = false,
@@ -481,7 +484,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             }
             return DeleteExecution.Ignored
         }
-        val distinctItems = items.distinctBy { item -> item.uri }.filter { item -> item.uri != Uri.EMPTY }
+        val distinctItems = items
+            .distinctBy { item -> item.id }
+            .mapNotNull(::normalizeDeleteTarget)
         if (distinctItems.isEmpty()) {
             Log.w(TAG, "Skipping deletion request from $origin because there were no valid items.")
             _uiState.update { currentState ->
@@ -492,10 +497,12 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         Log.d(TAG, "Prepared ${distinctItems.size} distinct items for deletion from $origin.")
         analytics.trackDeleteClicked(origin)
         val uris = distinctItems.map { item -> item.uri }
+        val ids = distinctItems.map { item -> item.id }.toSet()
         Log.d(TAG, "Requesting MediaStore delete for ${distinctItems.size} items from $origin.")
         _uiState.update { currentState ->
             currentState.copy(
                 pendingDeleteUris = uris,
+                pendingDeleteIds = ids,
                 deleteRequestId = currentState.deleteRequestId + 1L,
                 isDeleteInProgress = true
             )
@@ -509,8 +516,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun deleteMediaDirectly() {
+        val pendingIds = _uiState.value.pendingDeleteIds
         val pendingUris = _uiState.value.pendingDeleteUris.distinct()
-        if (pendingUris.isEmpty()) {
+        if (pendingUris.isEmpty() || pendingIds.isEmpty()) {
             _uiState.update { currentState -> currentState.copy(isDeleteInProgress = false) }
             return
         }
@@ -523,23 +531,35 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                         .getOrDefault(false)
                 }
             }
-            onMediaDeleteResult(success = deletedUris.isNotEmpty(), deletedCount = deletedUris.size, deletedUris = deletedUris)
+            val success = deletedUris.isNotEmpty()
+            onMediaDeleteResult(
+                success = success,
+                deletedCount = if (success) pendingIds.size else 0,
+                deletedIds = if (success) pendingIds else emptySet()
+            )
         }
     }
 
-    fun onDeleteRequestResult(approved: Boolean) {
-        if (!approved) {
+    fun onDeleteRequestResult(resultCode: Int) {
+        if (resultCode != android.app.Activity.RESULT_OK) {
             onMediaDeleteCancelled()
             return
         }
+        val pendingIds = _uiState.value.pendingDeleteIds
         val pendingUris = _uiState.value.pendingDeleteUris.distinct()
-        if (pendingUris.isEmpty()) {
+        if (pendingUris.isEmpty() || pendingIds.isEmpty()) {
             _uiState.update { currentState -> currentState.copy(isDeleteInProgress = false) }
             return
         }
         viewModelScope.launch {
-            val deletedUris = withContext(Dispatchers.IO) { pendingUris.filterNot(::uriExists) }
-            onMediaDeleteResult(success = deletedUris.isNotEmpty(), deletedCount = deletedUris.size, deletedUris = deletedUris)
+            val deletedIds = withContext(Dispatchers.IO) { pendingUris.filterNot(::uriExists) }
+                .let { verifiedUris ->
+                    if (verifiedUris.isEmpty()) pendingIds else {
+                        val idByUri = _uiState.value.allItems.associateBy({ it.uri }, { it.id })
+                        verifiedUris.mapNotNull { uri -> idByUri[uri] }.toSet().ifEmpty { pendingIds }
+                    }
+                }
+            onMediaDeleteResult(success = true, deletedCount = deletedIds.size, deletedIds = deletedIds)
         }
     }
 
@@ -549,16 +569,17 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             .getOrElse { false }
     }
 
-    fun onMediaDeleteResult(success: Boolean, deletedCount: Int = 0, deletedUris: List<Uri> = emptyList()) {
-        val pendingUris = _uiState.value.pendingDeleteUris.toSet()
-        if (pendingUris.isEmpty()) {
-            Log.w(TAG, "Delete result received with no pending URIs.")
+    fun onMediaDeleteResult(success: Boolean, deletedCount: Int = 0, deletedIds: Set<Long> = emptySet()) {
+        val pendingIds = _uiState.value.pendingDeleteIds
+        if (pendingIds.isEmpty()) {
+            Log.w(TAG, "Delete result received with no pending IDs.")
             return
         }
         if (!success) {
             Log.d(TAG, "Delete flow failed.")
             _uiState.update { currentState ->
                 currentState.copy(
+                    pendingDeleteIds = emptySet(),
                     pendingDeleteUris = emptyList(),
                     isDeleteInProgress = false,
                     deleteSnackbarMessage = "Failed to delete files"
@@ -567,38 +588,20 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
 
-        Log.d(TAG, "Delete flow completed. requested=${pendingUris.size}, deleted=$deletedCount")
-        _uiState.update { currentState ->
-            val deleteMessage = if (deletedCount <= 0) {
-                "No files were deleted"
-            } else if (deletedCount == 1) {
-                "1 item deleted"
-            } else {
-                "$deletedCount items deleted"
-            }
-            currentState.copy(
-                pendingDeleteUris = emptyList(),
-                isDeleteInProgress = false,
-                allItems = currentState.allItems.filterNot { item -> deletedUris.contains(item.uri) },
-                filteredItems = filterList(
-                    currentState.allItems.filterNot { item -> deletedUris.contains(item.uri) },
-                    currentState.currentFilter,
-                    currentState.activeSuggestion,
-                    currentState.settings
-                ),
-                deleteSnackbarMessage = deleteMessage,
-                lastDeletedItems = emptyList()
-            )
+        val idsToRemove = if (deletedIds.isNotEmpty()) deletedIds else pendingIds
+        Log.d(TAG, "Delete flow completed. requested=${pendingIds.size}, deleted=${idsToRemove.size}")
+        viewModelScope.launch {
+            applyDeletionToState(idsToRemove)
         }
-        refreshMedia(forceRefresh = true, showLoading = false)
     }
 
     fun onMediaDeleteCancelled() {
-        val pendingUris = _uiState.value.pendingDeleteUris
-        if (pendingUris.isEmpty()) return
+        val pendingIds = _uiState.value.pendingDeleteIds
+        if (pendingIds.isEmpty()) return
         Log.d(TAG, "Delete flow cancelled by user.")
         _uiState.update { currentState ->
             currentState.copy(
+                pendingDeleteIds = emptySet(),
                 pendingDeleteUris = emptyList(),
                 isDeleteInProgress = false,
                 deleteSnackbarMessage = "Delete cancelled"
@@ -618,6 +621,90 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     fun clearDeleteSnackbar() {
         _uiState.update { currentState -> currentState.copy(deleteSnackbarMessage = null, lastDeletedItems = emptyList()) }
+    }
+
+    private fun normalizeDeleteTarget(item: SimpleMediaItem): SimpleMediaItem? {
+        if (item.id <= 0L) return null
+        val collection = if (item.mimeType?.startsWith("video") == true || item.mediaType == "video") {
+            MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+        } else {
+            MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+        }
+        val normalizedUri = ContentUris.withAppendedId(collection, item.id)
+        if (normalizedUri == Uri.EMPTY) return null
+        return item.copy(uri = normalizedUri)
+    }
+
+    private suspend fun applyDeletionToState(deletedIds: Set<Long>) {
+        if (deletedIds.isEmpty()) {
+            _uiState.update { currentState ->
+                currentState.copy(
+                    pendingDeleteIds = emptySet(),
+                    pendingDeleteUris = emptyList(),
+                    isDeleteInProgress = false,
+                    deleteSnackbarMessage = "No files were deleted"
+                )
+            }
+            return
+        }
+        val currentState = _uiState.value
+        val updatedState = withContext(Dispatchers.Default) {
+            val remainingItems = currentState.allItems.filterNot { item -> item.id in deletedIds }
+            val remainingMemeItems = currentState.memeItems.filterNot { item -> item.id in deletedIds }
+            val remainingDuplicateItems = currentState.duplicateItems.filterNot { item -> item.id in deletedIds }
+            val remainingSpamItems = currentState.spamItems.filterNot { item -> item.id in deletedIds }
+            val remainingLargeFileItems = currentState.largeFileItems.filterNot { item -> item.id in deletedIds }
+            val remainingSentFileItems = currentState.sentFileItems.filterNot { item -> item.id in deletedIds }
+            val remainingTotalSize = remainingItems.sumOf { mediaItem -> mediaItem.sizeKb.toLong() * 1024L }
+            val today = System.currentTimeMillis() - 86400000
+            val remainingLargeToday = remainingItems.filter { mediaItem ->
+                mediaItem.addedMillis > today && mediaItem.sizeKb > 5000
+            }
+            val remainingScreenshotsToday = remainingItems.filter { mediaItem ->
+                mediaItem.addedMillis > today && mediaItem.name.startsWith("Screenshot", true)
+            }
+            val deleteMessage = if (deletedIds.size == 1) "1 item deleted" else "${deletedIds.size} items deleted"
+            currentState.copy(
+                pendingDeleteIds = emptySet(),
+                pendingDeleteUris = emptyList(),
+                isDeleteInProgress = false,
+                allItems = remainingItems,
+                filteredItems = filterList(
+                    remainingItems,
+                    currentState.currentFilter,
+                    currentState.activeSuggestion,
+                    currentState.settings
+                ),
+                summaryInfo = if (remainingItems.isEmpty()) {
+                    "No media found."
+                } else {
+                    "Found ${remainingItems.size} files (${formatSize(remainingTotalSize)})"
+                },
+                memeCount = remainingMemeItems.size,
+                memeItems = remainingMemeItems,
+                duplicateCount = remainingDuplicateItems.size,
+                duplicateItems = remainingDuplicateItems,
+                spamCount = remainingSpamItems.size,
+                spamItems = remainingSpamItems,
+                largeFileItems = remainingLargeFileItems,
+                sentFileItems = remainingSentFileItems,
+                totalFiles = remainingItems.size,
+                totalSize = remainingTotalSize,
+                largeTodayCount = remainingLargeToday.size,
+                largeTodaySizeText = formatSize(remainingLargeToday.sumOf { i -> i.sizeKb.toLong() * 1024 }),
+                screenshotTodayCount = remainingScreenshotsToday.size,
+                screenshotTodaySizeText = formatSize(remainingScreenshotsToday.sumOf { i -> i.sizeKb.toLong() * 1024 }),
+                report = currentState.report.copy(
+                    memeCount = remainingMemeItems.size,
+                    duplicateCount = remainingDuplicateItems.size,
+                    spamCount = remainingSpamItems.size
+                ),
+                deleteSnackbarMessage = deleteMessage,
+                lastDeletedItems = emptyList()
+            )
+        }
+        _uiState.value = updatedState
+        _items.update { currentItems -> currentItems.filterNot { item -> item.id in deletedIds } }
     }
 
     fun onReviewClicked() {
