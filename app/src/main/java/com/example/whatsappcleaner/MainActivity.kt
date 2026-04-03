@@ -194,19 +194,25 @@ class MainActivity : ComponentActivity() {
             return
         }
 
-        try {
-            Log.d("DELETE_FLOW", "Step 3: Launching system delete request")
-            Log.d("DELETE_DEBUG", "Android 11+ flow: MediaStore.createDeleteRequest for ${validUris.size} URIs")
-            val request = MediaStore.createDeleteRequest(contentResolver, validUris)
-            val intentSenderRequest = IntentSenderRequest.Builder(request.intentSender).build()
-            Log.d("DELETE_DEBUG", "About to call deleteLauncher.launch() with uriCount=${validUris.size}")
-            deleteLauncher.launch(intentSenderRequest)
-            Log.d("DELETE_FLOW", "Step 3.1: deleteLauncher launched")
-            Log.d("DELETE_DEBUG", "deleteLauncher.launch() executed for Android 11+ delete request")
-        } catch (error: Exception) {
-            Log.e("DELETE_DEBUG", "Unable to launch MediaStore delete request", error)
-            viewModel.onMediaDeleteFailed()
-            showDeleteError("Unable to delete files right now.")
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            try {
+                Log.d("DELETE_FLOW", "Step 3: Launching system delete request")
+                Log.d("DELETE_DEBUG", "Android 11+ flow: MediaStore.createDeleteRequest for ${validUris.size} URIs")
+                val request = MediaStore.createDeleteRequest(contentResolver, validUris)
+                val intentSenderRequest = IntentSenderRequest.Builder(request.intentSender).build()
+                Log.d("DELETE_DEBUG", "About to call deleteLauncher.launch() with uriCount=${validUris.size}")
+                deleteLauncher.launch(intentSenderRequest)
+                Log.d("DELETE_FLOW", "Step 3.1: deleteLauncher launched")
+                Log.d("DELETE_DEBUG", "deleteLauncher.launch() executed for Android 11+ delete request")
+            } catch (error: Exception) {
+                Log.e("DELETE_DEBUG", "Unable to launch MediaStore delete request", error)
+                viewModel.onMediaDeleteFailed()
+                showDeleteError("Unable to delete files right now.")
+            }
+        } else {
+            Log.d("DELETE_FLOW", "Step 3: Launching direct delete for Android 10 and below")
+            Log.d("DELETE_DEBUG", "Android 10- flow: contentResolver.delete for ${validUris.size} URIs")
+            deleteDirectlyForLegacyAndroid(validUris)
         }
     }
 
@@ -230,6 +236,7 @@ class MainActivity : ComponentActivity() {
                     }
                 }.toSet()
             }
+            Log.d("DELETE_FLOW", "Step 4: Direct delete finished. deletedCount=${deletedIds.size}")
             if (deletedIds.isEmpty()) {
                 viewModel.onMediaDeleteCancelled()
             } else {
