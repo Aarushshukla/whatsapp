@@ -220,7 +220,7 @@ class MainActivity : ComponentActivity() {
         val normalized = uri.toString()
         if (normalized.startsWith("content://com.whatsapp")) return false
         if (normalized.startsWith("file://")) return false
-        return normalized.startsWith("content://media/external/")
+        return normalized.startsWith("content://media/")
     }
 
     private fun showDeleteError(message: String) {
@@ -354,19 +354,22 @@ class MainActivity : ComponentActivity() {
                     val rawUris = items.map { item -> item.uri }
                     rawUris.forEachIndexed { index, uri -> Log.d("DELETE_DEBUG", "Raw URI[$index]=$uri") }
 
-                    val validItems = items.filter { item -> isValidMediaStoreUri(item.uri) }
-                    val validUris = validItems.map { item -> item.uri }.distinct()
-                    Log.d("DELETE_DEBUG", "Valid MediaStore URI list size=${validUris.size}")
-                    validUris.forEachIndexed { index, uri -> Log.d("DELETE_DEBUG", "Valid delete URI[$index]=$uri") }
-
-                    if (validUris.isEmpty()) {
-                        showDeleteError("This file cannot be deleted due to system restrictions")
-                    } else {
-                        when (val execution = viewModel.requestMediaDeletion(validItems, origin, Build.VERSION.SDK_INT)) {
-                            is DeleteExecution.NeedsUserApproval -> activity.launchDeleteRequest(execution.uris)
-                            DeleteExecution.StartedInBackground -> Unit
-                            DeleteExecution.Ignored -> Unit
+                    when (val execution = viewModel.requestMediaDeletion(items, origin, Build.VERSION.SDK_INT)) {
+                        is DeleteExecution.NeedsUserApproval -> {
+                            val validUris = execution.uris
+                                .filter(::isValidMediaStoreUri)
+                                .distinct()
+                            if (validUris.isEmpty()) {
+                                showDeleteError("This file cannot be deleted due to system restrictions")
+                                viewModel.onMediaDeleteResult(success = false)
+                            } else {
+                                Log.d("DELETE_DEBUG", "Valid MediaStore URI list size=${validUris.size}")
+                                validUris.forEachIndexed { index, uri -> Log.d("DELETE_DEBUG", "Valid delete URI[$index]=$uri") }
+                                activity.launchDeleteRequest(validUris)
+                            }
                         }
+                        DeleteExecution.StartedInBackground -> Unit
+                        DeleteExecution.Ignored -> Unit
                     }
                 },
                 onUndoDelete = viewModel::undoLastDelete,
