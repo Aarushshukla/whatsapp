@@ -2,17 +2,11 @@ package com.example.whatsappcleaner.data
 
 import android.content.ContentUris
 import android.content.Context
-import android.net.Uri
 import android.provider.MediaStore
-import android.util.Log
 
 class MediaStoreRepository(
     private val context: Context
 ) {
-
-    companion object {
-        private const val TAG = "MediaStoreRepository"
-    }
 
     fun loadImages(limit: Int = 100, offset: Int = 0): List<MediaItem> {
         val list = mutableListOf<MediaItem>()
@@ -61,17 +55,5 @@ class MediaStoreRepository(
         }
 
         return list
-    }
-
-    fun deleteMedia(uris: List<Uri>): Int {
-        if (uris.isEmpty()) return 0
-        var deletedCount = 0
-        uris.forEach { uri ->
-            val rows = runCatching { context.contentResolver.delete(uri, null, null) }
-                .onFailure { error -> Log.w(TAG, "Failed to delete URI: $uri", error) }
-                .getOrDefault(0)
-            if (rows > 0) deletedCount += 1
-        }
-        return deletedCount
     }
 }
