@@ -62,10 +62,14 @@ class MainActivity : ComponentActivity() {
         deleteLauncher = registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
             try {
                 Log.d(TAG, "Delete request finished. resultCode=${result.resultCode}")
-                viewModel.onDeleteRequestResult(result.resultCode)
+                if (result.resultCode == android.app.Activity.RESULT_OK) {
+                    viewModel.onMediaDeleteSuccess()
+                } else {
+                    viewModel.onMediaDeleteFailed()
+                }
             } catch (error: Exception) {
                 Log.e(TAG, "Failed while handling delete launcher result.", error)
-                viewModel.onMediaDeleteResult(success = false)
+                viewModel.onMediaDeleteFailed()
                 showDeleteError("Unable to process delete result.")
             }
         }
@@ -169,7 +173,7 @@ class MainActivity : ComponentActivity() {
         }
         if (uris.isEmpty()) {
             Log.e("DELETE_DEBUG", "Empty list")
-            viewModel.onMediaDeleteResult(success = false)
+            viewModel.onMediaDeleteFailed()
             showDeleteError("No files selected for deletion.")
             return
         }
@@ -187,7 +191,7 @@ class MainActivity : ComponentActivity() {
             .distinct()
         if (validUris.isEmpty()) {
             Log.w("DELETE_DEBUG", "No valid MediaStore URIs available for delete request.")
-            viewModel.onMediaDeleteResult(success = false)
+            viewModel.onMediaDeleteFailed()
             showDeleteError("This file cannot be deleted due to system restrictions")
             return
         }
@@ -202,7 +206,7 @@ class MainActivity : ComponentActivity() {
             val intentSenderRequest = IntentSenderRequest.Builder(request.intentSender).build()
             if (!::deleteLauncher.isInitialized) {
                 Log.e("DELETE_DEBUG", "deleteLauncher is not initialized; cannot launch request")
-                viewModel.onMediaDeleteResult(success = false)
+                viewModel.onMediaDeleteFailed()
                 showDeleteError("Delete action is unavailable right now.")
                 return
             }
@@ -210,7 +214,7 @@ class MainActivity : ComponentActivity() {
             Log.d("DELETE_DEBUG", "deleteLauncher.launch() executed for Android 11+ delete request")
         } catch (error: Exception) {
             Log.e("DELETE_DEBUG", "Unable to launch MediaStore delete request", error)
-            viewModel.onMediaDeleteResult(success = false)
+            viewModel.onMediaDeleteFailed()
             showDeleteError("Unable to delete files right now.")
         }
     }
@@ -361,7 +365,7 @@ class MainActivity : ComponentActivity() {
                                 .distinct()
                             if (validUris.isEmpty()) {
                                 showDeleteError("This file cannot be deleted due to system restrictions")
-                                viewModel.onMediaDeleteResult(success = false)
+                                viewModel.onMediaDeleteFailed()
                             } else {
                                 Log.d("DELETE_DEBUG", "Valid MediaStore URI list size=${validUris.size}")
                                 validUris.forEachIndexed { index, uri -> Log.d("DELETE_DEBUG", "Valid delete URI[$index]=$uri") }
