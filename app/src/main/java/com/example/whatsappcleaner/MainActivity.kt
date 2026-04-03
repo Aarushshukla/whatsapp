@@ -19,8 +19,14 @@ import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -314,6 +320,7 @@ class MainActivity : ComponentActivity() {
     private fun MainActivityContent(activity: MainActivity, versionLabel: String) {
         val state by viewModel.uiState.collectAsStateWithLifecycle()
         val mediaItems by viewModel.items.collectAsStateWithLifecycle()
+        var pendingSystemDeleteUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
         val darkTheme = when (state.settings.themeMode) {
             AppThemeMode.DARK -> true
             AppThemeMode.LIGHT -> false
@@ -386,7 +393,7 @@ class MainActivity : ComponentActivity() {
                             } else {
                                 Log.d("DELETE_DEBUG", "Valid MediaStore URI list size=${validUris.size}")
                                 validUris.forEachIndexed { index, uri -> Log.d("DELETE_DEBUG", "Valid delete URI[$index]=$uri") }
-                                activity.launchDeleteRequest(validUris)
+                                pendingSystemDeleteUris = validUris
                             }
                         }
                         is DeleteExecution.StartedInBackground -> {
@@ -403,6 +410,31 @@ class MainActivity : ComponentActivity() {
                 onCleanupRecorded = viewModel::recordCleanupResult,
                 versionLabel = versionLabel
             )
+
+            if (pendingSystemDeleteUris.isNotEmpty()) {
+                AlertDialog(
+                    onDismissRequest = { pendingSystemDeleteUris = emptyList() },
+                    title = { Text("Delete files?") },
+                    text = { Text("Selected files will be permanently deleted.") },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                val urisToDelete = pendingSystemDeleteUris
+                                pendingSystemDeleteUris = emptyList()
+                                activity.launchDeleteRequest(urisToDelete)
+                            }
+                        ) { Text("Continue") }
+                    },
+                    dismissButton = {
+                        TextButton(
+                            onClick = {
+                                pendingSystemDeleteUris = emptyList()
+                                viewModel.onMediaDeleteCancelled()
+                            }
+                        ) { Text("Cancel") }
+                    }
+                )
+            }
         }
     }
 

@@ -516,7 +516,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         Log.d(TAG, "Prepared ${validItems.size} valid items for deletion from $origin.")
         analytics.trackDeleteClicked(origin)
         val uris = validItems.map { item -> item.uri }.distinct()
-        val ids = validItems.map { item -> item.id }.toSet()
+        val ids = validItems.mapNotNull { item ->
+            runCatching { android.content.ContentUris.parseId(item.uri) }.getOrNull()
+        }.toSet()
         setPendingDelete(ids = ids, uris = uris, items = validItems)
         return if (sdkInt >= Build.VERSION_CODES.R) {
             Log.d(TAG, "Requesting MediaStore delete for ${validItems.size} items from $origin.")
