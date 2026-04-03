@@ -24,11 +24,15 @@ import androidx.compose.runtime.getValue
 import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
 import com.example.whatsappcleaner.data.billing.SubscriptionRepository
 import com.example.whatsappcleaner.ui.WhatsCleanAppRoot
 import com.example.whatsappcleaner.ui.home.DeleteExecution
 import com.example.whatsappcleaner.ui.home.HomeViewModel
 import com.example.whatsappcleaner.ui.settings.AppThemeMode
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.example.whatsappcleaner.ui.theme.WhatsCleanTheme
 
 class MainActivity : ComponentActivity() {
@@ -196,10 +200,6 @@ class MainActivity : ComponentActivity() {
             return
         }
 
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
-            Log.w(TAG, "launchDeleteRequest called on unsupported sdk=${Build.VERSION.SDK_INT}")
-            return
-        }
         try {
             Log.d("DELETE_DEBUG", "Android 11+ flow: MediaStore.createDeleteRequest for ${validUris.size} URIs")
             val request = MediaStore.createDeleteRequest(contentResolver, validUris)
@@ -216,6 +216,35 @@ class MainActivity : ComponentActivity() {
             Log.e("DELETE_DEBUG", "Unable to launch MediaStore delete request", error)
             viewModel.onMediaDeleteFailed()
             showDeleteError("Unable to delete files right now.")
+        }
+    }
+
+
+
+    private fun deleteDirectlyForLegacyAndroid(uris: List<Uri>) {
+        if (uris.isEmpty()) {
+            viewModel.onMediaDeleteFailed()
+            showDeleteError("No files selected for deletion.")
+            return
+        }
+        lifecycleScope.launch {
+            val deletedIds = withContext(Dispatchers.IO) {
+                uris.mapNotNull { uri ->
+                    runCatching {
+                        val rowsDeleted = contentResolver.delete(uri, null, null)
+                        if (rowsDeleted > 0) android.content.ContentUris.parseId(uri) else null
+                    }.getOrElse { error ->
+                        Log.e(TAG, "Direct delete failed for uri=$uri", error)
+                        null
+                    }
+                }.toSet()
+            }
+            if (deletedIds.isEmpty()) {
+                viewModel.onMediaDeleteFailed()
+                showDeleteError("Failed to delete files")
+            } else {
+                viewModel.onMediaDeleteSuccess(deletedIds)
+            }
         }
     }
 
@@ -372,7 +401,12 @@ class MainActivity : ComponentActivity() {
                                 activity.launchDeleteRequest(validUris)
                             }
                         }
-                        DeleteExecution.StartedInBackground -> Unit
+                        is DeleteExecution.StartedInBackground -> {
+                            val validUris = execution.uris
+                                .filter(::isValidMediaStoreUri)
+                                .distinct()
+                            deleteDirectlyForLegacyAndroid(validUris)
+                        }
                         DeleteExecution.Ignored -> Unit
                     }
                 },

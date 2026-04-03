@@ -89,7 +89,7 @@ data class HomeUiState(
 
 sealed class DeleteExecution {
     data class NeedsUserApproval(val uris: List<Uri>) : DeleteExecution()
-    data object StartedInBackground : DeleteExecution()
+    data class StartedInBackground(val uris: List<Uri>) : DeleteExecution()
     data object Ignored : DeleteExecution()
 }
 
@@ -517,15 +517,14 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         analytics.trackDeleteClicked(origin)
         val uris = validItems.map { item -> item.uri }.distinct()
         val ids = validItems.map { item -> item.id }.toSet()
-        if (sdkInt < Build.VERSION_CODES.R) {
-            _uiState.update { currentState ->
-                currentState.copy(deleteSnackbarMessage = "Delete is only supported on Android 11+")
-            }
-            return DeleteExecution.Ignored
-        }
         setPendingDelete(ids = ids, uris = uris, items = validItems)
-        Log.d(TAG, "Requesting MediaStore delete for ${validItems.size} items from $origin.")
-        return DeleteExecution.NeedsUserApproval(uris)
+        return if (sdkInt >= Build.VERSION_CODES.R) {
+            Log.d(TAG, "Requesting MediaStore delete for ${validItems.size} items from $origin.")
+            DeleteExecution.NeedsUserApproval(uris)
+        } else {
+            Log.d(TAG, "Requesting direct ContentResolver delete for ${validItems.size} items from $origin.")
+            DeleteExecution.StartedInBackground(uris)
+        }
     }
 
     fun setPendingDelete(ids: Set<Long>, uris: List<Uri>, items: List<SimpleMediaItem>) {
@@ -570,15 +569,17 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun onMediaDeleteSuccess() {
+    fun onMediaDeleteSuccess(deletedIds: Set<Long>? = null) {
         val pendingIds = _uiState.value.pendingDeleteIds
-        if (pendingIds.isEmpty()) {
-            Log.w(TAG, "Delete result received with no pending IDs.")
+        val resolvedDeletedIds = deletedIds?.takeIf { it.isNotEmpty() } ?: pendingIds
+        if (resolvedDeletedIds.isEmpty()) {
+            Log.w(TAG, "Delete result received with no deleted IDs.")
+            onMediaDeleteFailed()
             return
         }
-        Log.d(TAG, "Delete flow completed. requested=${pendingIds.size}, deleted=${pendingIds.size}")
+        Log.d(TAG, "Delete flow completed. requested=${pendingIds.size}, deleted=${resolvedDeletedIds.size}")
         viewModelScope.launch {
-            applyDeletionToState(pendingIds)
+            applyDeletionToState(resolvedDeletedIds)
         }
     }
 
