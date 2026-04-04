@@ -572,6 +572,10 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun confirmDeleteSuccess() {
+        onMediaDeleteSuccess()
+    }
+
     fun onMediaDeleteSuccess(deletedIds: Set<Long>? = null) {
         val pendingIds = _uiState.value.pendingDeleteIds
         val resolvedDeletedIds = deletedIds?.takeIf { it.isNotEmpty() } ?: pendingIds
@@ -591,20 +595,19 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     fun onMediaDeleteFailed() {
         val pendingIds = _uiState.value.pendingDeleteIds
         if (pendingIds.isEmpty()) return
-        Log.d("DELETE_FLOW", "ERROR: Delete failed triggered")
-        Log.d(TAG, "Delete flow failed.")
-        _uiState.update { currentState ->
-            currentState.copy(
+
+        _uiState.update {
+            it.copy(
                 pendingDeleteIds = emptySet(),
                 pendingDeleteUris = emptyList(),
                 pendingDeleteItems = emptyList(),
-                isDeleteInProgress = false,
-                deleteSnackbarMessage = null
+                isDeleteInProgress = false
             )
         }
     }
 
     fun onMediaDeleteCancelled() {
+
         val pendingIds = _uiState.value.pendingDeleteIds
         if (pendingIds.isEmpty()) return
         Log.d(TAG, "Delete flow cancelled by user.")
