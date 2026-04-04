@@ -49,19 +49,11 @@ class MainActivity : ComponentActivity() {
             try {
                 Log.d("DELETE_FLOW", "Step 4: Result code = ${result.resultCode}")
                 Log.d(TAG, "Delete request finished. resultCode=${result.resultCode}")
-                when (result.resultCode) {
-                    android.app.Activity.RESULT_OK -> {
-                        Log.d("DELETE_FLOW", "Step 4.1: User confirmed (Allow pressed)")
-                        viewModel.onMediaDeleteSuccess()
-                    }
-                    android.app.Activity.RESULT_CANCELED -> {
-                        Log.d("DELETE_FLOW", "Step 4.2: User cancelled delete request")
-                        viewModel.onMediaDeleteCancelled()
-                    }
-                    else -> {
-                        Log.d("DELETE_FLOW", "Step 4.3: Non-success delete result treated as neutral")
-                        viewModel.onMediaDeleteCancelled()
-                    }
+                if (result.resultCode == android.app.Activity.RESULT_OK) {
+                    Log.d("DELETE_FLOW", "Step 4.1: User confirmed (Allow pressed)")
+                    viewModel.confirmDeleteSuccess()
+                } else {
+                    Log.d("DELETE_FLOW", "Step 4.2: User cancelled delete request")
                 }
             } catch (error: Exception) {
                 Log.e(TAG, "Failed while handling delete launcher result.", error)
@@ -221,7 +213,9 @@ class MainActivity : ComponentActivity() {
                 deletedCount += contentResolver.delete(uri, null, null)
             }
             Log.d("DELETE_DEBUG", "contentResolver.delete flow completed. deletedCount=$deletedCount")
-            viewModel.onMediaDeleteSuccess()
+            if (deletedCount > 0) {
+                viewModel.confirmDeleteSuccess()
+            }
         } catch (error: Exception) {
             Log.e("DELETE_DEBUG", "Unable to delete media via contentResolver.delete", error)
             viewModel.onMediaDeleteFailed()
