@@ -162,6 +162,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun launchDeleteRequest(uris: List<Uri>) {
+        Log.d("DELETE_FLOW", "Step 3: Entered launchDeleteRequest")
         Log.d("DELETE_DEBUG", "Entering launchDeleteRequest with uriCount=${uris.size}")
         Log.d("DELETE_FLOW", "Step 2: URIs size = ${uris.size}")
         uris.forEach { uri -> Log.d("DELETE_FLOW", "URI = $uri") }
@@ -367,12 +368,16 @@ class MainActivity : ComponentActivity() {
                             } else {
                                 Log.d("DELETE_DEBUG", "Valid MediaStore URI list size=${validUris.size}")
                                 validUris.forEachIndexed { index, uri -> Log.d("DELETE_DEBUG", "Valid delete URI[$index]=$uri") }
+                                Log.d("DELETE_FLOW", "Step 2.5: Calling launchDeleteRequest")
                                 launchDeleteRequest(validUris)
                             }
                         }
                         is DeleteExecution.StartedInBackground -> {
                             val validUris = execution.uris.distinct()
-                            launchDeleteRequest(validUris)
+                            if (validUris.isNotEmpty()) {
+                                Log.d("DELETE_FLOW", "Step 2.5: Calling launchDeleteRequest")
+                                launchDeleteRequest(validUris)
+                            }
                         }
                         DeleteExecution.Ignored -> Unit
                     }
