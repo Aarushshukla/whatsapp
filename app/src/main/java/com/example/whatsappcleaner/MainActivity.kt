@@ -177,7 +177,7 @@ class MainActivity : ComponentActivity() {
         }
         if (uris.isEmpty()) {
             Log.e("DELETE_DEBUG", "Empty list")
-            viewModel.onMediaDeleteFailed()
+            viewModel.onMediaDeleteCancelled()
             showDeleteError("No files selected for deletion.")
             return
         }
@@ -185,7 +185,7 @@ class MainActivity : ComponentActivity() {
         Log.d("DELETE_FLOW", "Filtered valid URIs count = ${validUris.size}")
         if (validUris.isEmpty()) {
             Log.w("DELETE_DEBUG", "No valid MediaStore URIs available for delete request.")
-            viewModel.onMediaDeleteFailed()
+            viewModel.onMediaDeleteCancelled()
             showDeleteError("This file cannot be deleted due to system restrictions")
             return
         }
@@ -369,7 +369,7 @@ class MainActivity : ComponentActivity() {
                                 .distinct()
                             if (validUris.isEmpty()) {
                                 showDeleteError("This file cannot be deleted due to system restrictions")
-                                viewModel.onMediaDeleteFailed()
+                                viewModel.onMediaDeleteCancelled()
                             } else {
                                 Log.d("DELETE_DEBUG", "Valid MediaStore URI list size=${validUris.size}")
                                 validUris.forEachIndexed { index, uri -> Log.d("DELETE_DEBUG", "Valid delete URI[$index]=$uri") }
