@@ -577,7 +577,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         val resolvedDeletedIds = deletedIds?.takeIf { it.isNotEmpty() } ?: pendingIds
         if (resolvedDeletedIds.isEmpty()) {
             Log.w(TAG, "Delete result received with no deleted IDs.")
-            onMediaDeleteFailed()
+            onMediaDeleteCancelled()
             return
         }
         Log.d("DELETE_FLOW", "Step 5: Updating UI after delete")
