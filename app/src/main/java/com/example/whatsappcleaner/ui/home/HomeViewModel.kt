@@ -599,7 +599,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 pendingDeleteUris = emptyList(),
                 pendingDeleteItems = emptyList(),
                 isDeleteInProgress = false,
-                deleteSnackbarMessage = "Failed to delete files"
+                deleteSnackbarMessage = null
             )
         }
     }
