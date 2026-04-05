@@ -197,6 +197,9 @@ fun SimpleHomeScreen(
     totalFiles: Int,
     totalSize: Long,
     oldFilesCount: Int,
+    smartSuggestionSummary: SmartSuggestionSummary,
+    smartSuggestedItems: List<SimpleMediaItem>,
+    suggestionReasonsByUri: Map<String, List<String>>,
     onNavigateToFeatures: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
@@ -216,6 +219,12 @@ fun SimpleHomeScreen(
     LaunchedEffect(items) {
         selectedItems = selectedItems.filter { selectedItem ->
             items.any { mediaItem -> mediaItem.uri == selectedItem.uri }
+        }
+    }
+    LaunchedEffect(smartSuggestedItems) {
+        val suggestionUris = smartSuggestedItems.map { mediaItem -> mediaItem.uri.toString() }.toSet()
+        if (suggestionUris.isNotEmpty()) {
+            selectedItems = items.filter { mediaItem -> mediaItem.uri.toString() in suggestionUris }
         }
     }
     LaunchedEffect(deleteSnackbarMessage) {
@@ -329,6 +338,14 @@ fun SimpleHomeScreen(
                 }
             }
             item(span = { GridItemSpan(maxLineSpan) }) {
+                SmartSuggestionsCard(
+                    summary = smartSuggestionSummary,
+                    autoSelectedCount = selectedItems.count { selectedItem ->
+                        suggestionReasonsByUri.containsKey(selectedItem.uri.toString())
+                    }
+                )
+            }
+            item(span = { GridItemSpan(maxLineSpan) }) {
                 QuickActionsRow(
                     selectedCount = selectedItems.size,
                     onDeleteClick = {
@@ -389,6 +406,7 @@ fun SimpleHomeScreen(
                     PremiumMediaRow(
                         item = item,
                         selected = item.uri.toString() in selectedUris,
+                        suggestionReason = suggestionReasonsByUri[item.uri.toString()]?.joinToString(" • "),
                         onSelect = {
                             selectedItems = if (selectedItems.any { selectedItem -> selectedItem.uri == item.uri }) {
                                 selectedItems.filterNot { selectedItem -> selectedItem.uri == item.uri }
@@ -445,6 +463,39 @@ fun SimpleHomeScreen(
             containerColor = MaterialTheme.colorScheme.surface,
             tonalElevation = 0.dp
         )
+    }
+}
+
+@Composable
+private fun SmartSuggestionsCard(
+    summary: SmartSuggestionSummary,
+    autoSelectedCount: Int
+) {
+    LegitCard {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = AccentPurple)
+                Text("Smart Suggestions", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            }
+            Text(
+                "Potential cleanup: ${summary.totalSuggestedFiles} files • ${formatSize(summary.totalSpaceToFree)}",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                "Duplicates: ${summary.duplicateFiles} in ${summary.duplicateGroups} groups • Large: ${summary.largeFiles} • Old: ${summary.oldFiles}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                "Auto-selected: $autoSelectedCount recommended files",
+                style = MaterialTheme.typography.labelLarge,
+                color = AccentGreen
+            )
+        }
     }
 }
 
@@ -1005,6 +1056,7 @@ private fun PremiumSnackbarHost(snackbarHostState: SnackbarHostState) {
 private fun PremiumMediaRow(
     item: SimpleMediaItem,
     selected: Boolean,
+    suggestionReason: String?,
     onSelect: () -> Unit,
     onOpen: () -> Unit,
     onKeep: () -> Unit,
@@ -1114,6 +1166,15 @@ private fun PremiumMediaRow(
             Column(modifier = Modifier.padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(item.safeDisplayName(), maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
                 Text(item.safeMimeLabel(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (!suggestionReason.isNullOrBlank()) {
+                    Text(
+                        "AI: $suggestionReason",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = AccentPurple,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
 
             Row(
