@@ -28,9 +28,18 @@ import com.example.whatsappcleaner.data.ReminderTime
 import com.example.whatsappcleaner.data.billing.BillingProduct
 import com.example.whatsappcleaner.data.local.SimpleMediaItem
 import com.example.whatsappcleaner.ui.components.FriendlyState
+import com.example.whatsappcleaner.ui.home.AiFeature
 import com.example.whatsappcleaner.ui.home.AnalyticsScreen
-import com.example.whatsappcleaner.ui.home.FeaturePlaceholderScreen
+import com.example.whatsappcleaner.ui.home.BlurryPhotosFeatureScreen
+import com.example.whatsappcleaner.ui.home.DuplicateDetectorFeatureScreen
 import com.example.whatsappcleaner.ui.home.FeaturesScreen
+import com.example.whatsappcleaner.ui.home.LargeFilesFinderFeatureScreen
+import com.example.whatsappcleaner.ui.home.MemeCleanerFeatureScreen
+import com.example.whatsappcleaner.ui.home.OldMediaCleanerFeatureScreen
+import com.example.whatsappcleaner.ui.home.ScreenshotsCleanerFeatureScreen
+import com.example.whatsappcleaner.ui.home.SmartSuggestionsFeatureScreen
+import com.example.whatsappcleaner.ui.home.SpamMediaDetectorFeatureScreen
+import com.example.whatsappcleaner.ui.home.WhatsAppMediaCleanerFeatureScreen
 import com.example.whatsappcleaner.ui.home.HomeUiState
 import com.example.whatsappcleaner.ui.home.JunkFilesScreen
 import com.example.whatsappcleaner.ui.home.MediaFilter
@@ -61,6 +70,15 @@ private object Routes {
     const val ScreenshotsCleaner = "screenshots_cleaner"
     const val Paywall = "paywall"
     const val Settings = "settings"
+    const val AiSmartSuggestions = "ai_smart_suggestions"
+    const val AiDuplicateDetector = "ai_duplicate_detector"
+    const val AiLargeFilesFinder = "ai_large_files_finder"
+    const val AiOldMediaCleaner = "ai_old_media_cleaner"
+    const val AiWhatsappMediaCleaner = "ai_whatsapp_media_cleaner"
+    const val AiMemeCleaner = "ai_meme_cleaner"
+    const val AiBlurryPhotos = "ai_blurry_photos"
+    const val AiScreenshotsCleaner = "ai_screenshots_cleaner"
+    const val AiSpamDetector = "ai_spam_detector"
 }
 
 @Composable
@@ -202,27 +220,43 @@ fun WhatsCleanAppRoot(
                 smartSuggestionSummary = state.smartSuggestionSummary,
                 smartSuggestedItems = state.smartSuggestedItems,
                 suggestionReasonsByUri = state.suggestionReasonsByUri,
-                onNavigateToFeatures = { navController.navigateSingleTop(Routes.Features) }
+                onNavigateToFeatures = { navController.navigateSingleTop(Routes.Features) },
+                onAiFeatureClick = { feature ->
+                    navController.navigateSingleTop(
+                        when (feature) {
+                            AiFeature.SMART_SUGGESTIONS -> Routes.AiSmartSuggestions
+                            AiFeature.DUPLICATE_DETECTOR -> Routes.AiDuplicateDetector
+                            AiFeature.LARGE_FILES_FINDER -> Routes.AiLargeFilesFinder
+                            AiFeature.OLD_MEDIA_CLEANER -> Routes.AiOldMediaCleaner
+                            AiFeature.WHATSAPP_MEDIA_CLEANER -> Routes.AiWhatsappMediaCleaner
+                            AiFeature.MEME_CLEANER -> Routes.AiMemeCleaner
+                            AiFeature.BLURRY_PHOTOS -> Routes.AiBlurryPhotos
+                            AiFeature.SCREENSHOTS_CLEANER -> Routes.AiScreenshotsCleaner
+                            AiFeature.SPAM_MEDIA_DETECTOR -> Routes.AiSpamDetector
+                        }
+                    )
+                }
             )
         }
 
         composable(Routes.Features) {
             FeaturesScreen(
                 onBack = { navController.popBackStack() },
-                onDuplicatesClick = {
-                    if (onPremiumFeatureRequested(PremiumFeature.DUPLICATE_DETECTION)) {
-                        navController.navigateSingleTop(Routes.SmartClean)
-                    } else navController.navigateSingleTop(Routes.Paywall)
-                },
-                onMemeRadarClick = {
-                    if (onPremiumFeatureRequested(PremiumFeature.MEME_DETECTION)) {
-                        navController.navigateSingleTop(Routes.MemeScreen)
-                    } else navController.navigateSingleTop(Routes.Paywall)
-                },
-                onSpamShieldClick = { navController.navigateSingleTop(Routes.Spam) },
-                onWhatsAppCleanerClick = { navController.navigateSingleTop(Routes.WhatsAppCleaner) },
-                onScreenshotsCleanerClick = { navController.navigateSingleTop(Routes.ScreenshotsCleaner) },
-                onLargeFilesClick = { navController.navigateSingleTop(Routes.JunkScreen) }
+                onFeatureClick = { feature ->
+                    navController.navigateSingleTop(
+                        when (feature) {
+                            AiFeature.SMART_SUGGESTIONS -> Routes.AiSmartSuggestions
+                            AiFeature.DUPLICATE_DETECTOR -> Routes.AiDuplicateDetector
+                            AiFeature.LARGE_FILES_FINDER -> Routes.AiLargeFilesFinder
+                            AiFeature.OLD_MEDIA_CLEANER -> Routes.AiOldMediaCleaner
+                            AiFeature.WHATSAPP_MEDIA_CLEANER -> Routes.AiWhatsappMediaCleaner
+                            AiFeature.MEME_CLEANER -> Routes.AiMemeCleaner
+                            AiFeature.BLURRY_PHOTOS -> Routes.AiBlurryPhotos
+                            AiFeature.SCREENSHOTS_CLEANER -> Routes.AiScreenshotsCleaner
+                            AiFeature.SPAM_MEDIA_DETECTOR -> Routes.AiSpamDetector
+                        }
+                    )
+                }
             )
         }
 
@@ -299,12 +333,69 @@ fun WhatsCleanAppRoot(
             )
         }
 
-        composable(Routes.WhatsAppCleaner) {
-            FeaturePlaceholderScreen(title = "WhatsApp Cleaner", onBack = { navController.popBackStack() })
+        composable(Routes.AiSmartSuggestions) {
+            SmartSuggestionsFeatureScreen(
+                totalSuggested = state.smartSuggestionSummary.totalSuggestedFiles,
+                totalSpaceToFree = state.smartSuggestionSummary.totalSpaceToFree,
+                onBack = { navController.popBackStack() }
+            )
         }
 
-        composable(Routes.ScreenshotsCleaner) {
-            FeaturePlaceholderScreen(title = "Screenshots Cleaner", onBack = { navController.popBackStack() })
+        composable(Routes.AiDuplicateDetector) {
+            DuplicateDetectorFeatureScreen(
+                duplicateCount = state.duplicateCount,
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Routes.AiLargeFilesFinder) {
+            LargeFilesFinderFeatureScreen(
+                count = state.largeFileItems.size,
+                totalBytes = state.largeFileItems.sumOf { mediaItem -> mediaItem.sizeKb.toLong() * 1024L },
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Routes.AiOldMediaCleaner) {
+            OldMediaCleanerFeatureScreen(
+                count = state.report.oldFiles,
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Routes.AiWhatsappMediaCleaner) {
+            WhatsAppMediaCleanerFeatureScreen(
+                sentCount = state.sentFileItems.size,
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Routes.AiMemeCleaner) {
+            MemeCleanerFeatureScreen(
+                memeCount = state.memeCount,
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Routes.AiBlurryPhotos) {
+            BlurryPhotosFeatureScreen(
+                imageCount = state.allItems.count { mediaItem -> mediaItem.mimeType?.startsWith("image") == true },
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Routes.AiScreenshotsCleaner) {
+            ScreenshotsCleanerFeatureScreen(
+                screenshotCount = state.screenshotTodayCount,
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Routes.AiSpamDetector) {
+            SpamMediaDetectorFeatureScreen(
+                spamCount = state.spamCount,
+                onBack = { navController.popBackStack() }
+            )
         }
 
         composable(Routes.Paywall) {

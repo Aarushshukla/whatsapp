@@ -200,7 +200,8 @@ fun SimpleHomeScreen(
     smartSuggestionSummary: SmartSuggestionSummary,
     smartSuggestedItems: List<SimpleMediaItem>,
     suggestionReasonsByUri: Map<String, List<String>>,
-    onNavigateToFeatures: () -> Unit
+    onNavigateToFeatures: () -> Unit,
+    onAiFeatureClick: (AiFeature) -> Unit
 ) {
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -375,6 +376,9 @@ fun SimpleHomeScreen(
             }
             item(span = { GridItemSpan(maxLineSpan) }) {
                 FilterTabs(currentFilter = currentFilter, onFilterChange = onFilterChange)
+            }
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                AiToolsSection(onFeatureClick = onAiFeatureClick)
             }
             item(span = { GridItemSpan(maxLineSpan) }) {
                 SectionTitle(
