@@ -4,6 +4,9 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -14,7 +17,6 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -57,6 +59,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -150,6 +153,38 @@ val AiFeatureItems: List<AiFeature> = listOf(
     AiFeature.SPAM_MEDIA_DETECTOR
 )
 
+data class AiGroupData(
+    val title: String,
+    val features: List<AiFeature>
+)
+
+private val AiGroups = listOf(
+    AiGroupData(
+        title = "Smart AI",
+        features = listOf(
+            AiFeature.SMART_SUGGESTIONS,
+            AiFeature.DUPLICATE_DETECTOR,
+            AiFeature.SPAM_MEDIA_DETECTOR
+        )
+    ),
+    AiGroupData(
+        title = "Storage",
+        features = listOf(
+            AiFeature.LARGE_FILES_FINDER,
+            AiFeature.OLD_MEDIA_CLEANER,
+            AiFeature.WHATSAPP_MEDIA_CLEANER
+        )
+    ),
+    AiGroupData(
+        title = "Media Types",
+        features = listOf(
+            AiFeature.MEME_CLEANER,
+            AiFeature.BLURRY_PHOTOS,
+            AiFeature.SCREENSHOTS_CLEANER
+        )
+    )
+)
+
 @Composable
 fun PremiumSectionHeader(
     title: String,
@@ -183,13 +218,13 @@ fun AiFeatureCard(
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(
-        targetValue = if (isPressed) 0.97f else 1f,
-        animationSpec = tween(durationMillis = 120),
+        targetValue = if (isPressed) 0.965f else 1f,
+        animationSpec = tween(durationMillis = 180),
         label = "ai_feature_card_scale"
     )
     val elevation by animateDpAsState(
         targetValue = if (isPressed) 3.dp else 6.dp,
-        animationSpec = tween(durationMillis = 140),
+        animationSpec = tween(durationMillis = 180),
         label = "ai_feature_card_elevation"
     )
     val containerColor by animateColorAsState(
@@ -205,19 +240,18 @@ fun AiFeatureCard(
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .aspectRatio(1f)
             .scale(scale)
             .border(
                 width = 1.dp,
                 color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.75f),
-                shape = RoundedCornerShape(20.dp)
+                shape = RoundedCornerShape(22.dp)
             )
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
                 onClick = onClick
             ),
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(22.dp),
         colors = CardDefaults.cardColors(
             containerColor = containerColor
         ),
@@ -225,16 +259,28 @@ fun AiFeatureCard(
     ) {
         Column(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(12.dp),
+                .fillMaxWidth()
+                .padding(16.dp),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            Icon(
-                imageVector = feature.icon,
-                contentDescription = feature.title,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(30.dp)
-            )
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(14.dp))
+                    .border(
+                        width = 1.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f),
+                        shape = RoundedCornerShape(14.dp)
+                    )
+                    .padding(10.dp)
+            ) {
+                Icon(
+                    imageVector = feature.icon,
+                    contentDescription = feature.title,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+            Spacer(modifier = Modifier.height(12.dp))
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
                     text = feature.title,
@@ -251,6 +297,7 @@ fun AiFeatureCard(
                     overflow = TextOverflow.Ellipsis
                 )
             }
+            Spacer(modifier = Modifier.height(10.dp))
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.ArrowForward,
                 contentDescription = "Open ${feature.title}",
@@ -263,10 +310,58 @@ fun AiFeatureCard(
 
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
+fun AiGroup(
+    group: AiGroupData,
+    onFeatureClick: (AiFeature) -> Unit,
+    visible: Boolean,
+    modifier: Modifier = Modifier
+) {
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(animationSpec = tween(durationMillis = 380)) +
+            slideInVertically(
+                animationSpec = tween(durationMillis = 420),
+                initialOffsetY = { it / 5 }
+            ),
+        modifier = modifier
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(
+                text = group.title,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.SemiBold
+            )
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                maxItemsInEachRow = 2,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                group.features.forEach { feature ->
+                    AiFeatureCard(
+                        feature = feature,
+                        onClick = { onFeatureClick(feature) },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
 fun AiToolsSection(
     onFeatureClick: (AiFeature) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var groupsVisible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        delay(60)
+        groupsVisible = true
+    }
+
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
@@ -281,17 +376,12 @@ fun AiToolsSection(
                 title = "AI Tools",
                 subtitle = "Premium cleanup intelligence built for faster media decisions."
             )
-            FlowRow(
-                modifier = Modifier.fillMaxWidth(),
-                maxItemsInEachRow = 3,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                AiFeatureItems.forEach { feature ->
-                    AiFeatureCard(
-                        feature = feature,
-                        onClick = { onFeatureClick(feature) },
-                        modifier = Modifier.weight(1f)
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                AiGroups.forEach { group ->
+                    AiGroup(
+                        group = group,
+                        onFeatureClick = onFeatureClick,
+                        visible = groupsVisible
                     )
                 }
             }
