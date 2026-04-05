@@ -108,7 +108,7 @@ class MainActivity : ComponentActivity() {
 
     private fun requiredPermissions(): Array<String> =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            arrayOf(Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_MEDIA_VIDEO)
+            arrayOf(Manifest.permission.READ_MEDIA_IMAGES)
         } else {
             arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
         }
