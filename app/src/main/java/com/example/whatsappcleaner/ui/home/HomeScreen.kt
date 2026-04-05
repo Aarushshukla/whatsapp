@@ -249,15 +249,15 @@ fun SimpleHomeScreen(
     }
 
     Scaffold(
-        containerColor = PrimaryBackground,
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
                 title = {
                     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text("Cleaner", color = TextMain, fontWeight = FontWeight.Bold)
+                        Text("Smart Media Cleaner", color = MaterialTheme.colorScheme.onBackground, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                         Text(
                             text = summaryInfo,
-                            color = TextSecondary,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.labelMedium,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -270,15 +270,15 @@ fun SimpleHomeScreen(
                         modifier = Modifier
                             .padding(start = 4.dp)
                             .clip(RoundedCornerShape(14.dp))
-                            .background(SurfaceWhite.copy(alpha = 0.75f))
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f))
                     ) {
-                        Icon(Icons.Default.Menu, contentDescription = "Menu", tint = TextMain, modifier = Modifier.size(22.dp))
+                        Icon(Icons.Default.Menu, contentDescription = "Menu", tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(22.dp))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = PrimaryBackground,
-                    titleContentColor = TextMain,
-                    navigationIconContentColor = TextMain
+                    containerColor = MaterialTheme.colorScheme.background,
+                    titleContentColor = MaterialTheme.colorScheme.onBackground,
+                    navigationIconContentColor = MaterialTheme.colorScheme.onBackground
                 ),
                 windowInsets = WindowInsets.systemBars,
                 modifier = Modifier.statusBarsPadding()
@@ -301,28 +301,16 @@ fun SimpleHomeScreen(
                     visible = contentVisible,
                     enter = fadeIn(tween(360)) + slideInVertically(initialOffsetY = { it / 3 })
                 ) {
-                    GradientHeroButton(
-                        text = "Smart Scan / Clean Now",
-                        onClick = onNavigateToSmartClean,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(72.dp),
-                        icon = Icons.Default.AutoAwesome
+                    PremiumHeader(
+                        title = "Cleaner",
+                        subtitle = summaryInfo,
+                        remindersEnabled = remindersEnabled,
+                        onRemindersToggle = onRemindersToggle
                     )
                 }
             }
             item(span = { GridItemSpan(maxLineSpan) }) {
-                AnimatedVisibility(
-                    visible = contentVisible,
-                    enter = fadeIn(tween(420)) + slideInVertically(initialOffsetY = { it / 2 })
-                ) {
-                    MainActionsCard(
-                        remindersEnabled = remindersEnabled,
-                        onRemindersToggle = onRemindersToggle,
-                        onRefreshClick = onRefreshClick,
-                        onExploreFeatures = onNavigateToFeatures
-                    )
-                }
+                SmartCleanButton(onClick = onNavigateToSmartClean)
             }
             item(span = { GridItemSpan(maxLineSpan) }) {
                 AnimatedSuccessBanner(message = successMessage)
@@ -332,7 +320,7 @@ fun SimpleHomeScreen(
                     visible = contentVisible,
                     enter = fadeIn(tween(480)) + slideInVertically(initialOffsetY = { it / 2 })
                 ) {
-                    StorageOverviewCard(
+                    PremiumStorageCard(
                         totalFiles = totalFiles,
                         totalSize = totalSize,
                         largeTodayCount = largeTodayCount,
@@ -348,10 +336,10 @@ fun SimpleHomeScreen(
                 }
             }
             item(span = { GridItemSpan(maxLineSpan) }) {
-                QuickActionRow(
+                QuickActionsRow(
                     selectedCount = selectedItems.size,
                     onDeleteClick = {
-                        if (isDeleteInProgress) return@QuickActionRow
+                        if (isDeleteInProgress) return@QuickActionsRow
                         val itemsToDelete = items.filter { mediaItem -> mediaItem.uri.toString() in selectedUris }
                         if (itemsToDelete.isNotEmpty()) {
                             pendingDeleteItems = itemsToDelete
@@ -400,8 +388,12 @@ fun SimpleHomeScreen(
                     }
                 }
             } else {
-                gridItems(items, key = { mediaItem -> mediaItem.id }) { item ->
-                    MediaGridCard(
+                gridItems(
+                    items,
+                    key = { mediaItem -> mediaItem.id },
+                    span = { GridItemSpan(maxLineSpan) }
+                ) { item ->
+                    PremiumMediaRow(
                         item = item,
                         selected = item.uri.toString() in selectedUris,
                         onSelect = {
@@ -463,6 +455,59 @@ fun SimpleHomeScreen(
     }
 }
 
+
+
+@Composable
+private fun PremiumHeader(
+    title: String,
+    subtitle: String,
+    remindersEnabled: Boolean,
+    onRemindersToggle: (Boolean) -> Unit
+) {
+    Card(
+        shape = RoundedCornerShape(22.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    Brush.linearGradient(
+                        listOf(
+                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.9f),
+                            MaterialTheme.colorScheme.surface
+                        )
+                    )
+                )
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(title, style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
+            Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Daily reminders", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
+                Switch(checked = remindersEnabled, onCheckedChange = onRemindersToggle)
+            }
+        }
+    }
+}
+
+@Composable
+private fun SmartCleanButton(onClick: () -> Unit) {
+    GradientHeroButton(
+        text = "Smart Clean",
+        onClick = onClick,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(56.dp),
+        icon = Icons.Default.AutoAwesome
+    )
+}
 
 @Composable
 private fun MainActionsCard(
@@ -637,7 +682,7 @@ private fun QuickPill(icon: ImageVector, label: String, onClick: () -> Unit) {
 }
 
 @Composable
-private fun StorageOverviewCard(
+private fun PremiumStorageCard(
     totalFiles: Int,
     totalSize: Long,
     largeTodayCount: Int,
@@ -655,7 +700,7 @@ private fun StorageOverviewCard(
             .fillMaxWidth()
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = SurfaceWhite),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
         Row(
@@ -671,7 +716,7 @@ private fun StorageOverviewCard(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Storage overview", style = MaterialTheme.typography.titleLarge, color = TextMain)
+                Text("Storage overview", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface)
                 Text("Used $usedSpace • Free $freeSpace", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
                 StatLine(Icons.Default.CleaningServices, "$largeTodayCount large today", largeTodaySizeText.ifBlank { "Ready for review" })
                 StatLine(Icons.Default.Image, "$screenshotTodayCount screenshots", screenshotTodaySizeText.ifBlank { "Quick wins available" })
@@ -755,7 +800,7 @@ private fun InsightCard(model: InsightCardModel) {
                 onClick = model.onClick
             ),
         shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = SurfaceWhite),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
         Column(
@@ -780,7 +825,7 @@ private fun InsightCard(model: InsightCardModel) {
 }
 
 @Composable
-private fun QuickActionRow(
+private fun QuickActionsRow(
     selectedCount: Int,
     onDeleteClick: () -> Unit,
     onSelectAllClick: () -> Unit,
@@ -788,21 +833,21 @@ private fun QuickActionRow(
 ) {
     LegitCard {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("Quick actions", style = MaterialTheme.typography.titleMedium, color = TextMain)
+            Text("Quick actions", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                IconActionButton(Icons.Default.DeleteOutline, "Delete selected ($selectedCount)", selectedCount > 0, onDeleteClick)
-                IconActionButton(Icons.Default.SelectAll, "Select all", true, onSelectAllClick)
-                IconActionButton(Icons.Default.Sort, "Sort / filter", true, onFilterClick)
+                QuickActionChip(Icons.Default.DeleteOutline, "Delete selected ($selectedCount)", selectedCount > 0, onDeleteClick)
+                QuickActionChip(Icons.Default.SelectAll, "Select all", true, onSelectAllClick)
+                QuickActionChip(Icons.Default.Sort, "Sort / filter", true, onFilterClick)
             }
         }
     }
 }
 
 @Composable
-private fun IconActionButton(icon: ImageVector, label: String, enabled: Boolean, onClick: () -> Unit) {
+private fun QuickActionChip(icon: ImageVector, label: String, enabled: Boolean, onClick: () -> Unit) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(
@@ -960,7 +1005,7 @@ private fun PremiumSnackbarHost(snackbarHostState: SnackbarHostState) {
 }
 
 @Composable
-private fun MediaGridCard(
+private fun PremiumMediaRow(
     item: SimpleMediaItem,
     selected: Boolean,
     onSelect: () -> Unit,
