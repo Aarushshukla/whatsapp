@@ -339,14 +339,6 @@ fun SimpleHomeScreen(
                 }
             }
             item(span = { GridItemSpan(maxLineSpan) }) {
-                SmartSuggestionsCard(
-                    summary = smartSuggestionSummary,
-                    autoSelectedCount = selectedItems.count { selectedItem ->
-                        suggestionReasonsByUri.containsKey(selectedItem.uri.toString())
-                    }
-                )
-            }
-            item(span = { GridItemSpan(maxLineSpan) }) {
                 QuickActionsRow(
                     selectedCount = selectedItems.size,
                     onDeleteClick = {
@@ -371,19 +363,12 @@ fun SimpleHomeScreen(
                             MediaFilter.OTHER -> MediaFilter.ALL
                         }
                         onFilterChange(nextFilter)
-                    }
+                    },
+                    onAiToolsClick = { onNavigateToFeatures() }
                 )
             }
             item(span = { GridItemSpan(maxLineSpan) }) {
                 FilterTabs(currentFilter = currentFilter, onFilterChange = onFilterChange)
-            }
-            item(span = { GridItemSpan(maxLineSpan) }) {
-                AnimatedVisibility(
-                    visible = contentVisible,
-                    enter = fadeIn(tween(420)) + slideInVertically(initialOffsetY = { it / 4 })
-                ) {
-                    AiToolsSection(onFeatureClick = onAiFeatureClick)
-                }
             }
             item(span = { GridItemSpan(maxLineSpan) }) {
                 SectionTitle(
@@ -882,7 +867,8 @@ private fun QuickActionsRow(
     selectedCount: Int,
     onDeleteClick: () -> Unit,
     onSelectAllClick: () -> Unit,
-    onFilterClick: () -> Unit
+    onFilterClick: () -> Unit,
+    onAiToolsClick: () -> Unit
 ) {
     Card(
         shape = RoundedCornerShape(20.dp),
@@ -898,9 +884,28 @@ private fun QuickActionsRow(
                 QuickActionChip(Icons.Default.DeleteOutline, "Delete selected ($selectedCount)", selectedCount > 0, onDeleteClick)
                 QuickActionChip(Icons.Default.SelectAll, "Select all", true, onSelectAllClick)
                 QuickActionChip(Icons.Default.Sort, "Sort / filter", true, onFilterClick)
+                QuickActionButton(
+                    icon = Icons.Default.AutoAwesome,
+                    title = "AI Tools",
+                    onClick = { onAiToolsClick() }
+                )
             }
         }
     }
+}
+
+@Composable
+private fun QuickActionButton(
+    icon: ImageVector,
+    title: String,
+    onClick: () -> Unit
+) {
+    QuickActionChip(
+        icon = icon,
+        label = title,
+        enabled = true,
+        onClick = onClick
+    )
 }
 
 @Composable
