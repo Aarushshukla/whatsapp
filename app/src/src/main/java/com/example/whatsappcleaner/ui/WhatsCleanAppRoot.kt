@@ -7,23 +7,23 @@ import android.os.storage.StorageManager
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
-import androidx.work.ExistingPeriodicWorkPolicy
-import androidx.work.PeriodicWorkRequestBuilder
-import androidx.work.WorkManager
 import com.example.whatsappcleaner.data.MediaLoader
 import com.example.whatsappcleaner.data.SimpleMediaItem
 import com.example.whatsappcleaner.data.UserPrefs
 import com.example.whatsappcleaner.data.formatSize
+import com.example.whatsappcleaner.reminder.ReminderScheduler
 import com.example.whatsappcleaner.ui.home.MediaFilter
 import com.example.whatsappcleaner.ui.home.SimpleHomeScreen
 import com.example.whatsappcleaner.ui.home.SuggestionType
-import com.example.whatsappcleaner.workers.ReminderWorker
-import java.util.concurrent.TimeUnit
 
 data class FrequencyOption(val label: String, val days: Int)
-data class TimeOption(val label: String, val hour: Int, val minute: Int)
 
 @Composable
 fun WhatsCleanAppRoot() {
@@ -50,22 +50,14 @@ fun WhatsCleanAppRoot() {
 
     val frequencyOptions = remember {
         listOf(
-            FrequencyOption("Every day", 1),
-            FrequencyOption("Every 3 days", 3),
-            FrequencyOption("Every week", 7)
+            FrequencyOption("Daily", 1),
+            FrequencyOption("Weekly", 7)
         )
     }
 
-    // 24‑hour time options: 00:00 .. 23:00
-    val timeOptions = remember {
-        (0..23).map { hour ->
-            val label = String.format("%02d:00", hour)
-            TimeOption(label = label, hour = hour, minute = 0)
-        }
-    }
-
     var selectedFrequency by remember { mutableStateOf(frequencyOptions.first()) }
-    var selectedTime by remember { mutableStateOf(timeOptions.first()) }
+    var reminderHour by remember { mutableStateOf(22) }
+    var reminderMinute by remember { mutableStateOf(0) }
 
     fun reload() {
         if (!hasPermission) return
@@ -94,18 +86,13 @@ fun WhatsCleanAppRoot() {
         activeSuggestion = SuggestionType.NONE
     }
 
-    fun scheduleReminderWithFrequency(freqDays: Int) {
-        if (!remindersEnabled) return
-        val interval = freqDays.coerceAtLeast(1).toLong()
-
-        val request = PeriodicWorkRequestBuilder<ReminderWorker>(
-            interval, TimeUnit.DAYS
-        ).build()
-
-        WorkManager.getInstance(context).enqueueUniquePeriodicWork(
-            "whats_clean_daily_reminder",
-            ExistingPeriodicWorkPolicy.UPDATE,
-            request
+    fun applyReminderScheduling() {
+        if (!hasPermission || !remindersEnabled) return
+        ReminderScheduler.schedulePeriodicReminder(
+            context = context,
+            frequencyDays = selectedFrequency.days,
+            reminderHour = reminderHour,
+            reminderMinute = reminderMinute
         )
     }
 
@@ -114,11 +101,10 @@ fun WhatsCleanAppRoot() {
         val prefs = UserPrefs.get(context)
         prefs.setRemindersEnabled(enabled)
 
-        val wm = WorkManager.getInstance(context)
         if (enabled) {
-            scheduleReminderWithFrequency(selectedFrequency.days)
+            applyReminderScheduling()
         } else {
-            wm.cancelUniqueWork("whats_clean_daily_reminder")
+            ReminderScheduler.cancelPeriodicReminder(context)
         }
     }
 
@@ -136,15 +122,14 @@ fun WhatsCleanAppRoot() {
         selectedFrequency =
             frequencyOptions.firstOrNull { it.days == savedDays } ?: frequencyOptions.first()
 
-        val h = prefs.getReminderTimeHour()
-        val m = prefs.getReminderTimeMinute()
-        selectedTime =
-            timeOptions.firstOrNull { it.hour == h && it.minute == m } ?: timeOptions.first()
+        reminderHour = prefs.getReminderTimeHour()
+        reminderMinute = prefs.getReminderTimeMinute()
 
         val perms = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             arrayOf(
                 Manifest.permission.READ_MEDIA_IMAGES,
-                Manifest.permission.READ_MEDIA_VIDEO
+                Manifest.permission.READ_MEDIA_VIDEO,
+                Manifest.permission.POST_NOTIFICATIONS
             )
         } else {
             arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
@@ -159,9 +144,9 @@ fun WhatsCleanAppRoot() {
         }
     }
 
-    LaunchedEffect(hasPermission, remindersEnabled, selectedFrequency) {
+    LaunchedEffect(hasPermission, remindersEnabled, selectedFrequency, reminderHour, reminderMinute) {
         if (hasPermission && remindersEnabled) {
-            scheduleReminderWithFrequency(selectedFrequency.days)
+            applyReminderScheduling()
         }
     }
 
@@ -227,15 +212,16 @@ fun WhatsCleanAppRoot() {
             selectedFrequency = option
             val prefs = UserPrefs.get(context)
             prefs.setReminderFrequencyDays(option.days)
-            scheduleReminderWithFrequency(option.days)
+            applyReminderScheduling()
         },
-        selectedTime = selectedTime,
-        allTimeOptions = timeOptions,
-        onTimeChange = { option ->
-            selectedTime = option
+        reminderHour = reminderHour,
+        reminderMinute = reminderMinute,
+        onTimeChange = { hour, minute ->
+            reminderHour = hour
+            reminderMinute = minute
             val prefs = UserPrefs.get(context)
-            prefs.setReminderTime(option.hour, option.minute)
-            scheduleReminderWithFrequency(selectedFrequency.days)
+            prefs.setReminderTime(hour, minute)
+            applyReminderScheduling()
         },
         onRemindersToggle = { onRemindersToggle(it) },
         onOpenInSystem = { item ->

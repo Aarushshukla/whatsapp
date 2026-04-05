@@ -2,22 +2,35 @@ package com.example.whatsappcleaner.ui.home
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TimeInput
+import androidx.compose.material3.TimePickerDefaults
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -26,7 +39,6 @@ import androidx.compose.ui.unit.dp
 import com.example.whatsappcleaner.data.SimpleMediaItem
 import com.example.whatsappcleaner.data.formatSize
 import com.example.whatsappcleaner.ui.FrequencyOption
-import com.example.whatsappcleaner.ui.TimeOption
 
 enum class MediaFilter { ALL, IMAGES, VIDEOS, OTHER }
 enum class SuggestionType { NONE, LARGE_TODAY, SCREENSHOTS_TODAY }
@@ -48,15 +60,16 @@ fun SimpleHomeScreen(
     remindersEnabled: Boolean,
     selectedFrequency: FrequencyOption,
     onFrequencyChange: (FrequencyOption) -> Unit,
-    selectedTime: TimeOption,
-    allTimeOptions: List<TimeOption>,
-    onTimeChange: (TimeOption) -> Unit,
+    reminderHour: Int,
+    reminderMinute: Int,
+    onTimeChange: (Int, Int) -> Unit,
     onRemindersToggle: (Boolean) -> Unit,
     onOpenInSystem: (SimpleMediaItem) -> Unit,
     onOpenSystemStorage: () -> Unit
 ) {
     var selected by remember { mutableStateOf<Set<String>>(emptySet()) }
     var showDialog by remember { mutableStateOf(false) }
+    var showTimePicker by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -78,56 +91,65 @@ fun SimpleHomeScreen(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Remind me section
         Text(
-            text = "Remind me",
+            text = "Settings",
             style = MaterialTheme.typography.titleMedium
         )
-        Spacer(Modifier.height(4.dp))
+        Spacer(Modifier.height(6.dp))
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "Enable reminders",
-                style = MaterialTheme.typography.bodyMedium
-            )
-            Switch(
-                checked = remindersEnabled,
-                onCheckedChange = onRemindersToggle
-            )
-        }
-
-        if (remindersEnabled) {
-            Spacer(Modifier.height(8.dp))
-
-            ReminderDropdownRow(
-                label = "Frequency",
-                value = selectedFrequency.label,
-                options = listOf("Every day", "Every 3 days", "Every week"),
-                onSelectedIndex = { index ->
-                    val option = when (index) {
-                        0 -> FrequencyOption("Every day", 1)
-                        1 -> FrequencyOption("Every 3 days", 3)
-                        2 -> FrequencyOption("Every week", 7)
-                        else -> FrequencyOption("Every day", 1)
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Cleanup reminders",
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                        Text(
+                            text = "Get periodic reminders to keep media storage healthy.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
-                    onFrequencyChange(option)
+                    Switch(
+                        checked = remindersEnabled,
+                        onCheckedChange = onRemindersToggle
+                    )
                 }
-            )
 
-            Spacer(Modifier.height(8.dp))
+                if (remindersEnabled) {
+                    Spacer(Modifier.height(10.dp))
 
-            ReminderDropdownRow(
-                label = "Time (24‑hour)",
-                value = selectedTime.label,
-                options = allTimeOptions.map { it.label },
-                onSelectedIndex = { index ->
-                    onTimeChange(allTimeOptions[index])
+                    ReminderDropdownRow(
+                        label = "Frequency",
+                        value = selectedFrequency.label,
+                        options = listOf("Daily", "Weekly"),
+                        onSelectedIndex = { index ->
+                            val option = if (index == 0) {
+                                FrequencyOption("Daily", 1)
+                            } else {
+                                FrequencyOption("Weekly", 7)
+                            }
+                            onFrequencyChange(option)
+                        }
+                    )
+
+                    Spacer(Modifier.height(10.dp))
+
+                    Button(
+                        onClick = { showTimePicker = true },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = "Reminder time: ${String.format("%02d:%02d", reminderHour, reminderMinute)}"
+                        )
+                    }
                 }
-            )
+            }
         }
 
         Spacer(modifier = Modifier.height(12.dp))
@@ -243,6 +265,18 @@ fun SimpleHomeScreen(
             }
         )
     }
+
+    if (showTimePicker) {
+        ReminderTimePickerDialog(
+            initialHour = reminderHour,
+            initialMinute = reminderMinute,
+            onDismiss = { showTimePicker = false },
+            onConfirm = { hour, minute ->
+                showTimePicker = false
+                onTimeChange(hour, minute)
+            }
+        )
+    }
 }
 
 @Composable
@@ -292,6 +326,42 @@ private fun ReminderDropdownRow(
             }
         }
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ReminderTimePickerDialog(
+    initialHour: Int,
+    initialMinute: Int,
+    onDismiss: () -> Unit,
+    onConfirm: (Int, Int) -> Unit
+) {
+    val pickerState = rememberTimePickerState(
+        initialHour = initialHour,
+        initialMinute = initialMinute,
+        is24Hour = true
+    )
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Reminder time") },
+        text = {
+            TimeInput(
+                state = pickerState,
+                colors = TimePickerDefaults.colors()
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(pickerState.hour, pickerState.minute) }) {
+                Text("Save")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }
 
 @Composable
