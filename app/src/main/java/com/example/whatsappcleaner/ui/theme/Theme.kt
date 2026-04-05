@@ -26,14 +26,14 @@ private val LightColorScheme = lightColorScheme(
     onTertiaryContainer = BrandNavy,
     error = AccentError,
     onError = Color.White,
-    background = PrimaryBackground,
-    onBackground = TextMain,
-    surface = SurfaceWhite,
-    onSurface = TextMain,
-    surfaceVariant = SurfaceMuted,
-    onSurfaceVariant = TextSecondary,
-    outline = DividerColor,
-    outlineVariant = DividerColor.copy(alpha = 0.6f)
+    background = Color(0xFFF7F9FC),
+    onBackground = Color(0xFF0F172A),
+    surface = Color(0xFFFFFFFF),
+    onSurface = Color(0xFF0F172A),
+    surfaceVariant = Color(0xFFEFF3F8),
+    onSurfaceVariant = Color(0xFF516173),
+    outline = Color(0xFFD1DAE6),
+    outlineVariant = Color(0xFFE3E9F1)
 )
 
 private val DarkColorScheme = darkColorScheme(
@@ -53,14 +53,14 @@ private val DarkColorScheme = darkColorScheme(
     onError = Color.White,
     errorContainer = AccentError.copy(alpha = 0.18f),
     onErrorContainer = Color.White,
-    background = PrimaryBackground,
-    onBackground = TextMain,
-    surface = SurfaceWhite,
-    onSurface = TextMain,
-    surfaceVariant = SurfaceMuted,
-    onSurfaceVariant = TextSecondary,
-    outline = DividerColor,
-    outlineVariant = DividerColor.copy(alpha = 0.7f)
+    background = Color(0xFF0B1220),
+    onBackground = Color(0xFFE7EDF7),
+    surface = Color(0xFF111C2F),
+    onSurface = Color(0xFFE7EDF7),
+    surfaceVariant = Color(0xFF1C2A41),
+    onSurfaceVariant = Color(0xFFAAB8CD),
+    outline = Color(0xFF31435E),
+    outlineVariant = Color(0xFF27354C)
 )
 
 val AppTypography = Typography(

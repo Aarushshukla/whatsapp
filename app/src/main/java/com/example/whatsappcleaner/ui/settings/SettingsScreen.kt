@@ -1,7 +1,12 @@
 package com.example.whatsappcleaner.ui.settings
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,7 +15,9 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -38,11 +45,13 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -52,16 +61,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.whatsappcleaner.data.billing.SubscriptionPlan
 import com.example.whatsappcleaner.data.billing.SubscriptionState
-import com.example.whatsappcleaner.ui.theme.AccentBlue
-import com.example.whatsappcleaner.ui.theme.PrimaryBackground
-import com.example.whatsappcleaner.ui.theme.SurfaceWhite
-import com.example.whatsappcleaner.ui.theme.TextMain
-import com.example.whatsappcleaner.ui.theme.TextSecondary
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -91,14 +97,17 @@ fun SettingsScreen(
     onShareApp: () -> Unit,
     onInviteFriends: () -> Unit
 ) {
+    val colors = MaterialTheme.colorScheme
     Scaffold(
-        containerColor = PrimaryBackground,
+        containerColor = colors.background,
         topBar = {
             TopAppBar(
-                title = { Text("Settings", color = TextMain) },
+                title = {
+                    Text("Settings", color = colors.onBackground, style = MaterialTheme.typography.titleLarge)
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = TextMain)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = colors.onBackground)
                     }
                 }
             )
@@ -108,32 +117,82 @@ fun SettingsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            item { BrandHeader(versionLabel = versionLabel, tagline = tagline) }
             item {
-                BrandHeader(versionLabel = versionLabel, tagline = tagline)
-            }
-            item {
-                SettingsSection(title = "General") {
-                    ChoiceRow("Theme", settings.themeMode.label, Icons.Default.DarkMode, AppThemeMode.entries.map { themeMode: AppThemeMode -> themeMode.label to { onThemeSelected(themeMode) } })
+                SettingsSection(title = "Appearance") {
+                    ChoiceRow(
+                        "Theme",
+                        settings.themeMode.label,
+                        Icons.Default.DarkMode,
+                        AppThemeMode.entries.map { themeMode -> themeMode.label to { onThemeSelected(themeMode) } }
+                    )
                     ChoiceRow("Language", settings.languageLabel, Icons.Default.Language, listOf("English (coming soon)" to onFaq))
                 }
             }
             item {
                 SettingsSection(title = "Notifications") {
-                    ToggleRow("Daily reminder", "Get a gentle nudge to review clutter.", Icons.Default.Notifications, settings.dailyReminderEnabled, onDailyReminderToggle)
-                    ToggleRow("Smart alert", "Notify when junk or duplicates spike.", Icons.Default.CheckCircle, settings.smartAlertEnabled, onSmartAlertToggle)
+                    SettingsRow(
+                        title = "Daily reminder",
+                        subtitle = "Get a gentle nudge to review clutter.",
+                        icon = Icons.Default.Notifications,
+                        trailing = {
+                            Switch(
+                                checked = settings.dailyReminderEnabled,
+                                onCheckedChange = onDailyReminderToggle,
+                                colors = SwitchDefaults.colors(
+                                    checkedTrackColor = colors.primary,
+                                    checkedThumbColor = colors.onPrimary
+                                )
+                            )
+                        },
+                        onClick = { onDailyReminderToggle(!settings.dailyReminderEnabled) }
+                    )
+                    SettingsRow(
+                        title = "Smart alert",
+                        subtitle = "Notify when junk or duplicates spike.",
+                        icon = Icons.Default.CheckCircle,
+                        trailing = {
+                            Switch(
+                                checked = settings.smartAlertEnabled,
+                                onCheckedChange = onSmartAlertToggle,
+                                colors = SwitchDefaults.colors(
+                                    checkedTrackColor = colors.primary,
+                                    checkedThumbColor = colors.onPrimary
+                                )
+                            )
+                        },
+                        onClick = { onSmartAlertToggle(!settings.smartAlertEnabled) }
+                    )
                     if (subscriptionState.isProUser) {
-                        ChoiceRow("Auto-clean reminder", settings.autoCleanFrequency.label, Icons.Default.Tune, ReminderFrequencyOption.entries.map { frequencyOption: ReminderFrequencyOption -> frequencyOption.label to { onAutoCleanFrequencySelected(frequencyOption) } })
+                        ChoiceRow(
+                            "Auto-clean reminder",
+                            settings.autoCleanFrequency.label,
+                            Icons.Default.Tune,
+                            ReminderFrequencyOption.entries.map { frequencyOption ->
+                                frequencyOption.label to { onAutoCleanFrequencySelected(frequencyOption) }
+                            }
+                        )
                     } else {
-                        ActionRow("Auto-clean reminder", "Pro only: unlock advanced cleanup automation", Icons.Default.Tune, onUpgradeToPro)
+                        ActionRow(
+                            "Auto-clean reminder",
+                            "Pro only: unlock advanced cleanup automation",
+                            Icons.Default.Tune,
+                            onUpgradeToPro
+                        )
                     }
                 }
             }
             item {
-                SettingsSection(title = "Cleaning Preferences") {
-                    ChoiceRow("File size filter", ">= ${settings.fileSizeFilterMb} MB", Icons.Default.Tune, listOf(25, 50, 100, 250).map { value: Int -> "$value MB" to { onFileSizeFilterSelected(value) } })
+                SettingsSection(title = "Cleaning preferences") {
+                    ChoiceRow(
+                        "File size filter",
+                        ">= ${settings.fileSizeFilterMb} MB",
+                        Icons.Default.Tune,
+                        listOf(25, 50, 100, 250).map { value -> "$value MB" to { onFileSizeFilterSelected(value) } }
+                    )
                     ToggleRow("Show only large files", "Focus on heavier items first.", Icons.Default.Tune, settings.showOnlyLargeFiles, onShowOnlyLargeToggle)
                     ToggleRow("Include screenshots", "Surface camera roll screenshots.", Icons.Default.Tune, settings.includeScreenshots, onIncludeScreenshotsToggle)
                     ToggleRow("Include memes", "Premium meme detection candidates.", Icons.Default.Tune, settings.includeMemes, onIncludeMemesToggle)
@@ -151,40 +210,29 @@ fun SettingsScreen(
                     ActionRow("Restore purchase", "Refresh your previous Play purchases", Icons.Default.Restore, onRestorePurchase)
                     ActionRow(
                         "Manage subscription",
-                        if (subscriptionState.currentPlan == SubscriptionPlan.LIFETIME) "Lifetime unlocks do not renew, but you can still review Play purchases" else "Open the Play subscription center",
+                        if (subscriptionState.currentPlan == SubscriptionPlan.LIFETIME) "Lifetime unlocks do not renew" else "Open Play subscription center",
                         Icons.Default.Subscriptions,
                         onManageSubscription
                     )
-                    ActionRow("Billing status", subscriptionState.lastMessage ?: subscriptionState.currentPlan.displayName, Icons.Default.Star, onClick = onUpgradeToPro)
                 }
             }
             item {
-                SettingsSection(title = "Privacy & Security") {
+                SettingsSection(title = "Privacy & support") {
                     ActionRow("Privacy Policy", "Review our privacy commitments", Icons.Default.Policy, onPrivacyPolicy)
-                    ActionRow("Local scanning", "Scanning happens locally on device where supported", Icons.Default.PrivacyTip, onPrivacyPolicy)
-                    ActionRow("Permission explanation", "Media access is used only to analyze your files", Icons.Default.Shield, onPrivacyPolicy)
-                    ActionRow("Data usage note", "Analytics and billing are optional platform services", Icons.Default.Gavel, onPrivacyPolicy)
-                }
-            }
-            item {
-                SettingsSection(title = "Help & Support") {
+                    ActionRow("Local scanning", "Scanning happens on-device where supported", Icons.Default.PrivacyTip, onPrivacyPolicy)
+                    ActionRow("Permission explanation", "Media access is used only to analyze files", Icons.Default.Shield, onPrivacyPolicy)
+                    ActionRow("Data usage note", "Analytics and billing are optional services", Icons.Default.Gavel, onPrivacyPolicy)
+                    HorizontalDivider(color = colors.outlineVariant.copy(alpha = 0.5f))
                     ActionRow("FAQ", "Open common answers and tips", Icons.Default.Info, onFaq)
-                    ActionRow("Contact support", "Email the Cleanly AI support team", Icons.Default.Email, onContactSupport)
+                    ActionRow("Contact support", "Email the support team", Icons.Default.Email, onContactSupport)
                     ActionRow("Report issue", "Send a bug report", Icons.Default.BugReport, onReportIssue)
                 }
             }
             item {
                 SettingsSection(title = "Growth") {
                     ActionRow("Rate app", "Leave a Play Store review", Icons.Default.Star, onRateApp)
-                    ActionRow("Share app", "Share Cleanly AI with friends", Icons.Default.Share, onShareApp)
+                    ActionRow("Share app", "Share app with friends", Icons.Default.Share, onShareApp)
                     ActionRow("Invite friends", "Send a quick invite message", Icons.Default.Upgrade, onInviteFriends)
-                }
-            }
-            item {
-                SettingsSection(title = "About") {
-                    ActionRow("App version", versionLabel, Icons.Default.Info, onClick = onShareApp)
-                    ActionRow("App name", "Cleanly AI", Icons.Default.Star, onClick = onRateApp)
-                    ActionRow("Tagline", tagline, Icons.Default.CheckCircle, onClick = onShareApp)
                 }
             }
         }
@@ -193,71 +241,107 @@ fun SettingsScreen(
 
 @Composable
 private fun BrandHeader(versionLabel: String, tagline: String) {
-    Card(colors = CardDefaults.cardColors(containerColor = SurfaceWhite), shape = RoundedCornerShape(24.dp)) {
+    val colors = MaterialTheme.colorScheme
+    Card(
+        colors = CardDefaults.cardColors(containerColor = colors.surface),
+        shape = RoundedCornerShape(22.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
+                .background(colors.primaryContainer.copy(alpha = 0.6f))
                 .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text("Cleanly AI", color = TextMain, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-            Text(tagline, color = TextSecondary, style = MaterialTheme.typography.bodyLarge)
-            Text(versionLabel, color = AccentBlue, style = MaterialTheme.typography.labelLarge)
+            Text("Cleanly AI", color = colors.onSurface, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            Text(tagline, color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+            Text(versionLabel, color = colors.primary, style = MaterialTheme.typography.labelLarge)
         }
     }
 }
 
 @Composable
 private fun SettingsSection(title: String, content: @Composable ColumnScope.() -> Unit) {
-    Card(colors = CardDefaults.cardColors(containerColor = SurfaceWhite), shape = RoundedCornerShape(24.dp)) {
-        Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(title, color = TextMain, style = MaterialTheme.typography.titleLarge)
+    val colors = MaterialTheme.colorScheme
+    Card(
+        colors = CardDefaults.cardColors(containerColor = colors.surface),
+        shape = RoundedCornerShape(20.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(title, color = colors.onSurface, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             content()
         }
     }
 }
 
 @Composable
-private fun ToggleRow(title: String, subtitle: String, icon: ImageVector, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+private fun SettingsRow(
+    title: String,
+    subtitle: String,
+    icon: ImageVector,
+    trailing: @Composable () -> Unit,
+    onClick: () -> Unit
+) {
+    val colors = MaterialTheme.colorScheme
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(if (isPressed) 0.985f else 1f, animationSpec = tween(140), label = "settings_row_scale")
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onCheckedChange(!checked) }
-            .padding(vertical = 10.dp),
+            .scale(scale)
+            .clickable(interactionSource = interactionSource, indication = null, onClick = onClick)
+            .padding(vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(modifier = Modifier.background(AccentBlue.copy(alpha = 0.14f), RoundedCornerShape(14.dp)).padding(10.dp)) {
-            Icon(icon, contentDescription = null, tint = AccentBlue)
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .background(colors.primaryContainer, RoundedCornerShape(14.dp)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(icon, contentDescription = null, tint = colors.primary)
         }
-        Column(modifier = Modifier.weight(1f)) {
-            Text(title, color = TextMain, style = MaterialTheme.typography.titleMedium)
-            Text(subtitle, color = TextSecondary, style = MaterialTheme.typography.bodySmall)
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(title, color = colors.onSurface, style = MaterialTheme.typography.titleSmall)
+            Text(subtitle, color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
+        trailing()
     }
 }
 
 @Composable
+private fun ToggleRow(title: String, subtitle: String, icon: ImageVector, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    SettingsRow(
+        title = title,
+        subtitle = subtitle,
+        icon = icon,
+        trailing = {
+            Switch(
+                checked = checked,
+                onCheckedChange = onCheckedChange,
+                colors = SwitchDefaults.colors(checkedTrackColor = colors.primary, checkedThumbColor = colors.onPrimary)
+            )
+        },
+        onClick = { onCheckedChange(!checked) }
+    )
+}
+
+@Composable
 private fun ActionRow(title: String, subtitle: String, icon: ImageVector, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(vertical = 10.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(modifier = Modifier.background(AccentBlue.copy(alpha = 0.14f), RoundedCornerShape(14.dp)).padding(10.dp)) {
-            Icon(icon, contentDescription = null, tint = AccentBlue)
-        }
-        Column(modifier = Modifier.weight(1f)) {
-            Text(title, color = TextMain, style = MaterialTheme.typography.titleMedium)
-            Text(subtitle, color = TextSecondary, style = MaterialTheme.typography.bodySmall)
-        }
-        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = TextSecondary)
-    }
+    val colors = MaterialTheme.colorScheme
+    SettingsRow(
+        title = title,
+        subtitle = subtitle,
+        icon = icon,
+        trailing = { Icon(Icons.Default.ChevronRight, contentDescription = null, tint = colors.onSurfaceVariant) },
+        onClick = onClick
+    )
 }
 
 @Composable
