@@ -181,7 +181,7 @@ class MainActivity : ComponentActivity() {
         if (validUris.isEmpty()) {
             Log.w("DELETE_DEBUG", "No valid MediaStore URIs available for delete request.")
             viewModel.onMediaDeleteCancelled()
-            showDeleteError("This file cannot be deleted due to system restrictions")
+            showDeleteError("Some files cannot be deleted due to system restrictions")
             return
         }
 
@@ -211,6 +211,9 @@ class MainActivity : ComponentActivity() {
             Log.d("DELETE_DEBUG", "contentResolver.delete flow completed. deletedCount=$deletedCount")
             if (deletedCount > 0) {
                 viewModel.confirmDeleteSuccess()
+            } else {
+                viewModel.onMediaDeleteCancelled()
+                showDeleteError("Some files cannot be deleted due to system restrictions")
             }
         } catch (error: Exception) {
             Log.e("DELETE_DEBUG", "Unable to delete media via contentResolver.delete", error)
@@ -363,7 +366,7 @@ class MainActivity : ComponentActivity() {
                         is DeleteExecution.NeedsUserApproval -> {
                             val validUris = execution.uris.distinct()
                             if (validUris.isEmpty()) {
-                                showDeleteError("This file cannot be deleted due to system restrictions")
+                                showDeleteError("Some files cannot be deleted due to system restrictions")
                                 viewModel.onMediaDeleteCancelled()
                             } else {
                                 Log.d("DELETE_DEBUG", "Valid MediaStore URI list size=${validUris.size}")
