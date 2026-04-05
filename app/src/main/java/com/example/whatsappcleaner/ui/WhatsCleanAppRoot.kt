@@ -199,6 +199,9 @@ fun WhatsCleanAppRoot(
                 totalFiles = state.totalFiles,
                 totalSize = state.totalSize,
                 oldFilesCount = state.report.oldFiles,
+                smartSuggestionSummary = state.smartSuggestionSummary,
+                smartSuggestedItems = state.smartSuggestedItems,
+                suggestionReasonsByUri = state.suggestionReasonsByUri,
                 onNavigateToFeatures = { navController.navigateSingleTop(Routes.Features) }
             )
         }

@@ -69,6 +69,9 @@ data class HomeUiState(
     val spamItems: List<SimpleMediaItem> = emptyList(),
     val largeFileItems: List<SimpleMediaItem> = emptyList(),
     val sentFileItems: List<SimpleMediaItem> = emptyList(),
+    val smartSuggestionSummary: SmartSuggestionSummary = SmartSuggestionSummary(),
+    val smartSuggestedItems: List<SimpleMediaItem> = emptyList(),
+    val suggestionReasonsByUri: Map<String, List<String>> = emptyMap(),
     val report: StorageReport = StorageReport(0, 0, 0, 0, 0, 0),
     val settings: SettingsUiState = SettingsUiState(),
     val subscriptionState: SubscriptionState = SubscriptionState(),
@@ -87,6 +90,15 @@ data class HomeUiState(
     val isDeleting: Boolean get() = isDeleteInProgress
 }
 
+data class SmartSuggestionSummary(
+    val duplicateFiles: Int = 0,
+    val duplicateGroups: Int = 0,
+    val largeFiles: Int = 0,
+    val oldFiles: Int = 0,
+    val totalSuggestedFiles: Int = 0,
+    val totalSpaceToFree: Long = 0L
+)
+
 sealed class DeleteExecution {
     data class NeedsUserApproval(val uris: List<Uri>) : DeleteExecution()
     data class StartedInBackground(val uris: List<Uri>) : DeleteExecution()
@@ -102,6 +114,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     companion object {
         private const val TAG = "HomeViewModel"
         private const val INITIAL_LOAD_LIMIT = 100
+        private const val LARGE_FILE_THRESHOLD_BYTES = 10L * 1024L * 1024L
+        private const val OLD_FILE_AGE_DAYS = 30L
     }
 
     private val mediaLoader = MediaLoader(application)
@@ -223,6 +237,35 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         val spamItems = withContext(Dispatchers.Default) { spamMediaAnalyzer.findSpamMedia(allItems) }
         val baseReport = withContext(Dispatchers.Default) { phoneRealityAnalyzer.generateReport(allItems) }
         val totalSize = allItems.sumOf { mediaItem -> mediaItem.sizeKb.toLong() * 1024L }
+        val now = System.currentTimeMillis()
+        val oldFileCutoff = now - (OLD_FILE_AGE_DAYS * 24L * 60L * 60L * 1000L)
+        val duplicateGroups = allItems.groupBy { mediaItem -> mediaItem.name.lowercase() }.filterValues { it.size > 1 }
+        val duplicateSuggestedItems = duplicateGroups.values.flatten()
+        val largeSuggestedItems = allItems.filter { mediaItem -> mediaItem.size > LARGE_FILE_THRESHOLD_BYTES }
+        val oldSuggestedItems = allItems.filter { mediaItem -> mediaItem.addedMillis < oldFileCutoff }
+
+        val suggestedReasonMap = mutableMapOf<String, MutableSet<String>>()
+        duplicateSuggestedItems.forEach { item ->
+            suggestedReasonMap.getOrPut(item.uri.toString()) { linkedSetOf() }
+                .add("Duplicate name")
+        }
+        largeSuggestedItems.forEach { item ->
+            suggestedReasonMap.getOrPut(item.uri.toString()) { linkedSetOf() }
+                .add("Large file (>10MB)")
+        }
+        oldSuggestedItems.forEach { item ->
+            suggestedReasonMap.getOrPut(item.uri.toString()) { linkedSetOf() }
+                .add("Old file (>30 days)")
+        }
+        val smartSuggestedItems = allItems.filter { item -> suggestedReasonMap.containsKey(item.uri.toString()) }
+        val smartSuggestionSummary = SmartSuggestionSummary(
+            duplicateFiles = duplicateSuggestedItems.size,
+            duplicateGroups = duplicateGroups.size,
+            largeFiles = largeSuggestedItems.size,
+            oldFiles = oldSuggestedItems.size,
+            totalSuggestedFiles = smartSuggestedItems.size,
+            totalSpaceToFree = smartSuggestedItems.sumOf { item -> item.size }
+        )
         val summary = if (allItems.isEmpty()) {
             Log.d(TAG, "No media items found on device.")
             "No media found."
@@ -255,6 +298,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 spamItems = spamItems,
                 largeFileItems = junkBreakdown.largeFiles,
                 sentFileItems = junkBreakdown.sentFiles,
+                smartSuggestionSummary = smartSuggestionSummary,
+                smartSuggestedItems = smartSuggestedItems,
+                suggestionReasonsByUri = suggestedReasonMap.mapValues { entry -> entry.value.toList() },
                 report = baseReport.copy(
                     memeCount = memes.size,
                     duplicateCount = junkBreakdown.duplicates.size,
