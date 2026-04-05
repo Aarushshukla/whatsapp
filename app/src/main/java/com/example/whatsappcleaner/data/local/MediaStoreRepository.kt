@@ -3,10 +3,15 @@ package com.example.whatsappcleaner.data
 import android.content.ContentUris
 import android.content.Context
 import android.provider.MediaStore
+import android.util.Log
 
 class MediaStoreRepository(
     private val context: Context
 ) {
+
+    companion object {
+        private const val TAG = "MediaStoreRepository"
+    }
 
     fun loadImages(limit: Int = 100, offset: Int = 0): List<MediaItem> {
         val list = mutableListOf<MediaItem>()
@@ -16,22 +21,12 @@ class MediaStoreRepository(
             MediaStore.Images.Media.DISPLAY_NAME
         )
 
-        val sortOrder = buildString {
-            append("${MediaStore.Images.Media.DATE_ADDED} DESC")
-            append(" LIMIT ")
-            append(limit)
-            if (offset > 0) {
-                append(" OFFSET ")
-                append(offset)
-            }
-        }
-
         context.contentResolver.query(
             MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
             projection,
+            "${MediaStore.Images.Media.SIZE} > 0",
             null,
-            null,
-            sortOrder
+            "${MediaStore.Images.Media.DATE_ADDED} DESC"
         )?.use { cursor ->
             val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
             val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)
@@ -54,6 +49,14 @@ class MediaStoreRepository(
             }
         }
 
-        return list
+        val bounded = if (offset > 0 || limit >= 0) {
+            list.drop(offset).let { dropped ->
+                if (limit >= 0) dropped.take(limit) else dropped
+            }
+        } else {
+            list
+        }
+        Log.d(TAG, "MEDIA_DEBUG: Loaded items = ${bounded.size}")
+        return bounded
     }
 }

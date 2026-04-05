@@ -69,19 +69,9 @@ class MediaLoader(private val context: Context) {
             MediaStore.MediaColumns.MIME_TYPE
         )
 
-        val selection = "${MediaStore.MediaColumns.DATE_ADDED} BETWEEN ? AND ?"
+        val selection = "${MediaStore.MediaColumns.SIZE} > 0 AND ${MediaStore.MediaColumns.DATE_ADDED} BETWEEN ? AND ?"
         val selectionArgs = arrayOf((minDate / 1000).toString(), (maxDate / 1000).toString())
-        val sortOrder = buildString {
-            append("${MediaStore.MediaColumns.DATE_ADDED} DESC")
-            if (limit != null) {
-                append(" LIMIT ")
-                append(limit)
-                if (offset > 0) {
-                    append(" OFFSET ")
-                    append(offset)
-                }
-            }
-        }
+        val sortOrder = "${MediaStore.MediaColumns.DATE_ADDED} DESC"
 
         val items = mutableListOf<SimpleMediaItem>()
         try {
@@ -133,7 +123,15 @@ class MediaLoader(private val context: Context) {
         } catch (error: Exception) {
             Log.e(TAG, "Error loading $mediaType media", error)
         }
-        Log.d(TAG, "Loaded ${items.size} $mediaType items from MediaStore")
-        return items
+        val boundedItems = if (limit != null || offset > 0) {
+            items.drop(offset).let { dropped ->
+                limit?.let { dropped.take(it) } ?: dropped
+            }
+        } else {
+            items
+        }
+        Log.d(TAG, "Loaded ${boundedItems.size} $mediaType items from MediaStore")
+        Log.d(TAG, "MEDIA_DEBUG: Loaded items = ${boundedItems.size}")
+        return boundedItems
     }
 }
