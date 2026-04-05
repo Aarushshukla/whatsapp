@@ -6,10 +6,14 @@ enum class AppThemeMode(val label: String) {
     DARK("Dark")
 }
 
-enum class ReminderFrequencyOption(val label: String, val days: Int) {
-    DAILY("Daily", 1),
-    EVERY_3_DAYS("Every 3 days", 3),
-    WEEKLY("Weekly", 7)
+enum class ReminderFrequencyOption(val label: String, val intervalMinutes: Long) {
+    EVERY_15_MIN("Every 15 min", 15),
+    EVERY_30_MIN("Every 30 min", 30),
+    HOURLY("Hourly", 60),
+    EVERY_2_HOURS("Every 2 hours", 120),
+    EVERY_6_HOURS("Every 6 hours", 360),
+    EVERY_12_HOURS("Every 12 hours", 720),
+    DAILY("Daily (24h)", 1440)
 }
 
 data class SettingsUiState(

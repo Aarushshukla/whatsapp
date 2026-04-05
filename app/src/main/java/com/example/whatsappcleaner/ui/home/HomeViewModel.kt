@@ -21,6 +21,7 @@ import com.example.whatsappcleaner.data.local.MediaLoader
 import com.example.whatsappcleaner.data.local.SimpleMediaItem
 import com.example.whatsappcleaner.data.local.UserPrefs
 import com.example.whatsappcleaner.data.local.formatSize
+import com.example.whatsappcleaner.reminder.ReminderScheduler
 import com.example.whatsappcleaner.ui.settings.AppThemeMode
 import com.example.whatsappcleaner.ui.settings.ReminderFrequencyOption
 import com.example.whatsappcleaner.ui.settings.SettingsUiState
@@ -384,6 +385,14 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     fun toggleReminders(enabled: Boolean) {
         prefs.setRemindersEnabled(enabled)
+        if (enabled) {
+            ReminderScheduler.schedulePeriodicReminder(
+                getApplication(),
+                _uiState.value.settings.autoCleanFrequency.intervalMinutes
+            )
+        } else {
+            ReminderScheduler.cancelPeriodicReminder(getApplication())
+        }
         _uiState.update { currentState ->
             currentState.copy(remindersEnabled = enabled, settings = currentState.settings.copy(dailyReminderEnabled = enabled))
         }
@@ -413,6 +422,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setAutoCleanFrequency(option: ReminderFrequencyOption) {
         prefs.setAutoCleanFrequency(option)
+        if (_uiState.value.settings.dailyReminderEnabled) {
+            ReminderScheduler.schedulePeriodicReminder(getApplication(), option.intervalMinutes)
+        }
         _uiState.update { currentState ->
             currentState.copy(settings = currentState.settings.copy(autoCleanFrequency = option))
         }
@@ -503,8 +515,10 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun recordCleanupResult(bytes: Long) {
-        prefs.recordCleanup()
-        _uiState.update { currentState -> currentState.copy(lastCleanupBytes = bytes) }
+        val streak = prefs.recordCleanupDay()
+        _uiState.update { currentState ->
+            currentState.copy(lastCleanupBytes = bytes, deleteSnackbarMessage = "Great job! ${formatSize(bytes)} removed • ${streak}-day streak")
+        }
     }
 
     fun shareResultText(): String {
@@ -711,7 +725,15 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             val remainingScreenshotsToday = remainingItems.filter { mediaItem ->
                 mediaItem.addedMillis > today && mediaItem.name.startsWith("Screenshot", true)
             }
-            val deleteMessage = if (deletedIds.size == 1) "1 item deleted" else "${deletedIds.size} items deleted"
+            val deletedBytes = currentState.allItems
+                .filter { item -> item.id in deletedIds }
+                .sumOf { mediaItem -> mediaItem.sizeKb.toLong() * 1024L }
+            val streak = prefs.recordCleanupDay()
+            val deleteMessage = buildString {
+                append(if (deletedIds.size == 1) "1 item deleted" else "${deletedIds.size} items deleted")
+                if (deletedBytes > 0L) append(" • ${formatSize(deletedBytes)} freed")
+                append(" • ${streak}-day streak")
+            }
             currentState.copy(
                 pendingDeleteIds = emptySet(),
                 pendingDeleteUris = emptyList(),
@@ -800,6 +822,12 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 ),
                 hasExceededFreeLimit = prefs.getFreePremiumAttempts() >= 2
             )
+        }
+
+        if (prefs.isRemindersEnabled()) {
+            ReminderScheduler.schedulePeriodicReminder(getApplication(), prefs.getAutoCleanFrequency().intervalMinutes)
+        } else {
+            ReminderScheduler.cancelPeriodicReminder(getApplication())
         }
     }
 }

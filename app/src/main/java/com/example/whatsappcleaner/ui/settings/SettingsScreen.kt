@@ -166,23 +166,14 @@ fun SettingsScreen(
                         },
                         onClick = { onSmartAlertToggle(!settings.smartAlertEnabled) }
                     )
-                    if (subscriptionState.isProUser) {
-                        ChoiceRow(
-                            "Auto-clean reminder",
-                            settings.autoCleanFrequency.label,
-                            Icons.Default.Tune,
-                            ReminderFrequencyOption.entries.map { frequencyOption ->
-                                frequencyOption.label to { onAutoCleanFrequencySelected(frequencyOption) }
-                            }
-                        )
-                    } else {
-                        ActionRow(
-                            "Auto-clean reminder",
-                            "Pro only: unlock advanced cleanup automation",
-                            Icons.Default.Tune,
-                            onUpgradeToPro
-                        )
-                    }
+                    ChoiceRow(
+                        "Reminder frequency",
+                        settings.autoCleanFrequency.label,
+                        Icons.Default.Tune,
+                        ReminderFrequencyOption.entries.map { frequencyOption ->
+                            frequencyOption.label to { onAutoCleanFrequencySelected(frequencyOption) }
+                        }
+                    )
                 }
             }
             item {

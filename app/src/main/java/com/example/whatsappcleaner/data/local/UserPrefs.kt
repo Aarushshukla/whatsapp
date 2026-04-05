@@ -19,7 +19,8 @@ class UserPrefs private constructor(context: Context) {
         private const val KEY_LANGUAGE = "language_label"
         private const val KEY_REMINDERS_ENABLED = "reminders_enabled"
         private const val KEY_SMART_ALERTS_ENABLED = "smart_alerts_enabled"
-        private const val KEY_AUTO_CLEAN_DAYS = "auto_clean_days"
+        private const val KEY_AUTO_CLEAN_INTERVAL_MIN = "auto_clean_interval_min"
+        private const val KEY_AUTO_CLEAN_DAYS = "auto_clean_days" // legacy
         private const val KEY_FILE_SIZE_MB = "file_size_mb"
         private const val KEY_SHOW_ONLY_LARGE = "show_only_large"
         private const val KEY_INCLUDE_SCREENSHOTS = "include_screenshots"
@@ -32,10 +33,20 @@ class UserPrefs private constructor(context: Context) {
     fun setOnboardingSeen() = prefs.edit().putBoolean(KEY_SEEN_ONBOARDING, true).apply()
 
     fun getStreak(): Int = prefs.getInt("streak", 0)
-    fun recordCleanup(): Int {
-        val current = getStreak() + 1
-        prefs.edit().putInt("streak", current).apply()
-        return current
+
+    fun recordCleanupDay(): Int {
+        val todayEpochDay = System.currentTimeMillis() / 86_400_000L
+        val previousEpochDay = prefs.getLong("last_cleanup_epoch_day", -1L)
+        val updatedStreak = when {
+            previousEpochDay == todayEpochDay -> getStreak()
+            previousEpochDay == todayEpochDay - 1L -> getStreak() + 1
+            else -> 1
+        }
+        prefs.edit()
+            .putInt("streak", updatedStreak)
+            .putLong("last_cleanup_epoch_day", todayEpochDay)
+            .apply()
+        return updatedStreak
     }
 
     fun isRemindersEnabled(): Boolean = prefs.getBoolean(KEY_REMINDERS_ENABLED, true)
@@ -58,10 +69,19 @@ class UserPrefs private constructor(context: Context) {
     fun setSmartAlertEnabled(enabled: Boolean) = prefs.edit().putBoolean(KEY_SMART_ALERTS_ENABLED, enabled).apply()
 
     fun getAutoCleanFrequency(): ReminderFrequencyOption {
-        val days = prefs.getInt(KEY_AUTO_CLEAN_DAYS, ReminderFrequencyOption.DAILY.days)
-        return ReminderFrequencyOption.entries.firstOrNull { it.days == days } ?: ReminderFrequencyOption.DAILY
+        val legacyDays = prefs.getInt(KEY_AUTO_CLEAN_DAYS, -1)
+        val intervalMinutes = prefs.getLong(
+            KEY_AUTO_CLEAN_INTERVAL_MIN,
+            if (legacyDays > 0) legacyDays * 24L * 60L else ReminderFrequencyOption.DAILY.intervalMinutes
+        )
+        return ReminderFrequencyOption.entries.firstOrNull { it.intervalMinutes == intervalMinutes }
+            ?: ReminderFrequencyOption.DAILY
     }
-    fun setAutoCleanFrequency(option: ReminderFrequencyOption) = prefs.edit().putInt(KEY_AUTO_CLEAN_DAYS, option.days).apply()
+
+    fun setAutoCleanFrequency(option: ReminderFrequencyOption) = prefs.edit()
+        .putLong(KEY_AUTO_CLEAN_INTERVAL_MIN, option.intervalMinutes)
+        .remove(KEY_AUTO_CLEAN_DAYS)
+        .apply()
 
     fun getFileSizeFilterMb(): Int = prefs.getInt(KEY_FILE_SIZE_MB, 50)
     fun setFileSizeFilterMb(value: Int) = prefs.edit().putInt(KEY_FILE_SIZE_MB, value).apply()
