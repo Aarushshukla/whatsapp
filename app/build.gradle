@@ -78,6 +78,7 @@ dependencies {
 
     implementation 'com.android.billingclient:billing:8.3.0'
     implementation 'com.google.firebase:firebase-analytics'
+    implementation 'com.google.firebase:firebase-auth-ktx'
     implementation 'org.tensorflow:tensorflow-lite:2.14.0'
 
     testImplementation 'junit:junit:4.13.2'
