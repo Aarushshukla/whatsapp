@@ -63,7 +63,8 @@ fun PaywallScreen(
     exceededFreeLimit: Boolean,
     onBack: () -> Unit,
     onPurchaseClick: (BillingProduct) -> Unit,
-    onRestoreClick: () -> Unit
+    onRestoreClick: () -> Unit,
+    onContinueFreeClick: () -> Unit
 ) {
     var selectedPlan by remember { mutableStateOf(BillingProduct.YEARLY) }
 
@@ -146,6 +147,13 @@ fun PaywallScreen(
                 LegitButton(
                     text = "Restore purchase",
                     onClick = onRestoreClick,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+            item {
+                LegitButton(
+                    text = "Continue free",
+                    onClick = onContinueFreeClick,
                     modifier = Modifier.fillMaxWidth()
                 )
             }

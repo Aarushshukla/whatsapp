@@ -40,7 +40,8 @@ enum class PremiumFeature(val analyticsKey: String, val paywallSource: String) {
     MEME_DETECTION("meme_detection", "meme_detection"),
     BULK_DELETE("bulk_delete", "bulk_delete"),
     AUTO_CLEAN("auto_clean", "auto_clean"),
-    ADVANCED_ANALYTICS("advanced_analytics", "advanced_analytics")
+    ADVANCED_ANALYTICS("advanced_analytics", "advanced_analytics"),
+    AI_TOOLS("ai_tools", "ai_tools")
 }
 
 data class HomeUiState(
