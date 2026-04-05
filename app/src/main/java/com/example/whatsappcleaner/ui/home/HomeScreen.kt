@@ -139,13 +139,6 @@ import com.example.whatsappcleaner.ui.theme.AccentBlue
 import com.example.whatsappcleaner.ui.theme.AccentError
 import com.example.whatsappcleaner.ui.theme.AccentGreen
 import com.example.whatsappcleaner.ui.theme.AccentPurple
-import com.example.whatsappcleaner.ui.theme.BrandNavy
-import com.example.whatsappcleaner.ui.theme.DividerColor
-import com.example.whatsappcleaner.ui.theme.PrimaryBackground
-import com.example.whatsappcleaner.ui.theme.SurfaceMuted
-import com.example.whatsappcleaner.ui.theme.SurfaceWhite
-import com.example.whatsappcleaner.ui.theme.TextMain
-import com.example.whatsappcleaner.ui.theme.TextSecondary
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -424,11 +417,11 @@ fun SimpleHomeScreen(
         val deleteCount = pendingDeleteItems.size
         AlertDialog(
             onDismissRequest = { pendingDeleteItems = emptyList() },
-            title = { Text("Delete Files", color = TextMain) },
+            title = { Text("Delete Files", color = MaterialTheme.colorScheme.onSurface) },
             text = {
                 Text(
                     "Are you sure you want to delete $deleteCount file(s)?",
-                    color = TextSecondary
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             },
             confirmButton = {
@@ -449,7 +442,7 @@ fun SimpleHomeScreen(
             dismissButton = {
                 LegitButton(text = "Cancel", onClick = { pendingDeleteItems = emptyList() })
             },
-            containerColor = SurfaceWhite,
+            containerColor = MaterialTheme.colorScheme.surface,
             tonalElevation = 0.dp
         )
     }
@@ -523,14 +516,14 @@ private fun MainActionsCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Daily reminders", color = TextMain, fontWeight = FontWeight.SemiBold)
+                Text("Daily reminders", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold)
                 Switch(
                     checked = remindersEnabled,
                     onCheckedChange = onRemindersToggle,
                     colors = SwitchDefaults.colors(
-                        checkedThumbColor = Color.White,
+                        checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
                         checkedTrackColor = AccentBlue,
-                        uncheckedTrackColor = SurfaceMuted
+                        uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant
                     )
                 )
             }
@@ -574,8 +567,8 @@ private fun DashboardHeader(
                 .background(
                     Brush.verticalGradient(
                         listOf(
-                            SurfaceWhite,
-                            SurfaceWhite.copy(alpha = 0.96f)
+                            MaterialTheme.colorScheme.surface,
+                            MaterialTheme.colorScheme.surface.copy(alpha = 0.96f)
                         )
                     )
                 )
@@ -591,17 +584,17 @@ private fun DashboardHeader(
                     onClick = onMenuClick,
                     modifier = Modifier
                         .clip(RoundedCornerShape(20.dp))
-                        .background(SurfaceMuted.copy(alpha = 0.85f))
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f))
                 ) {
-                    Icon(Icons.Default.Menu, contentDescription = "Menu", tint = TextMain)
+                    Icon(Icons.Default.Menu, contentDescription = "Menu", tint = MaterialTheme.colorScheme.onSurface)
                 }
                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("Cleanly AI", style = MaterialTheme.typography.headlineSmall, color = TextMain)
-                    Text("Clean smarter. Free space instantly.", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+                    Text("Cleanly AI", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurface)
+                    Text("Clean smarter. Free space instantly.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
 
-            Text(summaryInfo, style = MaterialTheme.typography.bodyLarge, color = BrandNavy)
+            Text(summaryInfo, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
 
             LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 item {
@@ -647,7 +640,7 @@ private fun DashboardHeader(
             ) {
                 Text(
                     text = "Daily reminders",
-                    color = TextMain,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.weight(1f)
                 )
@@ -655,9 +648,9 @@ private fun DashboardHeader(
                     checked = remindersEnabled,
                     onCheckedChange = onRemindersToggle,
                     colors = SwitchDefaults.colors(
-                        checkedThumbColor = Color.White,
+                        checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
                         checkedTrackColor = AccentBlue,
-                        uncheckedTrackColor = SurfaceMuted
+                        uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant
                     )
                 )
             }
@@ -670,14 +663,14 @@ private fun QuickPill(icon: ImageVector, label: String, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .clip(RoundedCornerShape(20.dp))
-            .background(SurfaceMuted.copy(alpha = 0.9f))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f))
             .clickable(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(icon, contentDescription = null, tint = AccentBlue, modifier = Modifier.size(18.dp))
-        Text(label, color = TextMain, style = MaterialTheme.typography.labelLarge)
+        Text(label, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.labelLarge)
     }
 }
 
@@ -717,7 +710,7 @@ private fun PremiumStorageCard(
         ) {
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Storage overview", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface)
-                Text("Used $usedSpace • Free $freeSpace", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+                Text("Used $usedSpace • Free $freeSpace", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 StatLine(Icons.Default.CleaningServices, "$largeTodayCount large today", largeTodaySizeText.ifBlank { "Ready for review" })
                 StatLine(Icons.Default.Image, "$screenshotTodayCount screenshots", screenshotTodaySizeText.ifBlank { "Quick wins available" })
                 StatLine(Icons.Default.Analytics, "$totalFiles files • ${formatSize(totalSize)}", "$oldFilesCount older files")
@@ -736,8 +729,8 @@ private fun StatLine(icon: ImageVector, title: String, subtitle: String) {
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
         Icon(icon, contentDescription = null, tint = AccentBlue, modifier = Modifier.size(16.dp))
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(title, style = MaterialTheme.typography.labelLarge, color = TextMain)
-            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+            Text(title, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface)
+            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -818,8 +811,8 @@ private fun InsightCard(model: InsightCardModel) {
             ) {
                 Icon(model.icon, contentDescription = null, tint = model.accent)
             }
-            Text(model.title, style = MaterialTheme.typography.titleMedium, color = TextMain)
-            Text(model.subtitle, style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+            Text(model.title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
+            Text(model.subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -831,7 +824,11 @@ private fun QuickActionsRow(
     onSelectAllClick: () -> Unit,
     onFilterClick: () -> Unit
 ) {
-    LegitCard {
+    Card(
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+    ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("Quick actions", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
             FlowRow(
@@ -859,22 +856,22 @@ private fun QuickActionChip(icon: ImageVector, label: String, enabled: Boolean, 
         modifier = Modifier
             .scale(scale)
             .clip(RoundedCornerShape(20.dp))
-            .background(if (enabled) AccentBlue.copy(alpha = 0.14f) else SurfaceMuted.copy(alpha = 0.5f))
+            .background(if (enabled) AccentBlue.copy(alpha = 0.14f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
             .clickable(interactionSource = interactionSource, indication = null, enabled = enabled, onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(icon, contentDescription = null, tint = if (enabled) AccentBlue else TextSecondary, modifier = Modifier.size(16.dp))
-        Text(label, color = if (enabled) TextMain else TextSecondary, style = MaterialTheme.typography.labelLarge)
+        Icon(icon, contentDescription = null, tint = if (enabled) AccentBlue else MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
+        Text(label, color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelLarge)
     }
 }
 
 @Composable
 private fun SectionTitle(title: String, subtitle: String) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(title, style = MaterialTheme.typography.titleLarge, color = TextMain)
-        Text(subtitle, style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+        Text(title, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface)
+        Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -904,16 +901,16 @@ fun FilterTabs(currentFilter: MediaFilter, onFilterChange: (MediaFilter) -> Unit
                 shape = RoundedCornerShape(20.dp),
                 colors = FilterChipDefaults.filterChipColors(
                     selectedContainerColor = AccentBlue.copy(alpha = 0.18f),
-                    selectedLabelColor = TextMain,
+                    selectedLabelColor = MaterialTheme.colorScheme.onSurface,
                     selectedLeadingIconColor = AccentBlue,
-                    containerColor = SurfaceWhite,
-                    labelColor = TextSecondary,
-                    iconColor = TextSecondary
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    iconColor = MaterialTheme.colorScheme.onSurfaceVariant
                 ),
                 border = FilterChipDefaults.filterChipBorder(
                     enabled = true,
                     selected = currentFilter == filter,
-                    borderColor = DividerColor,
+                    borderColor = MaterialTheme.colorScheme.outlineVariant,
                     selectedBorderColor = AccentBlue
                 )
             )
@@ -931,7 +928,7 @@ private fun SuggestionStrip(
 ) {
     LegitCard {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("Quick wins", style = MaterialTheme.typography.titleMedium, color = TextMain)
+            Text("Quick wins", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 SuggestionChip(
                     label = "Everything",
@@ -966,14 +963,14 @@ private fun SuggestionChip(label: String, selected: Boolean, icon: ImageVector, 
         modifier = Modifier
             .scale(scale)
             .clip(RoundedCornerShape(999.dp))
-            .background(if (selected) AccentGreen.copy(alpha = 0.18f) else SurfaceMuted)
+            .background(if (selected) AccentGreen.copy(alpha = 0.18f) else MaterialTheme.colorScheme.surfaceVariant)
             .clickable(interactionSource = interactionSource, indication = null, onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(icon, contentDescription = null, tint = if (selected) AccentGreen else TextSecondary, modifier = Modifier.size(16.dp))
-        Text(label, color = if (selected) AccentGreen else TextSecondary, style = MaterialTheme.typography.labelLarge)
+        Icon(icon, contentDescription = null, tint = if (selected) AccentGreen else MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
+        Text(label, color = if (selected) AccentGreen else MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelLarge)
     }
 }
 
@@ -988,8 +985,8 @@ private fun PremiumSnackbarHost(snackbarHostState: SnackbarHostState) {
             Snackbar(
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
                 shape = RoundedCornerShape(20.dp),
-                containerColor = Color(0xFF1E293B),
-                contentColor = Color.White,
+                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                contentColor = MaterialTheme.colorScheme.onSurface,
                 action = {
                     data.visuals.actionLabel?.let { label ->
                         TextButton(onClick = { data.performAction() }) {
@@ -1022,7 +1019,7 @@ private fun PremiumMediaRow(
         label = "media_scale"
     )
     val selectedBorder by animateColorAsState(
-        targetValue = if (selected) AccentBlue else DividerColor.copy(alpha = 0.5f),
+        targetValue = if (selected) AccentBlue else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
         animationSpec = tween(260),
         label = "selected_border"
     )
@@ -1053,7 +1050,7 @@ private fun PremiumMediaRow(
                 onClick = onSelect
             ),
         shape = RoundedCornerShape(22.dp),
-        colors = CardDefaults.cardColors(containerColor = if (selected) SurfaceWhite.copy(alpha = 0.95f) else SurfaceWhite),
+        colors = CardDefaults.cardColors(containerColor = if (selected) MaterialTheme.colorScheme.surface.copy(alpha = 0.95f) else MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -1073,7 +1070,7 @@ private fun PremiumMediaRow(
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .background(PrimaryBackground.copy(alpha = 0.12f))
+                            .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.12f))
                     )
                 }
                 Box(
@@ -1081,7 +1078,7 @@ private fun PremiumMediaRow(
                         .matchParentSize()
                         .background(
                             Brush.verticalGradient(
-                                listOf(Color.Transparent, PrimaryBackground.copy(alpha = 0.82f))
+                                listOf(Color.Transparent, MaterialTheme.colorScheme.scrim.copy(alpha = 0.82f))
                             )
                         )
                 )
@@ -1090,7 +1087,7 @@ private fun PremiumMediaRow(
                         .align(Alignment.TopStart)
                         .padding(10.dp)
                         .clip(RoundedCornerShape(16.dp))
-                        .background(PrimaryBackground.copy(alpha = 0.72f))
+                        .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.72f))
                         .padding(horizontal = 10.dp, vertical = 6.dp),
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -1103,20 +1100,20 @@ private fun PremiumMediaRow(
                             else -> Icons.Default.InsertDriveFile
                         },
                         contentDescription = null,
-                        tint = if (selected) AccentGreen else Color.White,
+                        tint = if (selected) AccentGreen else MaterialTheme.colorScheme.onPrimary,
                         modifier = Modifier.size(16.dp)
                     )
                     Text(
                         if (selected) "Selected" else formatSize(item.sizeKb.toLong() * 1024L),
-                        color = Color.White,
+                        color = MaterialTheme.colorScheme.onPrimary,
                         style = MaterialTheme.typography.labelSmall
                     )
                 }
             }
 
             Column(modifier = Modifier.padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(item.safeDisplayName(), maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleSmall, color = TextMain)
-                Text(item.safeMimeLabel(), style = MaterialTheme.typography.bodySmall, color = TextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(item.safeDisplayName(), maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
+                Text(item.safeMimeLabel(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
 
             Row(
@@ -1223,7 +1220,7 @@ private fun MiniMetricCard(
     Row(
         modifier = modifier
             .clip(RoundedCornerShape(18.dp))
-            .background(SurfaceMuted.copy(alpha = 0.9f))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f))
             .padding(horizontal = 12.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -1238,8 +1235,8 @@ private fun MiniMetricCard(
             Icon(icon, contentDescription = null, tint = AccentBlue, modifier = Modifier.size(18.dp))
         }
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(title, color = TextMain, style = MaterialTheme.typography.titleSmall)
-            Text(subtitle, color = TextSecondary, style = MaterialTheme.typography.labelSmall)
+            Text(title, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleSmall)
+            Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall)
         }
     }
 }
@@ -1304,7 +1301,7 @@ fun MediaRow(item: SimpleMediaItem, selected: Boolean, onClick: () -> Unit, onOp
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(18.dp))
-                .background(if (selected) AccentBlue.copy(alpha = 0.12f) else SurfaceWhite)
+                .background(if (selected) AccentBlue.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surface)
                 .clickable(onClick = onClick)
                 .padding(14.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -1313,7 +1310,7 @@ fun MediaRow(item: SimpleMediaItem, selected: Boolean, onClick: () -> Unit, onOp
                 modifier = Modifier
                     .size(44.dp)
                     .clip(RoundedCornerShape(14.dp))
-                    .background(if (selected) AccentBlue.copy(alpha = 0.18f) else SurfaceMuted),
+                    .background(if (selected) AccentBlue.copy(alpha = 0.18f) else MaterialTheme.colorScheme.surfaceVariant),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
@@ -1324,14 +1321,14 @@ fun MediaRow(item: SimpleMediaItem, selected: Boolean, onClick: () -> Unit, onOp
                         else -> Icons.Default.InsertDriveFile
                     },
                     contentDescription = null,
-                    tint = if (selected) AccentBlue else TextSecondary
+                    tint = if (selected) AccentBlue else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             Spacer(Modifier.size(12.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(item.safeDisplayName(), maxLines = 1, color = TextMain, style = MaterialTheme.typography.titleSmall)
-                Text(item.safeMimeLabel(), color = TextSecondary, style = MaterialTheme.typography.bodySmall)
-                Text(formatSize(item.sizeKb.toLong() * 1024L), color = TextSecondary, style = MaterialTheme.typography.bodySmall)
+                Text(item.safeDisplayName(), maxLines = 1, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleSmall)
+                Text(item.safeMimeLabel(), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                Text(formatSize(item.sizeKb.toLong() * 1024L), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
             }
             LegitButton(text = "Open", onClick = onOpen, modifier = Modifier.height(42.dp))
         }
@@ -1348,6 +1345,6 @@ private fun LoadingCard() {
                 .clip(RoundedCornerShape(20.dp))
                 .shimmerEffect()
         )
-        HorizontalDivider(color = DividerColor.copy(alpha = 0.4f))
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
     }
 }

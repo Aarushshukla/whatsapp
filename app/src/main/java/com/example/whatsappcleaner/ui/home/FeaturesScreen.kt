@@ -46,10 +46,6 @@ import com.example.whatsappcleaner.ui.components.LegitCard
 import com.example.whatsappcleaner.ui.theme.AccentBlue
 import com.example.whatsappcleaner.ui.theme.AccentGreen
 import com.example.whatsappcleaner.ui.theme.AccentPurple
-import com.example.whatsappcleaner.ui.theme.PrimaryBackground
-import com.example.whatsappcleaner.ui.theme.SurfaceWhite
-import com.example.whatsappcleaner.ui.theme.TextMain
-import com.example.whatsappcleaner.ui.theme.TextSecondary
 
 private data class FeatureCardModel(
     val title: String,
@@ -79,21 +75,21 @@ fun FeaturesScreen(
     )
 
     Scaffold(
-        containerColor = PrimaryBackground,
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
                 title = {
                     Column {
-                        Text("Features", color = TextMain, fontWeight = FontWeight.Bold)
-                        Text("Advanced cleanup modules", color = TextSecondary, style = MaterialTheme.typography.labelMedium)
+                        Text("Features", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
+                        Text("Advanced cleanup modules", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelMedium)
                     }
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = TextMain)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = MaterialTheme.colorScheme.onSurface)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = PrimaryBackground),
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
                 modifier = Modifier.statusBarsPadding()
             )
         }
@@ -114,11 +110,11 @@ fun FeaturesScreen(
                         .shadow(8.dp, RoundedCornerShape(24.dp))
                         .clickable(onClick = model.onClick),
                     shape = RoundedCornerShape(24.dp),
-                    colors = CardDefaults.cardColors(containerColor = SurfaceWhite)
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                 ) {
                     Column(
                         modifier = Modifier
-                            .background(Brush.verticalGradient(listOf(SurfaceWhite, SurfaceWhite.copy(alpha = 0.92f))))
+                            .background(Brush.verticalGradient(listOf(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.colorScheme.surface)))
                             .padding(20.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
@@ -131,8 +127,8 @@ fun FeaturesScreen(
                                 .background(model.accent.copy(alpha = 0.14f), RoundedCornerShape(10.dp))
                                 .padding(6.dp)
                         )
-                        Text(model.title, style = MaterialTheme.typography.titleMedium, color = TextMain)
-                        Text("Tap to open", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                        Text(model.title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
+                        Text("Tap to open", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
@@ -144,10 +140,10 @@ fun FeaturesScreen(
 @Composable
 fun FeaturePlaceholderScreen(title: String, onBack: () -> Unit) {
     Scaffold(
-        containerColor = PrimaryBackground,
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
-                title = { Text(title, color = TextMain) },
+                title = { Text(title, color = MaterialTheme.colorScheme.onSurface) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -166,8 +162,8 @@ fun FeaturePlaceholderScreen(title: String, onBack: () -> Unit) {
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Icon(Icons.Default.CleaningServices, contentDescription = null, tint = AccentBlue)
-                Text("$title coming soon", color = TextMain, style = MaterialTheme.typography.titleMedium)
-                Text("This module is available from the new Features screen.", color = TextSecondary)
+                Text("$title coming soon", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleMedium)
+                Text("This module is available from the new Features screen.", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }

@@ -48,10 +48,6 @@ import com.example.whatsappcleaner.ui.theme.AccentBlue
 import com.example.whatsappcleaner.ui.theme.AccentError
 import com.example.whatsappcleaner.ui.theme.AccentGreen
 import com.example.whatsappcleaner.ui.theme.AccentPurple
-import com.example.whatsappcleaner.ui.theme.SurfaceMuted
-import com.example.whatsappcleaner.ui.theme.SurfaceWhite
-import com.example.whatsappcleaner.ui.theme.TextMain
-import com.example.whatsappcleaner.ui.theme.TextSecondary
 
 @Composable
 fun LegitButton(
@@ -76,8 +72,8 @@ fun LegitButton(
         shape = RoundedCornerShape(20.dp),
         colors = ButtonDefaults.buttonColors(
             containerColor = if (isDestructive) AccentError else AccentBlue,
-            contentColor = Color.White,
-            disabledContainerColor = SurfaceMuted
+            contentColor = MaterialTheme.colorScheme.onPrimary,
+            disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant
         ),
         elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp, pressedElevation = 1.dp),
         modifier = modifier
@@ -106,7 +102,7 @@ fun GradientHeroButton(
     val brush = if (enabled) {
         Brush.horizontalGradient(listOf(AccentBlue, AccentPurple))
     } else {
-        Brush.horizontalGradient(listOf(SurfaceMuted, SurfaceMuted))
+        Brush.horizontalGradient(listOf(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.colorScheme.surfaceVariant))
     }
 
     Button(
@@ -116,9 +112,9 @@ fun GradientHeroButton(
         shape = RoundedCornerShape(20.dp),
         colors = ButtonDefaults.buttonColors(
             containerColor = Color.Transparent,
-            contentColor = Color.White,
+            contentColor = MaterialTheme.colorScheme.onPrimary,
             disabledContainerColor = Color.Transparent,
-            disabledContentColor = Color.White.copy(alpha = 0.7f)
+            disabledContentColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f)
         ),
         contentPadding = androidx.compose.foundation.layout.PaddingValues(),
         modifier = modifier
@@ -156,8 +152,8 @@ fun LegitCard(
                 .background(
                     brush = Brush.linearGradient(
                         colors = listOf(
-                            SurfaceWhite,
-                            SurfaceWhite.copy(alpha = 0.94f)
+                            MaterialTheme.colorScheme.surface,
+                            MaterialTheme.colorScheme.surface.copy(alpha = 0.94f)
                         )
                     )
                 )
@@ -180,7 +176,7 @@ fun Modifier.shimmerEffect(): Modifier = composed {
     )
 
     background(
-        color = SurfaceMuted.copy(alpha = animatedAlpha),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = animatedAlpha),
         shape = RoundedCornerShape(18.dp)
     ).alpha(animatedAlpha)
 }
@@ -204,9 +200,9 @@ fun FriendlyState(
             Icon(icon, null, modifier = Modifier.size(34.dp), tint = AccentGreen)
         }
         Spacer(Modifier.height(16.dp))
-        Text(title, style = MaterialTheme.typography.titleLarge, color = TextMain)
+        Text(title, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface)
         Spacer(Modifier.height(8.dp))
-        Text(message, style = MaterialTheme.typography.bodyMedium, color = TextSecondary, textAlign = TextAlign.Center)
+        Text(message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
     }
 }
 
@@ -221,17 +217,17 @@ fun StorageRing(progress: Float, label: String, subtitle: String, modifier: Modi
     Box(modifier = modifier.size(90.dp), contentAlignment = Alignment.Center) {
         CircularProgressIndicator(
             progress = animatedProgress,
-            trackColor = SurfaceMuted,
+            trackColor = MaterialTheme.colorScheme.surfaceVariant,
             strokeWidth = 8.dp,
             color = AccentBlue,
             modifier = Modifier.size(90.dp)
         )
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(label, style = MaterialTheme.typography.titleMedium, color = TextMain)
+            Text(label, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
             Text(
                 subtitle,
                 style = MaterialTheme.typography.labelSmall,
-                color = TextSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
             )
         }
