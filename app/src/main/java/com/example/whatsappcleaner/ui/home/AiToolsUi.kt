@@ -1,13 +1,16 @@
 package com.example.whatsappcleaner.ui.home
 
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -18,9 +21,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -48,8 +49,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
@@ -60,6 +64,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.whatsappcleaner.data.local.formatSize
 import com.example.whatsappcleaner.ui.components.LegitButton
+import kotlinx.coroutines.delay
 
 enum class AiFeature(
     val title: String,
@@ -182,12 +187,31 @@ fun AiFeatureCard(
         animationSpec = tween(durationMillis = 120),
         label = "ai_feature_card_scale"
     )
+    val elevation by animateDpAsState(
+        targetValue = if (isPressed) 3.dp else 6.dp,
+        animationSpec = tween(durationMillis = 140),
+        label = "ai_feature_card_elevation"
+    )
+    val containerColor by animateColorAsState(
+        targetValue = if (isPressed) {
+            MaterialTheme.colorScheme.surfaceContainer
+        } else {
+            MaterialTheme.colorScheme.surfaceContainerLow
+        },
+        animationSpec = tween(durationMillis = 150),
+        label = "ai_feature_card_container"
+    )
 
     Card(
         modifier = modifier
             .fillMaxWidth()
             .aspectRatio(1f)
             .scale(scale)
+            .border(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.75f),
+                shape = RoundedCornerShape(20.dp)
+            )
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
@@ -195,9 +219,9 @@ fun AiFeatureCard(
             ),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+            containerColor = containerColor
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = elevation)
     ) {
         Column(
             modifier = Modifier
@@ -209,7 +233,7 @@ fun AiFeatureCard(
                 imageVector = feature.icon,
                 contentDescription = feature.title,
                 tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(22.dp)
+                modifier = Modifier.size(30.dp)
             )
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
@@ -237,30 +261,39 @@ fun AiFeatureCard(
     }
 }
 
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun AiToolsSection(
     onFeatureClick: (AiFeature) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Column(
-        modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        PremiumSectionHeader(
-            title = "AI Tools",
-            subtitle = "Premium cleanup intelligence built for faster media decisions."
-        )
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(3),
-            userScrollEnabled = false,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(380.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            items(AiFeatureItems, key = { it.name }) { feature ->
-                AiFeatureCard(feature = feature, onClick = { onFeatureClick(feature) })
+            PremiumSectionHeader(
+                title = "AI Tools",
+                subtitle = "Premium cleanup intelligence built for faster media decisions."
+            )
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                maxItemsInEachRow = 3,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                AiFeatureItems.forEach { feature ->
+                    AiFeatureCard(
+                        feature = feature,
+                        onClick = { onFeatureClick(feature) },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
             }
         }
     }
@@ -369,6 +402,12 @@ fun AiFeatureDetailScreen(
     onBack: () -> Unit,
     onActionClick: () -> Unit
 ) {
+    var contentVisible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        delay(80)
+        contentVisible = true
+    }
+
     AiFeatureScreenScaffold(feature = feature, onBack = onBack) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
@@ -376,20 +415,26 @@ fun AiFeatureDetailScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             item {
-                Card(
-                    shape = RoundedCornerShape(22.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = contentVisible,
+                    enter = androidx.compose.animation.fadeIn(animationSpec = tween(300)) +
+                        androidx.compose.animation.slideInVertically(initialOffsetY = { it / 3 })
                 ) {
-                    Column(
-                        modifier = Modifier.padding(18.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    Card(
+                        shape = RoundedCornerShape(22.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                     ) {
-                        Text(feature.description, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
-                        Text(
-                            "This screen is fully wired for future AI logic integration.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        Column(
+                            modifier = Modifier.padding(18.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(feature.description, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
+                            Text(
+                                "This screen is fully wired for future AI logic integration.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
             }
@@ -397,7 +442,22 @@ fun AiFeatureDetailScreen(
                 StatsCard(title = title, value = value, helper = helper)
             }
             item {
-                SmoothPrimaryButton(text = feature.actionLabel, onClick = onActionClick)
+                Card(
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Text(
+                            text = "Take action",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        SmoothPrimaryButton(text = feature.actionLabel, onClick = onActionClick)
+                    }
+                }
             }
             item {
                 EmptyStateCard(

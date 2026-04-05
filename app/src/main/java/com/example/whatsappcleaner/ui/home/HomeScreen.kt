@@ -295,9 +295,9 @@ fun SimpleHomeScreen(
                 .padding(padding)
                 .fillMaxSize(),
             state = gridState,
-            contentPadding = PaddingValues(16.dp),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 18.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(18.dp)
         ) {
             item(span = { GridItemSpan(maxLineSpan) }) {
                 AnimatedVisibility(
@@ -378,7 +378,12 @@ fun SimpleHomeScreen(
                 FilterTabs(currentFilter = currentFilter, onFilterChange = onFilterChange)
             }
             item(span = { GridItemSpan(maxLineSpan) }) {
-                AiToolsSection(onFeatureClick = onAiFeatureClick)
+                AnimatedVisibility(
+                    visible = contentVisible,
+                    enter = fadeIn(tween(420)) + slideInVertically(initialOffsetY = { it / 4 })
+                ) {
+                    AiToolsSection(onFeatureClick = onAiFeatureClick)
+                }
             }
             item(span = { GridItemSpan(maxLineSpan) }) {
                 SectionTitle(
