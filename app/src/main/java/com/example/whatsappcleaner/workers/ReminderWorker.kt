@@ -1,18 +1,12 @@
 package com.example.whatsappcleaner.workers
 
-import android.app.NotificationChannel
-import android.app.NotificationManager
 import android.content.Context
-import android.os.Build
-import androidx.core.app.NotificationCompat
-import androidx.core.app.NotificationManagerCompat
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
-import com.example.whatsappcleaner.R
+import com.example.whatsappcleaner.data.local.MediaLoader
 import com.example.whatsappcleaner.data.local.UserPrefs
 import com.example.whatsappcleaner.data.local.formatSize
-import com.example.whatsappcleaner.data.local.MediaLoader
-import kotlin.random.Random
+import com.example.whatsappcleaner.notifications.ReminderNotificationHelper
 
 class ReminderWorker(
     appContext: Context,
@@ -21,43 +15,32 @@ class ReminderWorker(
 
     override suspend fun doWork(): Result {
         val context = applicationContext
+        val userPrefs = UserPrefs.get(context)
+        if (!userPrefs.isRemindersEnabled()) return Result.success()
+
         val loader = MediaLoader(context)
         val now = System.currentTimeMillis()
         val todayItems = loader.queryMediaStore("all", now - 86400000L, now)
-        val todayBytes = todayItems.sumOf { mediaItem -> mediaItem.sizeKb.toLong() * 1024L }
-
         if (todayItems.isEmpty()) return Result.success()
 
-        val sizeText = formatSize(todayBytes)
-        createChannel(context)
+        val todayBytes = todayItems.sumOf { mediaItem -> mediaItem.sizeKb.toLong() * 1024L }
+        val predictedFreeableBytes = (todayBytes * 0.35f).toLong().coerceAtLeast(0L)
+        val sizeText = formatSize(predictedFreeableBytes)
+        val totalTodayText = formatSize(todayBytes)
+        val dynamicBody = buildDynamicBody(todayItems.size, totalTodayText, sizeText)
 
-        val builder = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle("Cleanly AI")
-            .setContentText("Today you added ~$sizeText. Review now?")
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-            .setAutoCancel(true)
+        val notificationHelper = ReminderNotificationHelper(context)
+        notificationHelper.createNotificationChannel()
+        notificationHelper.showReminderNotification(predictedFreeableBytes, dynamicBody)
 
-        try {
-            with(NotificationManagerCompat.from(context)) {
-                notify(Random.nextInt(), builder.build())
-            }
-        } catch (e: SecurityException) { }
-
-        UserPrefs.get(context) // Ensure initialized
         return Result.success()
     }
 
-    private fun createChannel(context: Context) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(CHANNEL_ID, "Cleanly AI Reminders", NotificationManager.IMPORTANCE_DEFAULT).apply {
-                description = "Daily reminders to review space and cleanup opportunities"
-            }
-            (context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).createNotificationChannel(channel)
+    private fun buildDynamicBody(itemCount: Int, todayAddedText: String, freeableText: String): String {
+        return when {
+            itemCount >= 40 -> "High activity today: $itemCount new files ($todayAddedText). You can likely free around $freeableText by cleaning now."
+            itemCount >= 15 -> "$itemCount new files detected today ($todayAddedText). A quick sweep could free about $freeableText."
+            else -> "Storage check-in: $itemCount recent files ($todayAddedText). You could free up to $freeableText in under a minute."
         }
-    }
-
-    companion object {
-        const val CHANNEL_ID = "whats_clean_reminders"
     }
 }
