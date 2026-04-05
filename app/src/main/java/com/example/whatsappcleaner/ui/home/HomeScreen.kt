@@ -110,6 +110,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
@@ -257,9 +258,9 @@ fun SimpleHomeScreen(
             TopAppBar(
                 title = {
                     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text("Smart Media Cleaner", color = MaterialTheme.colorScheme.onBackground, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                        Text("WhatsApp Cleaner", color = MaterialTheme.colorScheme.onBackground, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                         Text(
-                            text = summaryInfo,
+                            text = "Smart cleanup dashboard",
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.labelMedium,
                             maxLines = 1,
@@ -305,15 +306,19 @@ fun SimpleHomeScreen(
                     enter = fadeIn(tween(360)) + slideInVertically(initialOffsetY = { it / 3 })
                 ) {
                     PremiumHeader(
-                        title = "Cleaner",
-                        subtitle = summaryInfo,
+                        title = "WhatsApp Cleaner",
+                        subtitle = "Clear junk faster with AI-ranked cleanup suggestions",
                         remindersEnabled = remindersEnabled,
                         onRemindersToggle = onRemindersToggle
                     )
                 }
             }
             item(span = { GridItemSpan(maxLineSpan) }) {
-                SmartCleanButton(onClick = onNavigateToSmartClean)
+                SmartCleanButton(
+                    cleanableSize = formatSize(smartSuggestionSummary.totalSpaceToFree),
+                    cleanableCount = smartSuggestionSummary.totalSuggestedFiles,
+                    onClick = onNavigateToSmartClean
+                )
             }
             item(span = { GridItemSpan(maxLineSpan) }) {
                 AnimatedSuccessBanner(message = successMessage)
@@ -331,6 +336,7 @@ fun SimpleHomeScreen(
                         screenshotTodayCount = screenshotTodayCount,
                         screenshotTodaySizeText = screenshotTodaySizeText,
                         oldFilesCount = oldFilesCount,
+                        cleanableSize = formatSize(smartSuggestionSummary.totalSpaceToFree),
                         progress = storageProgress,
                         usedSpace = formatSize(usedBytes),
                         freeSpace = formatSize(freeBytes),
@@ -386,8 +392,8 @@ fun SimpleHomeScreen(
                     LegitCard {
                         FriendlyState(
                             icon = Icons.Default.CheckCircle,
-                            title = "Nothing to clean right now",
-                            message = "Refresh later to rescan your photos, videos, memes, and quick-win suggestions."
+                            title = "You're all caught up",
+                            message = "No obvious cleanup items found right now. New files and suggestions will appear after your next scan."
                         )
                     }
                 }
@@ -536,15 +542,48 @@ private fun PremiumHeader(
 }
 
 @Composable
-private fun SmartCleanButton(onClick: () -> Unit) {
-    GradientHeroButton(
-        text = "Smart Clean",
-        onClick = onClick,
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(56.dp),
-        icon = Icons.Default.AutoAwesome
-    )
+private fun SmartCleanButton(
+    cleanableSize: String,
+    cleanableCount: Int,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            GradientHeroButton(
+                text = "Smart Clean",
+                onClick = onClick,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(68.dp),
+                icon = Icons.Default.AutoAwesome
+            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "Recommended now",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    "$cleanableSize • $cleanableCount files",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = AccentGreen,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            Spacer(Modifier.height(2.dp))
+        }
+    }
 }
 
 @Composable
@@ -728,6 +767,7 @@ private fun PremiumStorageCard(
     screenshotTodayCount: Int,
     screenshotTodaySizeText: String,
     oldFilesCount: Int,
+    cleanableSize: String,
     progress: Float,
     usedSpace: String,
     freeSpace: String,
@@ -756,26 +796,38 @@ private fun PremiumStorageCard(
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Storage overview", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface)
                 Text("Used $usedSpace • Free $freeSpace", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                StatLine(Icons.Default.CleaningServices, "$largeTodayCount large today", largeTodaySizeText.ifBlank { "Ready for review" })
-                StatLine(Icons.Default.Image, "$screenshotTodayCount screenshots", screenshotTodaySizeText.ifBlank { "Quick wins available" })
-                StatLine(Icons.Default.Analytics, "$totalFiles files • ${formatSize(totalSize)}", "$oldFilesCount older files")
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(AccentGreen.copy(alpha = 0.15f))
+                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.CleaningServices, contentDescription = null, tint = AccentGreen, modifier = Modifier.size(16.dp))
+                    Text(
+                        "Cleanable now: $cleanableSize",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = AccentGreen,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                Text(
+                    "$largeTodayCount large files (${largeTodaySizeText.ifBlank { "review" }}) • $screenshotTodayCount screenshots (${screenshotTodaySizeText.ifBlank { "review" }})",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    "$totalFiles files • ${formatSize(totalSize)} • $oldFilesCount older files",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
             StorageRing(
                 progress = progress,
                 label = "${(progress * 100).toInt()}%",
                 subtitle = "reviewable"
             )
-        }
-    }
-}
-
-@Composable
-private fun StatLine(icon: ImageVector, title: String, subtitle: String) {
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, contentDescription = null, tint = AccentBlue, modifier = Modifier.size(16.dp))
-        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(title, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface)
-            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -870,26 +922,20 @@ private fun QuickActionsRow(
     onFilterClick: () -> Unit,
     onAiToolsClick: () -> Unit
 ) {
-    Card(
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-    ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("Quick actions", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                QuickActionChip(Icons.Default.DeleteOutline, "Delete selected ($selectedCount)", selectedCount > 0, onDeleteClick)
-                QuickActionChip(Icons.Default.SelectAll, "Select all", true, onSelectAllClick)
-                QuickActionChip(Icons.Default.Sort, "Sort / filter", true, onFilterClick)
-                QuickActionButton(
-                    icon = Icons.Default.AutoAwesome,
-                    title = "AI Tools",
-                    onClick = { onAiToolsClick() }
-                )
-            }
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text("Quick actions", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            QuickActionChip(Icons.Default.DeleteOutline, "Delete ($selectedCount)", selectedCount > 0, onDeleteClick)
+            QuickActionChip(Icons.Default.SelectAll, "Select all", true, onSelectAllClick)
+            QuickActionChip(Icons.Default.Sort, "Sort / filter", true, onFilterClick)
+            QuickActionButton(
+                icon = Icons.Default.AutoAwesome,
+                title = "AI tools",
+                onClick = { onAiToolsClick() }
+            )
         }
     }
 }
@@ -917,19 +963,32 @@ private fun QuickActionChip(icon: ImageVector, label: String, enabled: Boolean, 
         animationSpec = tween(180),
         label = "action_button_scale"
     )
-    Row(
-        modifier = Modifier
-            .scale(scale)
-            .clip(RoundedCornerShape(20.dp))
-            .background(if (enabled) AccentBlue.copy(alpha = 0.14f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-            .clickable(interactionSource = interactionSource, indication = null, enabled = enabled, onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(icon, contentDescription = null, tint = if (enabled) AccentBlue else MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
-        Text(label, color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelLarge)
-    }
+    FilterChip(
+        selected = false,
+        onClick = onClick,
+        enabled = enabled,
+        label = {
+            Text(
+                label,
+                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold)
+            )
+        },
+        leadingIcon = { Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp)) },
+        modifier = Modifier.scale(scale),
+        shape = RoundedCornerShape(999.dp),
+        colors = FilterChipDefaults.filterChipColors(
+            containerColor = MaterialTheme.colorScheme.surface,
+            labelColor = MaterialTheme.colorScheme.onSurface,
+            iconColor = AccentBlue,
+            disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+        ),
+        border = FilterChipDefaults.filterChipBorder(
+            enabled = enabled,
+            selected = false,
+            borderColor = MaterialTheme.colorScheme.outlineVariant
+        ),
+        interactionSource = interactionSource
+    )
 }
 
 @Composable
@@ -1089,6 +1148,11 @@ private fun PremiumMediaRow(
         animationSpec = tween(260),
         label = "selected_border"
     )
+    val contentAlpha by animateFloatAsState(
+        targetValue = if (selected) 1f else 0.97f,
+        animationSpec = tween(240),
+        label = "media_alpha"
+    )
     val mediaSource = remember(item.uri) { item.uri.takeIf { uri -> uri != Uri.EMPTY } }
     val model = remember(mediaSource, item.mimeType) {
         mediaSource?.let { source ->
@@ -1109,6 +1173,7 @@ private fun PremiumMediaRow(
             .fillMaxWidth()
             .shadow(if (selected) 10.dp else 4.dp, RoundedCornerShape(22.dp))
             .scale(scale)
+            .alpha(contentAlpha)
             .border(width = 1.6.dp, color = selectedBorder, shape = RoundedCornerShape(22.dp))
             .clickable(
                 interactionSource = interactionSource,
@@ -1119,7 +1184,7 @@ private fun PremiumMediaRow(
         colors = CardDefaults.cardColors(containerColor = if (selected) MaterialTheme.colorScheme.surface.copy(alpha = 0.95f) else MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1177,17 +1242,39 @@ private fun PremiumMediaRow(
                 }
             }
 
-            Column(modifier = Modifier.padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(item.safeDisplayName(), maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
-                Text(item.safeMimeLabel(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Column(modifier = Modifier.padding(horizontal = 14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    item.safeDisplayName(),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    "${item.safeMimeLabel()} • ${formatSize(item.sizeKb.toLong() * 1024L)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
                 if (!suggestionReason.isNullOrBlank()) {
-                    Text(
-                        "AI: $suggestionReason",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = AccentPurple,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(AccentPurple.copy(alpha = 0.12f))
+                            .padding(horizontal = 8.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = AccentPurple, modifier = Modifier.size(14.dp))
+                        Text(
+                            "Suggested: $suggestionReason",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = AccentPurple,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 }
             }
 
