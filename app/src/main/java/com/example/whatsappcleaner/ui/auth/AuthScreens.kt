@@ -22,6 +22,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.UserProfileChangeRequest
 
 @Composable
 fun PreparingCleanerScreen(
@@ -58,6 +59,10 @@ fun LoginScreen(
     AuthFormLayout(
         title = "Welcome back",
         subtitle = "Sign in to continue",
+        name = null,
+        age = null,
+        onNameChange = {},
+        onAgeChange = {},
         email = email,
         password = password,
         onEmailChange = {
@@ -108,6 +113,8 @@ fun SignupScreen(
     onLoginClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var name by remember { mutableStateOf("") }
+    var age by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var isSubmitting by remember { mutableStateOf(false) }
@@ -118,6 +125,16 @@ fun SignupScreen(
     AuthFormLayout(
         title = "Create account",
         subtitle = "Start cleaning smarter",
+        name = name,
+        age = age,
+        onNameChange = {
+            name = it
+            errorMessage = null
+        },
+        onAgeChange = {
+            age = it.filter { c -> c.isDigit() }.take(3)
+            errorMessage = null
+        },
         email = email,
         password = password,
         onEmailChange = {
@@ -133,8 +150,13 @@ fun SignupScreen(
         isSubmitting = isSubmitting,
         primaryActionText = "Sign up",
         onPrimaryAction = {
-            if (email.isBlank() || password.isBlank()) {
-                errorMessage = "Email and password are required."
+            if (name.isBlank() || age.isBlank() || email.isBlank() || password.isBlank()) {
+                errorMessage = "Name, age, email, and password are required."
+                return@AuthFormLayout
+            }
+            val parsedAge = age.toIntOrNull()
+            if (parsedAge == null || parsedAge !in 13..120) {
+                errorMessage = "Please enter a valid age (13-120)."
                 return@AuthFormLayout
             }
             if (password.length < 6) {
@@ -144,11 +166,24 @@ fun SignupScreen(
             isSubmitting = true
             auth.createUserWithEmailAndPassword(email.trim(), password)
                 .addOnCompleteListener { task ->
-                    isSubmitting = false
                     if (task.isSuccessful) {
-                        errorMessage = null
-                        onSignupSuccess()
+                        val profileUpdate = UserProfileChangeRequest.Builder()
+                            .setDisplayName("${name.trim()} • ${parsedAge}y")
+                            .build()
+                        auth.currentUser
+                            ?.updateProfile(profileUpdate)
+                            ?.addOnCompleteListener {
+                                isSubmitting = false
+                                errorMessage = null
+                                onSignupSuccess()
+                            }
+                            ?: run {
+                                isSubmitting = false
+                                errorMessage = null
+                                onSignupSuccess()
+                            }
                     } else {
+                        isSubmitting = false
                         errorMessage = task.exception?.localizedMessage ?: "Signup failed. Try again."
                     }
                 }
@@ -170,6 +205,10 @@ fun SignupScreen(
 private fun AuthFormLayout(
     title: String,
     subtitle: String,
+    name: String?,
+    age: String?,
+    onNameChange: (String) -> Unit,
+    onAgeChange: (String) -> Unit,
     email: String,
     password: String,
     onEmailChange: (String) -> Unit,
@@ -198,10 +237,36 @@ private fun AuthFormLayout(
             modifier = Modifier.padding(top = 8.dp, bottom = 24.dp)
         )
 
+        if (name != null) {
+            OutlinedTextField(
+                value = name,
+                onValueChange = onNameChange,
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("Full name") },
+                singleLine = true,
+                enabled = !isSubmitting
+            )
+        }
+
+        if (age != null) {
+            OutlinedTextField(
+                value = age,
+                onValueChange = onAgeChange,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp),
+                label = { Text("Age") },
+                singleLine = true,
+                enabled = !isSubmitting
+            )
+        }
+
         OutlinedTextField(
             value = email,
             onValueChange = onEmailChange,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = if (name != null || age != null) 12.dp else 0.dp),
             label = { Text("Email") },
             singleLine = true,
             enabled = !isSubmitting

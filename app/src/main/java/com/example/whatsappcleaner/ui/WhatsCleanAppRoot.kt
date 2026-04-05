@@ -222,19 +222,23 @@ fun WhatsCleanAppRoot(
                 suggestionReasonsByUri = state.suggestionReasonsByUri,
                 onNavigateToFeatures = { navController.navigateSingleTop(Routes.Features) },
                 onAiFeatureClick = { feature ->
-                    navController.navigateSingleTop(
-                        when (feature) {
-                            AiFeature.SMART_SUGGESTIONS -> Routes.AiSmartSuggestions
-                            AiFeature.DUPLICATE_DETECTOR -> Routes.AiDuplicateDetector
-                            AiFeature.LARGE_FILES_FINDER -> Routes.AiLargeFilesFinder
-                            AiFeature.OLD_MEDIA_CLEANER -> Routes.AiOldMediaCleaner
-                            AiFeature.WHATSAPP_MEDIA_CLEANER -> Routes.AiWhatsappMediaCleaner
-                            AiFeature.MEME_CLEANER -> Routes.AiMemeCleaner
-                            AiFeature.BLURRY_PHOTOS -> Routes.AiBlurryPhotos
-                            AiFeature.SCREENSHOTS_CLEANER -> Routes.AiScreenshotsCleaner
-                            AiFeature.SPAM_MEDIA_DETECTOR -> Routes.AiSpamDetector
-                        }
-                    )
+                    if (state.isProUser || onPremiumFeatureRequested(PremiumFeature.AI_TOOLS)) {
+                        navController.navigateSingleTop(
+                            when (feature) {
+                                AiFeature.SMART_SUGGESTIONS -> Routes.AiSmartSuggestions
+                                AiFeature.DUPLICATE_DETECTOR -> Routes.AiDuplicateDetector
+                                AiFeature.LARGE_FILES_FINDER -> Routes.AiLargeFilesFinder
+                                AiFeature.OLD_MEDIA_CLEANER -> Routes.AiOldMediaCleaner
+                                AiFeature.WHATSAPP_MEDIA_CLEANER -> Routes.AiWhatsappMediaCleaner
+                                AiFeature.MEME_CLEANER -> Routes.AiMemeCleaner
+                                AiFeature.BLURRY_PHOTOS -> Routes.AiBlurryPhotos
+                                AiFeature.SCREENSHOTS_CLEANER -> Routes.AiScreenshotsCleaner
+                                AiFeature.SPAM_MEDIA_DETECTOR -> Routes.AiSpamDetector
+                            }
+                        )
+                    } else {
+                        navController.navigateSingleTop(Routes.Paywall)
+                    }
                 }
             )
         }
@@ -243,19 +247,23 @@ fun WhatsCleanAppRoot(
             FeaturesScreen(
                 onBack = { navController.popBackStack() },
                 onFeatureClick = { feature ->
-                    navController.navigateSingleTop(
-                        when (feature) {
-                            AiFeature.SMART_SUGGESTIONS -> Routes.AiSmartSuggestions
-                            AiFeature.DUPLICATE_DETECTOR -> Routes.AiDuplicateDetector
-                            AiFeature.LARGE_FILES_FINDER -> Routes.AiLargeFilesFinder
-                            AiFeature.OLD_MEDIA_CLEANER -> Routes.AiOldMediaCleaner
-                            AiFeature.WHATSAPP_MEDIA_CLEANER -> Routes.AiWhatsappMediaCleaner
-                            AiFeature.MEME_CLEANER -> Routes.AiMemeCleaner
-                            AiFeature.BLURRY_PHOTOS -> Routes.AiBlurryPhotos
-                            AiFeature.SCREENSHOTS_CLEANER -> Routes.AiScreenshotsCleaner
-                            AiFeature.SPAM_MEDIA_DETECTOR -> Routes.AiSpamDetector
-                        }
-                    )
+                    if (state.isProUser || onPremiumFeatureRequested(PremiumFeature.AI_TOOLS)) {
+                        navController.navigateSingleTop(
+                            when (feature) {
+                                AiFeature.SMART_SUGGESTIONS -> Routes.AiSmartSuggestions
+                                AiFeature.DUPLICATE_DETECTOR -> Routes.AiDuplicateDetector
+                                AiFeature.LARGE_FILES_FINDER -> Routes.AiLargeFilesFinder
+                                AiFeature.OLD_MEDIA_CLEANER -> Routes.AiOldMediaCleaner
+                                AiFeature.WHATSAPP_MEDIA_CLEANER -> Routes.AiWhatsappMediaCleaner
+                                AiFeature.MEME_CLEANER -> Routes.AiMemeCleaner
+                                AiFeature.BLURRY_PHOTOS -> Routes.AiBlurryPhotos
+                                AiFeature.SCREENSHOTS_CLEANER -> Routes.AiScreenshotsCleaner
+                                AiFeature.SPAM_MEDIA_DETECTOR -> Routes.AiSpamDetector
+                            }
+                        )
+                    } else {
+                        navController.navigateSingleTop(Routes.Paywall)
+                    }
                 }
             )
         }
@@ -405,7 +413,8 @@ fun WhatsCleanAppRoot(
                 exceededFreeLimit = state.hasExceededFreeLimit,
                 onBack = { navController.popBackStack() },
                 onPurchaseClick = { product -> onPurchasePlan(product, state.paywallSource) },
-                onRestoreClick = { onRestorePurchase("paywall") }
+                onRestoreClick = { onRestorePurchase("paywall") },
+                onContinueFreeClick = { navController.popBackStack() }
             )
         }
 
