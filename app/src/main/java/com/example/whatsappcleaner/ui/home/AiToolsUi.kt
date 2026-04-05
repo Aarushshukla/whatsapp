@@ -438,8 +438,18 @@ fun AiFeatureDetailScreen(
                     }
                 }
             }
-            items(stats, key = { it.first }) { (title, value, helper) ->
-                StatsCard(title = title, value = value, helper = helper)
+            item {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    stats.forEach { (title, value, helper) ->
+                        StatsCard(
+                            title = title,
+                            value = value.toString(),
+                            helper = helper
+                        )
+                    }
+                }
             }
             item {
                 Card(
