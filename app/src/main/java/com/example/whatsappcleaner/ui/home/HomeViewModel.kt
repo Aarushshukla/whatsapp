@@ -141,7 +141,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     fun updatePermissionStatus(granted: Boolean) {
         Log.d(TAG, "Permission state updated: granted=$granted")
         _uiState.update { currentState -> currentState.copy(permissionGranted = granted) }
-        if (granted) refreshMedia() else _uiState.update { currentState ->
+        if (!granted) _uiState.update { currentState ->
             currentState.copy(summaryInfo = "Permission needed to scan.", isLoading = false)
         }
     }

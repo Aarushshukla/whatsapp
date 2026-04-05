@@ -78,7 +78,12 @@ class MainActivity : ComponentActivity() {
         Log.d(TAG, "onCreate called.")
         runCatching { subscriptionRepository.start(this) }
             .onFailure { error -> Log.e(TAG, "Unable to initialize subscriptions during onCreate.", error) }
-        syncPermissionState()
+        val hasPermission = syncPermissionState()
+        if (hasPermission) {
+            viewModel.refreshMedia()
+        } else {
+            requestStoragePermissions()
+        }
         setContent {
             MainActivityContent(
                 activity = this,
@@ -95,7 +100,10 @@ class MainActivity : ComponentActivity() {
             subscriptionRepository.refreshPurchases()
         }
             .onFailure { error -> Log.e(TAG, "Unable to refresh purchases on resume.", error) }
-        syncPermissionState()
+        val hasPermission = syncPermissionState()
+        if (hasPermission) {
+            viewModel.refreshMedia(showLoading = false)
+        }
     }
 
     private fun requiredPermissions(): Array<String> =
@@ -105,12 +113,13 @@ class MainActivity : ComponentActivity() {
             arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
         }
 
-    private fun syncPermissionState() {
+    private fun syncPermissionState(): Boolean {
         val permissions = requiredPermissions()
         val granted = permissions.isNotEmpty() && permissions.all { permission ->
             ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
         }
         viewModel.updatePermissionStatus(granted)
+        return granted
     }
 
     private fun requestStoragePermissions() {

@@ -133,6 +133,7 @@ class MediaLoader(private val context: Context) {
         } catch (error: Exception) {
             Log.e(TAG, "Error loading $mediaType media", error)
         }
+        Log.d(TAG, "Loaded ${items.size} $mediaType items from MediaStore")
         return items
     }
 }
