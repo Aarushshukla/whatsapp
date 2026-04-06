@@ -5,3 +5,4 @@ local.properties
 .idea/
 *.iml
 *.log
+app/google-services.json
