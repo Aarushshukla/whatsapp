@@ -1,5 +1,7 @@
 package com.example.whatsappcleaner.ui.auth
 
+import android.content.Context
+import android.util.Log
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -18,10 +20,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
-import android.util.Log
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.UserProfileChangeRequest
 
@@ -118,10 +120,11 @@ fun SignupScreen(
     var age by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
-    var isSubmitting by remember { mutableStateOf(false) }
+    var isLoading by remember { mutableStateOf(false) }
     var isPasswordVisible by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     val auth = remember { FirebaseAuth.getInstance() }
+    val context = LocalContext.current
 
     AuthFormLayout(
         title = "Create account",
@@ -148,9 +151,17 @@ fun SignupScreen(
         },
         isPasswordVisible = isPasswordVisible,
         onPasswordVisibilityChange = { isPasswordVisible = !isPasswordVisible },
-        isSubmitting = isSubmitting,
+        isSubmitting = isLoading,
         primaryActionText = "Sign up",
         onPrimaryAction = {
+            if (!isFirebaseSignupConfigured(context)) {
+                Log.e(
+                    "AUTH_ERROR",
+                    "Firebase config is missing/placeholder. Replace app/google-services.json with a valid file from Firebase Console."
+                )
+                errorMessage = "Signup failed. Please try again."
+                return@AuthFormLayout
+            }
             if (name.isBlank() || age.isBlank() || email.isBlank() || password.length < 6) {
                 errorMessage = "Please fill all fields correctly"
                 return@AuthFormLayout
@@ -160,7 +171,7 @@ fun SignupScreen(
                 errorMessage = "Please fill all fields correctly"
                 return@AuthFormLayout
             }
-            isSubmitting = true
+            isLoading = true
             auth.createUserWithEmailAndPassword(email.trim(), password)
                 .addOnSuccessListener {
                     val profileUpdate = UserProfileChangeRequest.Builder()
@@ -169,7 +180,7 @@ fun SignupScreen(
                     auth.currentUser
                         ?.updateProfile(profileUpdate)
                         ?.addOnCompleteListener {
-                            isSubmitting = false
+                            isLoading = false
                             errorMessage = null
                             onSignupSuccess()
                         }
@@ -177,21 +188,21 @@ fun SignupScreen(
                             Log.e("AUTH_ERROR", exception.toString())
                         }
                         ?: run {
-                            isSubmitting = false
+                            isLoading = false
                             errorMessage = null
                             onSignupSuccess()
                         }
                 }
                 .addOnFailureListener { exception ->
                     Log.e("AUTH_ERROR", exception.toString())
-                    isSubmitting = false
+                    isLoading = false
                     errorMessage = "Signup failed. Please try again."
                 }
         },
         footer = {
             TextButton(
                 onClick = onLoginClick,
-                enabled = !isSubmitting
+                enabled = !isLoading
             ) {
                 Text("Already have an account? Login")
             }
@@ -323,4 +334,24 @@ private fun AuthFormLayout(
 
         footer()
     }
+}
+
+private fun isFirebaseSignupConfigured(context: Context): Boolean {
+    val resources = context.resources
+    val packageName = context.packageName
+    val googleAppIdRes = resources.getIdentifier("google_app_id", "string", packageName)
+    val googleApiKeyRes = resources.getIdentifier("google_api_key", "string", packageName)
+
+    if (googleAppIdRes == 0 || googleApiKeyRes == 0) {
+        return false
+    }
+
+    val googleAppId = resources.getString(googleAppIdRes)
+    val googleApiKey = resources.getString(googleApiKeyRes)
+
+    if (googleAppId.isBlank() || googleApiKey.isBlank()) {
+        return false
+    }
+
+    return !googleApiKey.contains("placeholder", ignoreCase = true)
 }
