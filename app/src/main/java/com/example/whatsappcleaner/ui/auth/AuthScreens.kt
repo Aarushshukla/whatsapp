@@ -1,6 +1,7 @@
 package com.example.whatsappcleaner.ui.auth
 
 import android.content.Context
+import android.util.Patterns
 import android.util.Log
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -25,6 +26,9 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
+import com.google.firebase.auth.FirebaseAuthUserCollisionException
+import com.google.firebase.auth.FirebaseAuthWeakPasswordException
 import com.google.firebase.auth.UserProfileChangeRequest
 
 @Composable
@@ -162,17 +166,30 @@ fun SignupScreen(
                 errorMessage = "Signup failed. Please try again."
                 return@AuthFormLayout
             }
-            if (name.isBlank() || age.isBlank() || email.isBlank() || password.length < 6) {
-                errorMessage = "Please fill all fields correctly"
+            if (name.isBlank() || age.isBlank() || email.isBlank() || password.isBlank()) {
+                errorMessage = "Please fill all fields"
                 return@AuthFormLayout
             }
+
+            if (password.length < 6) {
+                errorMessage = "Password must be at least 6 characters"
+                return@AuthFormLayout
+            }
+
+            if (!Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+                errorMessage = "Enter a valid email"
+                return@AuthFormLayout
+            }
+
             val parsedAge = age.toIntOrNull()
             if (parsedAge == null || parsedAge !in 13..120) {
-                errorMessage = "Please fill all fields correctly"
+                errorMessage = "Enter a valid age"
                 return@AuthFormLayout
             }
+
             isLoading = true
-            auth.createUserWithEmailAndPassword(email.trim(), password)
+            FirebaseAuth.getInstance()
+                .createUserWithEmailAndPassword(email.trim(), password.trim())
                 .addOnSuccessListener {
                     val profileUpdate = UserProfileChangeRequest.Builder()
                         .setDisplayName("${name.trim()} • ${parsedAge}y")
@@ -196,7 +213,12 @@ fun SignupScreen(
                 .addOnFailureListener { exception ->
                     Log.e("AUTH_ERROR", exception.toString())
                     isLoading = false
-                    errorMessage = "Signup failed. Please try again."
+                    errorMessage = when (exception) {
+                        is FirebaseAuthUserCollisionException -> "Account already exists. Please login"
+                        is FirebaseAuthWeakPasswordException -> "Password is too weak"
+                        is FirebaseAuthInvalidCredentialsException -> "Invalid email format"
+                        else -> "Signup failed. Please try again"
+                    }
                 }
         },
         footer = {
