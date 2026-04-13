@@ -210,8 +210,7 @@ fun SimpleHomeScreen(
 ) {
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
-    var selectedItems by remember { mutableStateOf<List<SimpleMediaItem>>(emptyList()) }
-    val selectedUris = remember(selectedItems) { selectedItems.map { mediaItem -> mediaItem.uri.toString() }.toSet() }
+    var selectedItemIds by remember { mutableStateOf(setOf<Long>()) }
     var pendingDeleteItems by remember { mutableStateOf<List<SimpleMediaItem>>(emptyList()) }
     var previewItem by remember { mutableStateOf<SimpleMediaItem?>(null) }
     var successMessage by remember { mutableStateOf<String?>(null) }
@@ -224,14 +223,13 @@ fun SimpleHomeScreen(
         }
     }
     LaunchedEffect(items) {
-        selectedItems = selectedItems.filter { selectedItem ->
-            items.any { mediaItem -> mediaItem.uri == selectedItem.uri }
-        }
+        val validIds = items.map { mediaItem -> mediaItem.id }.toSet()
+        selectedItemIds = selectedItemIds.filterTo(linkedSetOf()) { selectedId -> selectedId in validIds }
     }
     LaunchedEffect(smartSuggestedItems) {
-        val suggestionUris = smartSuggestedItems.map { mediaItem -> mediaItem.uri.toString() }.toSet()
-        if (suggestionUris.isNotEmpty()) {
-            selectedItems = items.filter { mediaItem -> mediaItem.uri.toString() in suggestionUris }
+        val suggestionIds = smartSuggestedItems.map { mediaItem -> mediaItem.id }.toSet()
+        if (suggestionIds.isNotEmpty()) {
+            selectedItemIds = suggestionIds
         }
     }
     LaunchedEffect(deleteSnackbarMessage) {
@@ -351,10 +349,10 @@ fun SimpleHomeScreen(
             }
             item(span = { GridItemSpan(maxLineSpan) }) {
                 QuickActionsRow(
-                    selectedCount = selectedItems.size,
+                    selectedCount = selectedItemIds.size,
                     onDeleteClick = {
                         if (isDeleteInProgress) return@QuickActionsRow
-                        val itemsToDelete = items.filter { mediaItem -> mediaItem.uri.toString() in selectedUris }
+                        val itemsToDelete = items.filter { mediaItem -> mediaItem.id in selectedItemIds }
                         if (itemsToDelete.isNotEmpty()) {
                             pendingDeleteItems = itemsToDelete
                         } else {
@@ -362,7 +360,7 @@ fun SimpleHomeScreen(
                         }
                     },
                     onSelectAllClick = {
-                        selectedItems = if (selectedItems.size == items.size) emptyList() else items
+                        selectedItemIds = if (selectedItemIds.size == items.size) emptySet() else items.map { it.id }.toSet()
                     },
                     onFilterClick = {
                         val nextFilter = when (currentFilter) {
@@ -410,14 +408,14 @@ fun SimpleHomeScreen(
                 ) { item ->
                     PremiumMediaRow(
                         item = item,
-                        selected = item.uri.toString() in selectedUris,
+                        selected = item.id in selectedItemIds,
                         suggestionReason = suggestionReasonsByUri[item.uri.toString()]?.joinToString(" • "),
                         onImageClick = { previewItem = item },
                         onToggleSelection = {
-                            selectedItems = if (selectedItems.any { selectedItem -> selectedItem.uri == item.uri }) {
-                                selectedItems.filterNot { selectedItem -> selectedItem.uri == item.uri }
+                            selectedItemIds = if (item.id in selectedItemIds) {
+                                selectedItemIds - item.id
                             } else {
-                                selectedItems + item
+                                selectedItemIds + item.id
                             }
                         },
                         onOpen = { onOpenInSystem(item) },
@@ -1153,6 +1151,7 @@ private fun PremiumMediaRow(
             ImageRequest.Builder(context)
                 .data(source)
                 .crossfade(true)
+                .size(300)
                 .apply {
                     if (item.mimeType?.startsWith("video") == true) {
                         videoFrameMillis(0)

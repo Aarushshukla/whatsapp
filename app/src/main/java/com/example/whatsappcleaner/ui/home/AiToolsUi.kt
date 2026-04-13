@@ -653,6 +653,7 @@ private fun AiResultImageCard(
         coil.request.ImageRequest.Builder(context)
             .data(mediaItem.uri)
             .crossfade(true)
+            .size(300)
             .build()
     }
 
