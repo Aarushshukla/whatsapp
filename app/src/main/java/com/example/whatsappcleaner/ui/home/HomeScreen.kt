@@ -694,7 +694,10 @@ private fun DashboardHeader(
                     QuickPill(icon = Icons.Default.Settings, label = "Settings", onClick = onSettingsClick)
                 }
                 item {
+                    // TODO: RE-ENABLE SUBSCRIPTION LATER
+                    /*
                     QuickPill(icon = Icons.Default.Star, label = if (isProUser) "Pro active" else "Go Pro", onClick = onUpgradeToPro)
+                    */
                 }
             }
 

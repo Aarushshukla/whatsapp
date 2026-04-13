@@ -91,8 +91,11 @@ class MainActivity : ComponentActivity() {
         installSplashScreen()
         super.onCreate(savedInstanceState)
         Log.d(TAG, "onCreate called.")
+        // TODO: RE-ENABLE SUBSCRIPTION LATER
+        /*
         runCatching { subscriptionRepository.start(this) }
             .onFailure { error -> Log.e(TAG, "Unable to initialize subscriptions during onCreate.", error) }
+        */
         if (FirebaseAuth.getInstance().currentUser != null) {
             ensureMediaAccessForSignedInUser()
         }
@@ -104,11 +107,14 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         Log.d(TAG, "onResume called. Refreshing purchases and permission state.")
+        // TODO: RE-ENABLE SUBSCRIPTION LATER
+        /*
         runCatching {
             subscriptionRepository.start(this)
             subscriptionRepository.refreshPurchases()
         }
             .onFailure { error -> Log.e(TAG, "Unable to refresh purchases on resume.", error) }
+        */
         if (FirebaseAuth.getInstance().currentUser != null) {
             val hasPermission = syncPermissionState()
             if (hasPermission) {
@@ -287,12 +293,16 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun openManageSubscription() {
+        // TODO: RE-ENABLE SUBSCRIPTION LATER
+        /*
         val webUri = Uri.parse("https://play.google.com/store/account/subscriptions?package=$packageName")
         runCatching { startActivity(Intent(Intent.ACTION_VIEW, webUri)) }
             .onFailure { error ->
                 Log.e(TAG, "Unable to open subscription management page.", error)
                 rateApp()
             }
+        */
+        rateApp()
     }
 
     private fun openUrl(url: String) {
@@ -404,10 +414,13 @@ class MainActivity : ComponentActivity() {
                     onRestorePurchase = viewModel::restorePurchases,
                     onManageSubscription = ::openManageSubscription,
                     onPurchasePlan = { product, source ->
+                        // TODO: RE-ENABLE SUBSCRIPTION LATER
+                        /*
                         viewModel.notePaywallViewed(source)
                         Log.d(TAG, "Paywall CTA clicked for product=${product.productId}, source=$source")
                         runCatching { subscriptionRepository.launchPurchase(this@MainActivity, product, source) }
                             .onFailure { error -> Log.e(TAG, "Unable to launch purchase flow.", error) }
+                        */
                     },
                     onShareText = ::shareText,
                     onShareResult = { shareText(viewModel.shareResultText()) },
