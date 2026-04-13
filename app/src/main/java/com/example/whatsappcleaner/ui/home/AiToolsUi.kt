@@ -9,9 +9,11 @@ import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
@@ -23,8 +25,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.weight
+import androidx.compose.foundation.background
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -33,6 +39,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.AutoDelete
 import androidx.compose.material.icons.filled.BrokenImage
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Collections
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.FolderOpen
@@ -503,65 +510,194 @@ fun AiFeatureDetailScreen(
     var isProcessing by remember { mutableStateOf(false) }
     var hasResults by remember { mutableStateOf(false) }
     var processedItems by remember(items) { mutableStateOf(items) }
+    var selectedIds by remember { mutableStateOf(setOf<Long>()) }
+    var previewUri by remember { mutableStateOf<android.net.Uri?>(null) }
+
+    LaunchedEffect(processedItems) {
+        selectedIds = selectedIds.filter { selectedId -> processedItems.any { it.id == selectedId } }.toSet()
+    }
+
     AiFeatureScreenScaffold(feature = feature, onBack = onBack) {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            item {
-                Card(shape = RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-                    Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(feature.description, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
-                    }
-                }
-            }
-            item {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    stats.forEach { (title, value, helper) -> StatsCard(title = title, value = value, helper = helper) }
-                }
-            }
-            item {
-                Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
-                    Column(modifier = Modifier.padding(14.dp).animateContentSize(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text(text = "Take action", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
+        Scaffold(
+            containerColor = MaterialTheme.colorScheme.background,
+            bottomBar = {
+                if (hasResults && processedItems.isNotEmpty()) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
                         SmoothPrimaryButton(
-                            text = if (isProcessing) "Scanning..." else feature.actionLabel,
+                            text = "Select All",
+                            modifier = Modifier.weight(1f),
                             onClick = {
-                                if (isProcessing) return@SmoothPrimaryButton
-                                onActionClick()
-                                isProcessing = true
+                                selectedIds = if (selectedIds.size == processedItems.size) {
+                                    emptySet()
+                                } else {
+                                    processedItems.map { it.id }.toSet()
+                                }
                             }
                         )
-                        if (isProcessing) {
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                                Text("Scanning...", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        SmoothPrimaryButton(
+                            text = "Delete Selected (${selectedIds.size})",
+                            modifier = Modifier.weight(1f),
+                            onClick = {
+                                val selectedItems = processedItems.filter { it.id in selectedIds }
+                                if (selectedItems.isNotEmpty()) {
+                                    onDeleteItemsRequested(selectedItems)
+                                    selectedIds = emptySet()
+                                }
                             }
-                            LaunchedEffect(feature, items) {
-                                processedItems = withContext(Dispatchers.Default) { processItems(items) }
-                                hasResults = true
-                                isProcessing = false
-                            }
-                        }
-                        if (hasResults && processedItems.isNotEmpty()) {
-                            SmoothPrimaryButton(text = "Delete all shown (${processedItems.size})", onClick = { onDeleteItemsRequested(processedItems) })
-                        }
+                        )
                     }
                 }
             }
-            if (!hasResults || processedItems.isEmpty()) {
-                item { EmptyStateCard(title = "No processed results yet", body = "Run ${feature.actionLabel.lowercase()} to prepare an actionable list for review.") }
-            } else {
-                items(processedItems.take(60), key = { it.id }) { item ->
-                    StatsCard(
-                        title = item.name,
-                        value = formatSize(item.size),
-                        helper = item.mimeType ?: "Unknown"
-                    )
+        ) { paddingValues ->
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(3),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues),
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    Card(
+                        shape = RoundedCornerShape(22.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                    ) {
+                        Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(feature.description, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
+                        }
+                    }
+                }
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        stats.forEach { (title, value, helper) -> StatsCard(title = title, value = value, helper = helper) }
+                    }
+                }
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    Card(
+                        shape = RoundedCornerShape(20.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp).animateContentSize(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Text(text = "Take action", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
+                            SmoothPrimaryButton(
+                                text = if (isProcessing) "Scanning..." else feature.actionLabel,
+                                onClick = {
+                                    if (isProcessing) return@SmoothPrimaryButton
+                                    onActionClick()
+                                    isProcessing = true
+                                }
+                            )
+                            if (isProcessing) {
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                                    Text("Scanning...", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                LaunchedEffect(feature, items) {
+                                    processedItems = withContext(Dispatchers.Default) { processItems(items) }
+                                    hasResults = true
+                                    isProcessing = false
+                                }
+                            }
+                            if (hasResults && processedItems.isNotEmpty()) {
+                                val totalBytes = processedItems.sumOf { it.size }
+                                Text(
+                                    text = "${processedItems.size} images found • ${formatSize(totalBytes)}",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+
+                if (!hasResults || processedItems.isEmpty()) {
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        EmptyStateCard(
+                            title = "No processed results yet",
+                            body = "Run ${feature.actionLabel.lowercase()} to prepare an actionable list for review."
+                        )
+                    }
+                } else {
+                    items(
+                        processedItems,
+                        key = { it.id }
+                    ) { mediaItem ->
+                        AiResultImageCard(
+                            mediaItem = mediaItem,
+                            selected = mediaItem.id in selectedIds,
+                            onOpenPreview = { previewUri = mediaItem.uri },
+                            onToggleSelection = {
+                                selectedIds = if (mediaItem.id in selectedIds) {
+                                    selectedIds - mediaItem.id
+                                } else {
+                                    selectedIds + mediaItem.id
+                                }
+                            }
+                        )
+                    }
                 }
             }
-            item { Spacer(modifier = Modifier.height(8.dp)) }
+        }
+
+        previewUri?.let { uri ->
+            ImagePreviewScreen(uri = uri, onBack = { previewUri = null })
+        }
+    }
+}
+
+@Composable
+private fun AiResultImageCard(
+    mediaItem: com.example.whatsappcleaner.data.local.SimpleMediaItem,
+    selected: Boolean,
+    onOpenPreview: () -> Unit,
+    onToggleSelection: () -> Unit
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val model = remember(mediaItem.uri) {
+        coil.request.ImageRequest.Builder(context)
+            .data(mediaItem.uri)
+            .crossfade(true)
+            .build()
+    }
+
+    Card(
+        modifier = Modifier
+            .padding(6.dp)
+            .aspectRatio(1f)
+            .combinedClickable(
+                onClick = onOpenPreview,
+                onLongClick = onToggleSelection
+            ),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            coil.compose.AsyncImage(
+                model = model,
+                contentDescription = null,
+                contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+            if (selected) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(androidx.compose.ui.graphics.Color(0x55000000))
+                )
+                Icon(
+                    imageVector = Icons.Default.CheckCircle,
+                    contentDescription = null,
+                    tint = androidx.compose.ui.graphics.Color.White,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(6.dp)
+                )
+            }
         }
     }
 }
