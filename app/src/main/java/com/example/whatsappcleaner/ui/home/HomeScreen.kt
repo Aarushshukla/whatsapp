@@ -10,6 +10,7 @@ import android.os.Environment
 import android.os.StatFs
 import android.util.Log
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
@@ -23,6 +24,7 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -54,6 +56,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Analytics
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.AutoDelete
 import androidx.compose.material.icons.filled.Check
@@ -113,13 +116,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.statusBarsPadding
 import coil.compose.AsyncImage
@@ -209,6 +212,7 @@ fun SimpleHomeScreen(
     var selectedItems by remember { mutableStateOf<List<SimpleMediaItem>>(emptyList()) }
     val selectedUris = remember(selectedItems) { selectedItems.map { mediaItem -> mediaItem.uri.toString() }.toSet() }
     var pendingDeleteItems by remember { mutableStateOf<List<SimpleMediaItem>>(emptyList()) }
+    var previewItem by remember { mutableStateOf<SimpleMediaItem?>(null) }
     var successMessage by remember { mutableStateOf<String?>(null) }
     val gridState = rememberLazyGridState()
 
@@ -407,7 +411,8 @@ fun SimpleHomeScreen(
                         item = item,
                         selected = item.uri.toString() in selectedUris,
                         suggestionReason = suggestionReasonsByUri[item.uri.toString()]?.joinToString(" • "),
-                        onSelect = {
+                        onImageClick = { previewItem = item },
+                        onToggleSelection = {
                             selectedItems = if (selectedItems.any { selectedItem -> selectedItem.uri == item.uri }) {
                                 selectedItems.filterNot { selectedItem -> selectedItem.uri == item.uri }
                             } else {
@@ -429,6 +434,10 @@ fun SimpleHomeScreen(
                 }
             }
         }
+    }
+
+    previewItem?.let { item ->
+        ImagePreviewScreen(uri = item.uri, onBack = { previewItem = null })
     }
 
     if (pendingDeleteItems.isNotEmpty()) {
@@ -542,7 +551,7 @@ private fun SmartCleanButton(
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -640,14 +649,7 @@ private fun DashboardHeader(
     LegitCard {
         Column(
             modifier = Modifier
-                .background(
-                    Brush.verticalGradient(
-                        listOf(
-                            MaterialTheme.colorScheme.surface,
-                            MaterialTheme.colorScheme.surface.copy(alpha = 0.96f)
-                        )
-                    )
-                )
+                .background(MaterialTheme.colorScheme.surface)
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
@@ -660,7 +662,7 @@ private fun DashboardHeader(
                     onClick = onMenuClick,
                     modifier = Modifier
                         .clip(RoundedCornerShape(20.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
                 ) {
                     Icon(Icons.Default.Menu, contentDescription = "Menu", tint = MaterialTheme.colorScheme.onSurface)
                 }
@@ -1120,7 +1122,8 @@ private fun PremiumMediaRow(
     item: SimpleMediaItem,
     selected: Boolean,
     suggestionReason: String?,
-    onSelect: () -> Unit,
+    onImageClick: () -> Unit,
+    onToggleSelection: () -> Unit,
     onOpen: () -> Unit,
     onKeep: () -> Unit,
     onDelete: () -> Unit
@@ -1164,11 +1167,13 @@ private fun PremiumMediaRow(
             .shadow(if (selected) 10.dp else 4.dp, RoundedCornerShape(22.dp))
             .scale(scale)
             .alpha(contentAlpha)
+            .animateContentSize()
             .border(width = 1.6.dp, color = selectedBorder, shape = RoundedCornerShape(22.dp))
-            .clickable(
+            .combinedClickable(
                 interactionSource = interactionSource,
                 indication = null,
-                onClick = onSelect
+                onClick = onImageClick,
+                onLongClick = onToggleSelection
             ),
         shape = RoundedCornerShape(22.dp),
         colors = CardDefaults.cardColors(containerColor = if (selected) MaterialTheme.colorScheme.surface.copy(alpha = 0.95f) else MaterialTheme.colorScheme.surface),
@@ -1191,18 +1196,16 @@ private fun PremiumMediaRow(
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.12f))
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
                     )
                 }
-                Box(
-                    modifier = Modifier
-                        .matchParentSize()
-                        .background(
-                            Brush.verticalGradient(
-                                listOf(Color.Transparent, MaterialTheme.colorScheme.scrim.copy(alpha = 0.82f))
-                            )
-                        )
-                )
+                if (selected) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color(0x55000000))
+                    )
+                }
                 Row(
                     modifier = Modifier
                         .align(Alignment.TopStart)
@@ -1297,6 +1300,32 @@ private fun PremiumMediaRow(
                     onClick = onDelete
                 )
             }
+        }
+    }
+}
+
+@Composable
+fun ImagePreviewScreen(uri: Uri, onBack: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black)
+            .zIndex(2f)
+    ) {
+        AsyncImage(
+            model = uri,
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Fit
+        )
+
+        IconButton(
+            onClick = onBack,
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .statusBarsPadding()
+        ) {
+            Icon(Icons.Default.ArrowBack, contentDescription = null, tint = Color.White)
         }
     }
 }
