@@ -3,14 +3,10 @@ package com.example.whatsappcleaner.ui.theme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.Color
-import android.os.Build
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -31,14 +27,14 @@ private val LightColorScheme = lightColorScheme(
     onTertiaryContainer = BrandNavy,
     error = AccentError,
     onError = Color.White,
-    background = Color(0xFFF7F9FC),
+    background = Color(0xFFF8FAFC),
     onBackground = Color(0xFF0F172A),
     surface = Color(0xFFFFFFFF),
     onSurface = Color(0xFF0F172A),
-    surfaceVariant = Color(0xFFEFF3F8),
-    onSurfaceVariant = Color(0xFF516173),
-    outline = Color(0xFFD1DAE6),
-    outlineVariant = Color(0xFFE3E9F1)
+    surfaceVariant = Color(0xFFE2E8F0),
+    onSurfaceVariant = Color(0xFF334155),
+    outline = Color(0xFFCBD5E1),
+    outlineVariant = Color(0xFFE2E8F0)
 )
 
 private val DarkColorScheme = darkColorScheme(
@@ -91,13 +87,8 @@ fun WhatsCleanTheme(
     darkTheme: Boolean = true,
     content: @Composable () -> Unit
 ) {
-    val context = LocalContext.current
-    val colorScheme = remember(context, darkTheme) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        } else {
-            if (darkTheme) DarkColorScheme else LightColorScheme
-        }
+    val colorScheme = remember(darkTheme) {
+        if (darkTheme) DarkColorScheme else LightColorScheme
     }
     MaterialTheme(colorScheme = colorScheme, typography = AppTypography, content = content)
 }

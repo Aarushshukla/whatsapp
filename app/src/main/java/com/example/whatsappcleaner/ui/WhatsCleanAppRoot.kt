@@ -85,6 +85,7 @@ private object Routes {
 fun WhatsCleanAppRoot(
     state: HomeUiState,
     onRefreshClick: () -> Unit,
+    onAiScanClick: () -> Unit,
     onFilterChange: (MediaFilter) -> Unit,
     onSuggestionChange: (SuggestionType) -> Unit,
     onFrequencyChange: (ReminderFreq) -> Unit,
@@ -264,7 +265,9 @@ fun WhatsCleanAppRoot(
                     } else {
                         navController.navigateSingleTop(Routes.Paywall)
                     }
-                }
+                },
+                aiScanSummary = state.aiScanSummary,
+                onAiScanClick = onAiScanClick
             )
         }
 
@@ -345,13 +348,17 @@ fun WhatsCleanAppRoot(
             SmartSuggestionsFeatureScreen(
                 totalSuggested = state.smartSuggestionSummary.totalSuggestedFiles,
                 totalSpaceToFree = state.smartSuggestionSummary.totalSpaceToFree,
+                items = state.smartSuggestedItems,
+                onDeleteItemsRequested = { items -> onDeleteMediaRequest(items, "ai_smart_suggestions") },
                 onBack = { navController.popBackStack() }
             )
         }
 
         composable(Routes.AiDuplicateDetector) {
             DuplicateDetectorFeatureScreen(
-                duplicateCount = state.duplicateCount,
+                duplicateCount = state.duplicateGroups.flatten().size,
+                items = state.duplicateGroups.flatten(),
+                onDeleteItemsRequested = { items -> onDeleteMediaRequest(items, "ai_duplicates") },
                 onBack = { navController.popBackStack() }
             )
         }
@@ -360,20 +367,26 @@ fun WhatsCleanAppRoot(
             LargeFilesFinderFeatureScreen(
                 count = state.largeFileItems.size,
                 totalBytes = state.largeFileItems.sumOf { mediaItem -> mediaItem.sizeKb.toLong() * 1024L },
+                items = state.largeFileItems.sortedByDescending { it.size },
+                onDeleteItemsRequested = { items -> onDeleteMediaRequest(items, "ai_large") },
                 onBack = { navController.popBackStack() }
             )
         }
 
         composable(Routes.AiOldMediaCleaner) {
             OldMediaCleanerFeatureScreen(
-                count = state.report.oldFiles,
+                count = state.oldFileItems.size,
+                items = state.oldFileItems,
+                onDeleteItemsRequested = { items -> onDeleteMediaRequest(items, "ai_old") },
                 onBack = { navController.popBackStack() }
             )
         }
 
         composable(Routes.AiWhatsappMediaCleaner) {
             WhatsAppMediaCleanerFeatureScreen(
-                sentCount = state.sentFileItems.size,
+                sentCount = state.whatsappJunkItems.size,
+                items = state.whatsappJunkItems,
+                onDeleteItemsRequested = { items -> onDeleteMediaRequest(items, "ai_whatsapp_junk") },
                 onBack = { navController.popBackStack() }
             )
         }
@@ -381,13 +394,17 @@ fun WhatsCleanAppRoot(
         composable(Routes.AiMemeCleaner) {
             MemeCleanerFeatureScreen(
                 memeCount = state.memeCount,
+                items = state.memeItems,
+                onDeleteItemsRequested = { items -> onDeleteMediaRequest(items, "ai_memes") },
                 onBack = { navController.popBackStack() }
             )
         }
 
         composable(Routes.AiBlurryPhotos) {
             BlurryPhotosFeatureScreen(
-                imageCount = state.allItems.count { mediaItem -> mediaItem.mimeType?.startsWith("image") == true },
+                imageCount = state.blurryImageItems.size,
+                items = state.blurryImageItems,
+                onDeleteItemsRequested = { items -> onDeleteMediaRequest(items, "ai_blurry") },
                 onBack = { navController.popBackStack() }
             )
         }
@@ -395,6 +412,8 @@ fun WhatsCleanAppRoot(
         composable(Routes.AiScreenshotsCleaner) {
             ScreenshotsCleanerFeatureScreen(
                 screenshotCount = state.screenshotTodayCount,
+                items = state.allItems.filter { it.name.startsWith("Screenshot", true) },
+                onDeleteItemsRequested = { items -> onDeleteMediaRequest(items, "ai_screenshots") },
                 onBack = { navController.popBackStack() }
             )
         }
@@ -402,6 +421,8 @@ fun WhatsCleanAppRoot(
         composable(Routes.AiSpamDetector) {
             SpamMediaDetectorFeatureScreen(
                 spamCount = state.spamCount,
+                items = state.spamItems,
+                onDeleteItemsRequested = { items -> onDeleteMediaRequest(items, "ai_spam") },
                 onBack = { navController.popBackStack() }
             )
         }

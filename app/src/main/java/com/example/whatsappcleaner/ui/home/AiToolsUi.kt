@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -489,15 +490,11 @@ fun SmoothPrimaryButton(
 fun AiFeatureDetailScreen(
     feature: AiFeature,
     stats: List<Triple<String, String, String>>,
+    items: List<com.example.whatsappcleaner.data.local.SimpleMediaItem>,
     onBack: () -> Unit,
-    onActionClick: () -> Unit
+    onActionClick: () -> Unit,
+    onDeleteItemsRequested: (List<com.example.whatsappcleaner.data.local.SimpleMediaItem>) -> Unit
 ) {
-    var contentVisible by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) {
-        delay(80)
-        contentVisible = true
-    }
-
     AiFeatureScreenScaffold(feature = feature, onBack = onBack) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
@@ -505,65 +502,38 @@ fun AiFeatureDetailScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             item {
-                androidx.compose.animation.AnimatedVisibility(
-                    visible = contentVisible,
-                    enter = androidx.compose.animation.fadeIn(animationSpec = tween(300)) +
-                        androidx.compose.animation.slideInVertically(initialOffsetY = { it / 3 })
-                ) {
-                    Card(
-                        shape = RoundedCornerShape(22.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(18.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Text(feature.description, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
-                            Text(
-                                "This screen is fully wired for future AI logic integration.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                Card(shape = RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                    Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(feature.description, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
+                    }
+                }
+            }
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    stats.forEach { (title, value, helper) -> StatsCard(title = title, value = value, helper = helper) }
+                }
+            }
+            item {
+                Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
+                    Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text(text = "Take action", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
+                        SmoothPrimaryButton(text = feature.actionLabel, onClick = onActionClick)
+                        if (items.isNotEmpty()) {
+                            SmoothPrimaryButton(text = "Delete all shown (${items.size})", onClick = { onDeleteItemsRequested(items) })
                         }
                     }
                 }
             }
-            item {
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    stats.forEach { (title, value, helper) ->
-                        StatsCard(
-                            title = title,
-                            value = value.toString(),
-                            helper = helper
-                        )
-                    }
+            if (items.isEmpty()) {
+                item { EmptyStateCard(title = "No processed results yet", body = "Run ${feature.actionLabel.lowercase()} to prepare an actionable list for review.") }
+            } else {
+                items(items.take(60), key = { it.id }) { item ->
+                    StatsCard(
+                        title = item.name,
+                        value = formatSize(item.size),
+                        helper = item.mimeType ?: "Unknown"
+                    )
                 }
-            }
-            item {
-                Card(
-                    shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(14.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Text(
-                            text = "Take action",
-                            style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        SmoothPrimaryButton(text = feature.actionLabel, onClick = onActionClick)
-                    }
-                }
-            }
-            item {
-                EmptyStateCard(
-                    title = "No processed results yet",
-                    body = "Run ${feature.actionLabel.lowercase()} to prepare an actionable list for review."
-                )
             }
             item { Spacer(modifier = Modifier.height(8.dp)) }
         }
@@ -571,127 +541,89 @@ fun AiFeatureDetailScreen(
 }
 
 @Composable
-fun SmartSuggestionsFeatureScreen(totalSuggested: Int, totalSpaceToFree: Long, onBack: () -> Unit) {
+fun SmartSuggestionsFeatureScreen(totalSuggested: Int, totalSpaceToFree: Long, onBack: () -> Unit, items: List<com.example.whatsappcleaner.data.local.SimpleMediaItem>, onDeleteItemsRequested: (List<com.example.whatsappcleaner.data.local.SimpleMediaItem>) -> Unit) {
     AiFeatureDetailScreen(
         feature = AiFeature.SMART_SUGGESTIONS,
         stats = listOf(
             Triple("Suggestions", totalSuggested.toString(), "AI-prioritized items ready for review"),
-            Triple("Potential savings", formatSize(totalSpaceToFree), "Estimated recoverable storage"),
-            Triple("Confidence", "High", "Built from duplicate, size, and age signals")
+            Triple("Potential savings", formatSize(totalSpaceToFree), "Estimated recoverable storage")
         ),
+        items = items,
         onBack = onBack,
-        onActionClick = {}
+        onActionClick = {},
+        onDeleteItemsRequested = onDeleteItemsRequested
     )
 }
 
 @Composable
-fun DuplicateDetectorFeatureScreen(duplicateCount: Int, onBack: () -> Unit) {
+fun DuplicateDetectorFeatureScreen(duplicateCount: Int, onBack: () -> Unit, items: List<com.example.whatsappcleaner.data.local.SimpleMediaItem>, onDeleteItemsRequested: (List<com.example.whatsappcleaner.data.local.SimpleMediaItem>) -> Unit) {
     AiFeatureDetailScreen(
         feature = AiFeature.DUPLICATE_DETECTOR,
         stats = listOf(
-            Triple("Detected duplicates", duplicateCount.toString(), "Items sharing similar identity patterns"),
-            Triple("Scan quality", "Stable", "Checks remain aligned with your existing media loader"),
-            Triple("Mode", "Review-first", "No auto deletion performed from this UI")
+            Triple("Detected duplicates", duplicateCount.toString(), "Matched by file name + size")
         ),
+        items = items,
         onBack = onBack,
-        onActionClick = {}
+        onActionClick = {},
+        onDeleteItemsRequested = onDeleteItemsRequested
     )
 }
 
 @Composable
-fun LargeFilesFinderFeatureScreen(count: Int, totalBytes: Long, onBack: () -> Unit) {
+fun LargeFilesFinderFeatureScreen(count: Int, totalBytes: Long, onBack: () -> Unit, items: List<com.example.whatsappcleaner.data.local.SimpleMediaItem>, onDeleteItemsRequested: (List<com.example.whatsappcleaner.data.local.SimpleMediaItem>) -> Unit) {
     AiFeatureDetailScreen(
         feature = AiFeature.LARGE_FILES_FINDER,
         stats = listOf(
-            Triple("Large files", count.toString(), "Files over cleanup threshold"),
-            Triple("Heavy media size", formatSize(totalBytes), "Storage impact from large files"),
-            Triple("Priority", "Top space hogs", "Sorted for fastest storage relief")
+            Triple("Large files", count.toString(), "Files over 10MB"),
+            Triple("Heavy media size", formatSize(totalBytes), "Sorted largest first")
         ),
+        items = items,
         onBack = onBack,
-        onActionClick = {}
+        onActionClick = {},
+        onDeleteItemsRequested = onDeleteItemsRequested
     )
 }
 
 @Composable
-fun OldMediaCleanerFeatureScreen(count: Int, onBack: () -> Unit) {
+fun OldMediaCleanerFeatureScreen(count: Int, onBack: () -> Unit, items: List<com.example.whatsappcleaner.data.local.SimpleMediaItem>, onDeleteItemsRequested: (List<com.example.whatsappcleaner.data.local.SimpleMediaItem>) -> Unit) {
     AiFeatureDetailScreen(
         feature = AiFeature.OLD_MEDIA_CLEANER,
-        stats = listOf(
-            Triple("Old files", count.toString(), "Media older than cleanup threshold"),
-            Triple("Cleanup strategy", "Conservative", "Review-first to avoid accidental removal"),
-            Triple("Recommended", "Monthly", "Run periodically to keep storage fresh")
-        ),
+        stats = listOf(Triple("Old files", count.toString(), "Older than 30 days")),
+        items = items,
         onBack = onBack,
-        onActionClick = {}
+        onActionClick = {},
+        onDeleteItemsRequested = onDeleteItemsRequested
     )
 }
 
 @Composable
-fun WhatsAppMediaCleanerFeatureScreen(sentCount: Int, onBack: () -> Unit) {
+fun WhatsAppMediaCleanerFeatureScreen(sentCount: Int, onBack: () -> Unit, items: List<com.example.whatsappcleaner.data.local.SimpleMediaItem>, onDeleteItemsRequested: (List<com.example.whatsappcleaner.data.local.SimpleMediaItem>) -> Unit) {
     AiFeatureDetailScreen(
         feature = AiFeature.WHATSAPP_MEDIA_CLEANER,
-        stats = listOf(
-            Triple("Forwarded or sent", sentCount.toString(), "WhatsApp-heavy shareable media"),
-            Triple("Review workflow", "One tap", "Built for quick batch review sessions"),
-            Triple("Safety", "Manual confirmation", "Uses your current delete confirmation flow")
-        ),
+        stats = listOf(Triple("Junk candidates", sentCount.toString(), "Small WhatsApp images under 200KB")),
+        items = items,
         onBack = onBack,
-        onActionClick = {}
+        onActionClick = {},
+        onDeleteItemsRequested = onDeleteItemsRequested
     )
 }
 
 @Composable
-fun MemeCleanerFeatureScreen(memeCount: Int, onBack: () -> Unit) {
-    AiFeatureDetailScreen(
-        feature = AiFeature.MEME_CLEANER,
-        stats = listOf(
-            Triple("Meme candidates", memeCount.toString(), "Detected by current classifier"),
-            Triple("Mode", "Review and keep", "Sort humor content before cleanup"),
-            Triple("Expected impact", "Medium", "Useful for social-media heavy libraries")
-        ),
-        onBack = onBack,
-        onActionClick = {}
-    )
+fun MemeCleanerFeatureScreen(memeCount: Int, onBack: () -> Unit, items: List<com.example.whatsappcleaner.data.local.SimpleMediaItem>, onDeleteItemsRequested: (List<com.example.whatsappcleaner.data.local.SimpleMediaItem>) -> Unit) {
+    AiFeatureDetailScreen(feature = AiFeature.MEME_CLEANER, stats = listOf(Triple("Meme candidates", memeCount.toString(), "Detected by classifier")), items = items, onBack = onBack, onActionClick = {}, onDeleteItemsRequested = onDeleteItemsRequested)
 }
 
 @Composable
-fun BlurryPhotosFeatureScreen(imageCount: Int, onBack: () -> Unit) {
-    AiFeatureDetailScreen(
-        feature = AiFeature.BLURRY_PHOTOS,
-        stats = listOf(
-            Triple("Photos analyzed", imageCount.toString(), "Image pool ready for quality scoring"),
-            Triple("Status", "UI ready", "Awaiting future blur-scoring integration"),
-            Triple("Workflow", "Safe review", "No automatic cleanup actions performed")
-        ),
-        onBack = onBack,
-        onActionClick = {}
-    )
+fun BlurryPhotosFeatureScreen(imageCount: Int, onBack: () -> Unit, items: List<com.example.whatsappcleaner.data.local.SimpleMediaItem>, onDeleteItemsRequested: (List<com.example.whatsappcleaner.data.local.SimpleMediaItem>) -> Unit) {
+    AiFeatureDetailScreen(feature = AiFeature.BLURRY_PHOTOS, stats = listOf(Triple("Blurry photos", imageCount.toString(), "Low-sharpness images")), items = items, onBack = onBack, onActionClick = {}, onDeleteItemsRequested = onDeleteItemsRequested)
 }
 
 @Composable
-fun ScreenshotsCleanerFeatureScreen(screenshotCount: Int, onBack: () -> Unit) {
-    AiFeatureDetailScreen(
-        feature = AiFeature.SCREENSHOTS_CLEANER,
-        stats = listOf(
-            Triple("Screenshots", screenshotCount.toString(), "Captured temporary images"),
-            Triple("Cleanup type", "Quick wins", "Usually low-risk for cleanup"),
-            Triple("Batching", "Enabled", "Designed for fast review sessions")
-        ),
-        onBack = onBack,
-        onActionClick = {}
-    )
+fun ScreenshotsCleanerFeatureScreen(screenshotCount: Int, onBack: () -> Unit, items: List<com.example.whatsappcleaner.data.local.SimpleMediaItem>, onDeleteItemsRequested: (List<com.example.whatsappcleaner.data.local.SimpleMediaItem>) -> Unit) {
+    AiFeatureDetailScreen(feature = AiFeature.SCREENSHOTS_CLEANER, stats = listOf(Triple("Screenshots", screenshotCount.toString(), "Temporary captures")), items = items, onBack = onBack, onActionClick = {}, onDeleteItemsRequested = onDeleteItemsRequested)
 }
 
 @Composable
-fun SpamMediaDetectorFeatureScreen(spamCount: Int, onBack: () -> Unit) {
-    AiFeatureDetailScreen(
-        feature = AiFeature.SPAM_MEDIA_DETECTOR,
-        stats = listOf(
-            Triple("Potential spam", spamCount.toString(), "Likely junk media candidates"),
-            Triple("Source quality", "Current analyzer", "Based on existing spam scoring logic"),
-            Triple("Action mode", "Review-first", "Keeps cleanup flow safe and transparent")
-        ),
-        onBack = onBack,
-        onActionClick = {}
-    )
+fun SpamMediaDetectorFeatureScreen(spamCount: Int, onBack: () -> Unit, items: List<com.example.whatsappcleaner.data.local.SimpleMediaItem>, onDeleteItemsRequested: (List<com.example.whatsappcleaner.data.local.SimpleMediaItem>) -> Unit) {
+    AiFeatureDetailScreen(feature = AiFeature.SPAM_MEDIA_DETECTOR, stats = listOf(Triple("Potential spam", spamCount.toString(), "Likely junk media")), items = items, onBack = onBack, onActionClick = {}, onDeleteItemsRequested = onDeleteItemsRequested)
 }
