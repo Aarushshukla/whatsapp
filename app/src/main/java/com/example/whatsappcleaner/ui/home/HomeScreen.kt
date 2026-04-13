@@ -210,7 +210,17 @@ fun SimpleHomeScreen(
 ) {
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
-    var selectedItemIds by remember { mutableStateOf(setOf<Long>()) }
+    val selectedItems = remember { mutableStateOf(setOf<Long>()) }
+
+    fun toggleSelection(item: SimpleMediaItem) {
+        val current = selectedItems.value.toMutableSet()
+        if (current.contains(item.id)) {
+            current.remove(item.id)
+        } else {
+            current.add(item.id)
+        }
+        selectedItems.value = current
+    }
     var pendingDeleteItems by remember { mutableStateOf<List<SimpleMediaItem>>(emptyList()) }
     var previewItem by remember { mutableStateOf<SimpleMediaItem?>(null) }
     var successMessage by remember { mutableStateOf<String?>(null) }
@@ -224,12 +234,12 @@ fun SimpleHomeScreen(
     }
     LaunchedEffect(items) {
         val validIds = items.map { mediaItem -> mediaItem.id }.toSet()
-        selectedItemIds = selectedItemIds.filterTo(linkedSetOf()) { selectedId -> selectedId in validIds }
+        selectedItems.value = selectedItems.value.filterTo(linkedSetOf()) { selectedId -> selectedId in validIds }
     }
     LaunchedEffect(smartSuggestedItems) {
         val suggestionIds = smartSuggestedItems.map { mediaItem -> mediaItem.id }.toSet()
         if (suggestionIds.isNotEmpty()) {
-            selectedItemIds = suggestionIds
+            selectedItems.value = suggestionIds
         }
     }
     LaunchedEffect(deleteSnackbarMessage) {
@@ -349,10 +359,10 @@ fun SimpleHomeScreen(
             }
             item(span = { GridItemSpan(maxLineSpan) }) {
                 QuickActionsRow(
-                    selectedCount = selectedItemIds.size,
+                    selectedCount = selectedItems.value.size,
                     onDeleteClick = {
                         if (isDeleteInProgress) return@QuickActionsRow
-                        val itemsToDelete = items.filter { mediaItem -> mediaItem.id in selectedItemIds }
+                        val itemsToDelete = items.filter { mediaItem -> mediaItem.id in selectedItems.value }
                         if (itemsToDelete.isNotEmpty()) {
                             pendingDeleteItems = itemsToDelete
                         } else {
@@ -360,7 +370,7 @@ fun SimpleHomeScreen(
                         }
                     },
                     onSelectAllClick = {
-                        selectedItemIds = if (selectedItemIds.size == items.size) emptySet() else items.map { it.id }.toSet()
+                        selectedItems.value = if (selectedItems.value.size == items.size) emptySet() else items.map { it.id }.toSet()
                     },
                     onFilterClick = {
                         val nextFilter = when (currentFilter) {
@@ -406,18 +416,13 @@ fun SimpleHomeScreen(
                     key = { mediaItem -> mediaItem.id },
                     span = { GridItemSpan(maxLineSpan) }
                 ) { item ->
+                    val isSelected = selectedItems.value.contains(item.id)
                     PremiumMediaRow(
                         item = item,
-                        selected = item.id in selectedItemIds,
+                        selected = isSelected,
                         suggestionReason = suggestionReasonsByUri[item.uri.toString()]?.joinToString(" • "),
                         onImageClick = { previewItem = item },
-                        onToggleSelection = {
-                            selectedItemIds = if (item.id in selectedItemIds) {
-                                selectedItemIds - item.id
-                            } else {
-                                selectedItemIds + item.id
-                            }
-                        },
+                        onToggleSelection = { toggleSelection(item) },
                         onOpen = { onOpenInSystem(item) },
                         onKeep = {
                             val itemName = item.safeDisplayName()
@@ -457,9 +462,7 @@ fun SimpleHomeScreen(
                     onClick = {
                         val itemsToDelete = pendingDeleteItems
                         pendingDeleteItems = emptyList()
-                        selectedItems = selectedItems.filterNot { selectedItem ->
-                            itemsToDelete.any { itemToDelete -> itemToDelete.uri == selectedItem.uri }
-                        }
+                        selectedItems.value = selectedItems.value - itemsToDelete.map { itemToDelete -> itemToDelete.id }.toSet()
                         onDeleteConfirmed()
                         onDeleteItemsRequested(itemsToDelete)
                     }
