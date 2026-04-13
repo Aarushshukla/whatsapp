@@ -1,6 +1,7 @@
 package com.example.whatsappcleaner.ui.home
 
 import android.app.Application
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
 import android.util.Log
@@ -21,6 +22,7 @@ import com.example.whatsappcleaner.data.local.MediaLoader
 import com.example.whatsappcleaner.data.local.SimpleMediaItem
 import com.example.whatsappcleaner.data.local.UserPrefs
 import com.example.whatsappcleaner.data.local.formatSize
+import kotlin.math.abs
 import com.example.whatsappcleaner.reminder.ReminderScheduler
 import com.example.whatsappcleaner.ui.settings.AppThemeMode
 import com.example.whatsappcleaner.ui.settings.ReminderFrequencyOption
@@ -86,7 +88,12 @@ data class HomeUiState(
     val deleteRequestId: Long = 0L,
     val isDeleteInProgress: Boolean = false,
     val deleteSnackbarMessage: String? = null,
-    val lastDeletedItems: List<SimpleMediaItem> = emptyList()
+    val lastDeletedItems: List<SimpleMediaItem> = emptyList(),
+    val duplicateGroups: List<List<SimpleMediaItem>> = emptyList(),
+    val oldFileItems: List<SimpleMediaItem> = emptyList(),
+    val whatsappJunkItems: List<SimpleMediaItem> = emptyList(),
+    val blurryImageItems: List<SimpleMediaItem> = emptyList(),
+    val aiScanSummary: AiScanSummary = AiScanSummary()
 ) {
     // TODO: RE-ENABLE SUBSCRIPTION LATER
     /*
@@ -103,6 +110,14 @@ data class SmartSuggestionSummary(
     val oldFiles: Int = 0,
     val totalSuggestedFiles: Int = 0,
     val totalSpaceToFree: Long = 0L
+)
+
+data class AiScanSummary(
+    val isRunning: Boolean = false,
+    val progress: Float = 0f,
+    val status: String = "Idle",
+    val cleanableBytes: Long = 0L,
+    val junkCount: Int = 0
 )
 
 sealed class DeleteExecution {
@@ -125,6 +140,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private val mediaLoader = MediaLoader(application)
+    private val appContext = application.applicationContext
     private val smartJunkAnalyzer = SmartJunkAnalyzer()
     private val spamMediaAnalyzer = SpamMediaAnalyzer()
     private val phoneRealityAnalyzer = PhoneRealityAnalyzer()
@@ -248,10 +264,20 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         val totalSize = allItems.sumOf { mediaItem -> mediaItem.sizeKb.toLong() * 1024L }
         val now = System.currentTimeMillis()
         val oldFileCutoff = now - (OLD_FILE_AGE_DAYS * 24L * 60L * 60L * 1000L)
-        val duplicateGroups = allItems.groupBy { mediaItem -> mediaItem.name.lowercase() }.filterValues { it.size > 1 }
-        val duplicateSuggestedItems = duplicateGroups.values.flatten()
-        val largeSuggestedItems = allItems.filter { mediaItem -> mediaItem.size > LARGE_FILE_THRESHOLD_BYTES }
+        val duplicateGroups = allItems
+            .groupBy { mediaItem -> "${mediaItem.name.lowercase()}_${mediaItem.size}" }
+            .values
+            .filter { groupedItems -> groupedItems.size > 1 }
+        val duplicateSuggestedItems = duplicateGroups.flatten()
+        val largeSuggestedItems = allItems
+            .filter { mediaItem -> mediaItem.size > LARGE_FILE_THRESHOLD_BYTES }
+            .sortedByDescending { mediaItem -> mediaItem.size }
         val oldSuggestedItems = allItems.filter { mediaItem -> mediaItem.addedMillis < oldFileCutoff }
+        val whatsappJunkItems = allItems.filter { mediaItem ->
+            mediaItem.mimeType?.startsWith("image") == true &&
+                mediaItem.size < 200L * 1024L &&
+                (mediaItem.uri.toString().contains("whatsapp", ignoreCase = true) || mediaItem.name.contains("IMG-", ignoreCase = true))
+        }
 
         val suggestedReasonMap = mutableMapOf<String, MutableSet<String>>()
         duplicateSuggestedItems.forEach { item ->
@@ -314,7 +340,10 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     memeCount = memes.size,
                     duplicateCount = junkBreakdown.duplicates.size,
                     spamCount = spamItems.size
-                )
+                ),
+                duplicateGroups = duplicateGroups,
+                oldFileItems = oldSuggestedItems.sortedBy { mediaItem -> mediaItem.addedMillis },
+                whatsappJunkItems = whatsappJunkItems
             )
         }
         _items.value = allItems
@@ -326,6 +355,83 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         val classification = classifier.classify(item.uri)
         return classification.category == ImageCategory.MEME || likelyByName
     }
+
+    fun runAiScan() {
+        val allItems = _uiState.value.allItems
+        if (allItems.isEmpty()) return
+        viewModelScope.launch(Dispatchers.Default) {
+            _uiState.update { it.copy(aiScanSummary = AiScanSummary(isRunning = true, progress = 0.1f, status = "Checking duplicates...")) }
+            val duplicateItems = allItems
+                .groupBy { "${it.name.lowercase()}_${it.size}" }
+                .values
+                .filter { it.size > 1 }
+                .flatten()
+
+            _uiState.update { it.copy(aiScanSummary = it.aiScanSummary.copy(progress = 0.35f, status = "Finding large files...")) }
+            val largeItems = allItems.filter { it.size > LARGE_FILE_THRESHOLD_BYTES }.sortedByDescending { it.size }
+
+            _uiState.update { it.copy(aiScanSummary = it.aiScanSummary.copy(progress = 0.55f, status = "Checking old media...")) }
+            val oldCutoff = System.currentTimeMillis() - (OLD_FILE_AGE_DAYS * 24L * 60L * 60L * 1000L)
+            val oldItems = allItems.filter { it.addedMillis < oldCutoff }
+
+            _uiState.update { it.copy(aiScanSummary = it.aiScanSummary.copy(progress = 0.75f, status = "Detecting blurry and junk images...")) }
+            val junkItems = allItems.filter { mediaItem ->
+                mediaItem.mimeType?.startsWith("image") == true &&
+                    mediaItem.size < 200L * 1024L &&
+                    mediaItem.uri.toString().contains("whatsapp", ignoreCase = true)
+            }
+            val blurryItems = detectBlurryImages(allItems)
+
+            val union = (duplicateItems + largeItems + oldItems + junkItems + blurryItems).distinctBy { it.uri.toString() }
+            _uiState.update {
+                it.copy(
+                    duplicateGroups = duplicateItems.groupBy { item -> "${item.name.lowercase()}_${item.size}" }.values.toList(),
+                    largeFileItems = largeItems,
+                    oldFileItems = oldItems.sortedBy { item -> item.addedMillis },
+                    whatsappJunkItems = junkItems,
+                    blurryImageItems = blurryItems,
+                    aiScanSummary = AiScanSummary(
+                        isRunning = false,
+                        progress = 1f,
+                        status = "Scan complete",
+                        cleanableBytes = union.sumOf { item -> item.size },
+                        junkCount = union.size
+                    )
+                )
+            }
+        }
+    }
+
+    private fun detectBlurryImages(items: List<SimpleMediaItem>): List<SimpleMediaItem> =
+        items.asSequence()
+            .filter { it.mimeType?.startsWith("image") == true }
+            .take(80)
+            .filter { isLikelyBlurry(it.uri) }
+            .toList()
+
+    private fun isLikelyBlurry(uri: Uri): Boolean = runCatching {
+        val options = BitmapFactory.Options().apply { inSampleSize = 8 }
+        appContext.contentResolver.openInputStream(uri)?.use { input ->
+            val bitmap = BitmapFactory.decodeStream(input, null, options) ?: return false
+            if (bitmap.width < 8 || bitmap.height < 8) return true
+            var diffSum = 0L
+            var count = 0
+            for (y in 1 until bitmap.height step 2) {
+                for (x in 1 until bitmap.width step 2) {
+                    val pixel = bitmap.getPixel(x, y)
+                    val left = bitmap.getPixel(x - 1, y)
+                    val up = bitmap.getPixel(x, y - 1)
+                    val lum = ((pixel shr 16) and 0xFF) + ((pixel shr 8) and 0xFF) + (pixel and 0xFF)
+                    val lumL = ((left shr 16) and 0xFF) + ((left shr 8) and 0xFF) + (left and 0xFF)
+                    val lumU = ((up shr 16) and 0xFF) + ((up shr 8) and 0xFF) + (up and 0xFF)
+                    diffSum += abs(lum - lumL) + abs(lum - lumU)
+                    count++
+                }
+            }
+            bitmap.recycle()
+            (if (count == 0) 0.0 else diffSum.toDouble() / count.toDouble()) < 35.0
+        } ?: false
+    }.getOrDefault(false)
 
     fun setFilter(filter: MediaFilter) {
         _uiState.update { currentState ->

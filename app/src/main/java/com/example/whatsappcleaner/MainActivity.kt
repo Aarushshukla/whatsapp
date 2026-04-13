@@ -340,6 +340,7 @@ class MainActivity : ComponentActivity() {
             WhatsCleanAppRoot(
                 state = state,
                 onRefreshClick = viewModel::refreshMedia,
+                onAiScanClick = viewModel::runAiScan,
                 onFilterChange = viewModel::setFilter,
                 onSuggestionChange = viewModel::setSuggestion,
                 onFrequencyChange = viewModel::setFrequency,
