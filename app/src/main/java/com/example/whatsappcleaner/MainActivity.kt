@@ -18,26 +18,18 @@ import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.whatsappcleaner.data.billing.SubscriptionRepository
 import com.example.whatsappcleaner.ui.WhatsCleanAppRoot
-import com.example.whatsappcleaner.ui.auth.LoginScreen
-import com.example.whatsappcleaner.ui.auth.PreparingCleanerScreen
-import com.example.whatsappcleaner.ui.auth.SignupScreen
 import com.example.whatsappcleaner.ui.home.DeleteExecution
 import com.example.whatsappcleaner.ui.home.HomeViewModel
 import com.example.whatsappcleaner.ui.settings.AppThemeMode
 import com.example.whatsappcleaner.ui.theme.WhatsCleanTheme
-import com.google.firebase.auth.FirebaseAuth
 
 class MainActivity : ComponentActivity() {
 
@@ -80,13 +72,6 @@ class MainActivity : ComponentActivity() {
                 }
             }
         )
-
-    private enum class AuthGateState {
-        Checking,
-        SignedOut,
-        SignedIn
-    }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
@@ -96,9 +81,7 @@ class MainActivity : ComponentActivity() {
         runCatching { subscriptionRepository.start(this) }
             .onFailure { error -> Log.e(TAG, "Unable to initialize subscriptions during onCreate.", error) }
         */
-        if (FirebaseAuth.getInstance().currentUser != null) {
-            ensureMediaAccessForSignedInUser()
-        }
+        ensureMediaAccessForSignedInUser()
         setContent {
             MainActivityContent(versionLabel = safeVersionLabel())
         }
@@ -115,11 +98,9 @@ class MainActivity : ComponentActivity() {
         }
             .onFailure { error -> Log.e(TAG, "Unable to refresh purchases on resume.", error) }
         */
-        if (FirebaseAuth.getInstance().currentUser != null) {
-            val hasPermission = syncPermissionState()
-            if (hasPermission) {
-                viewModel.refreshMedia(showLoading = false)
-            }
+        val hasPermission = syncPermissionState()
+        if (hasPermission) {
+            viewModel.refreshMedia(showLoading = false)
         }
     }
 
@@ -338,9 +319,6 @@ class MainActivity : ComponentActivity() {
     private fun MainActivityContent(versionLabel: String) {
         val state by viewModel.uiState.collectAsStateWithLifecycle()
         val mediaItems by viewModel.items.collectAsStateWithLifecycle()
-        val firebaseAuth = remember { FirebaseAuth.getInstance() }
-        var authGateState by remember { mutableStateOf(AuthGateState.Checking) }
-        var showSignup by remember { mutableStateOf(false) }
         val darkTheme = when (state.settings.themeMode) {
             AppThemeMode.DARK -> true
             AppThemeMode.LIGHT -> false
@@ -349,127 +327,96 @@ class MainActivity : ComponentActivity() {
         val privacyPolicyUrl = "https://www.google.com/search?q=Cleanly+AI+privacy+policy"
         val faqUrl = "https://www.google.com/search?q=Cleanly+AI+FAQ"
 
-        androidx.compose.runtime.LaunchedEffect(state.deleteRequestId, mediaItems.size) {
+        LaunchedEffect(state.deleteRequestId, mediaItems.size) {
             if (state.pendingDeleteUris.isEmpty()) {
                 Log.d(TAG, "Delete request id changed to ${state.deleteRequestId}, but pendingDeleteUris is empty.")
             }
         }
-        DisposableEffect(firebaseAuth) {
-            val listener = FirebaseAuth.AuthStateListener { auth ->
-                authGateState = if (auth.currentUser == null) {
-                    AuthGateState.SignedOut
-                } else {
-                    AuthGateState.SignedIn
-                }
-            }
-            firebaseAuth.addAuthStateListener(listener)
-            onDispose { firebaseAuth.removeAuthStateListener(listener) }
-        }
-        LaunchedEffect(authGateState) {
-            if (authGateState == AuthGateState.SignedIn) {
-                ensureMediaAccessForSignedInUser()
-            }
+        LaunchedEffect(Unit) {
+            ensureMediaAccessForSignedInUser()
         }
 
         WhatsCleanTheme(darkTheme = darkTheme) {
-            when (authGateState) {
-                AuthGateState.Checking -> PreparingCleanerScreen(message = "Preparing Cleaner…")
-                AuthGateState.SignedOut -> {
-                    if (showSignup) {
-                        SignupScreen(
-                            onSignupSuccess = { showSignup = false },
-                            onLoginClick = { showSignup = false }
-                        )
-                    } else {
-                        LoginScreen(
-                            onLoginSuccess = { showSignup = false },
-                            onSignupClick = { showSignup = true }
-                        )
-                    }
-                }
-                AuthGateState.SignedIn -> WhatsCleanAppRoot(
-                    state = state,
-                    onRefreshClick = viewModel::refreshMedia,
-                    onFilterChange = viewModel::setFilter,
-                    onSuggestionChange = viewModel::setSuggestion,
-                    onFrequencyChange = viewModel::setFrequency,
-                    onTimeChange = viewModel::setTime,
-                    onRemindersToggle = viewModel::toggleReminders,
-                    onOpenInSystem = { item -> openFileInSystem(item.uri) },
-                    onOpenSystemStorage = {
-                        viewModel.onStorageScreenOpened()
-                        openSystemStorage()
-                    },
-                    onRequestPermission = ::requestStoragePermissions,
-                    onSettingsOpened = viewModel::onSettingsOpened,
-                    onThemeSelected = viewModel::setThemeMode,
-                    onSmartAlertsToggle = viewModel::setSmartAlerts,
-                    onAutoCleanFrequencySelected = viewModel::setAutoCleanFrequency,
-                    onFileSizeFilterSelected = viewModel::setFileSizeFilter,
-                    onShowOnlyLargeToggle = viewModel::setShowOnlyLargeFiles,
-                    onIncludeScreenshotsToggle = viewModel::setIncludeScreenshots,
-                    onIncludeMemesToggle = viewModel::setIncludeMemes,
-                    onIncludeDuplicatesToggle = viewModel::setIncludeDuplicates,
-                    onUpgradeToPro = { viewModel.notePaywallViewed("settings_upgrade") },
-                    onRestorePurchase = viewModel::restorePurchases,
-                    onManageSubscription = ::openManageSubscription,
-                    onPurchasePlan = { product, source ->
-                        // TODO: RE-ENABLE SUBSCRIPTION LATER
-                        /*
-                        viewModel.notePaywallViewed(source)
-                        Log.d(TAG, "Paywall CTA clicked for product=${product.productId}, source=$source")
-                        runCatching { subscriptionRepository.launchPurchase(this@MainActivity, product, source) }
-                            .onFailure { error -> Log.e(TAG, "Unable to launch purchase flow.", error) }
-                        */
-                    },
-                    onShareText = ::shareText,
-                    onShareResult = { shareText(viewModel.shareResultText()) },
-                    onInviteFriends = { shareText(viewModel.shareInviteText()) },
-                    onRateApp = ::rateApp,
-                    onPrivacyPolicy = { openUrl(privacyPolicyUrl) },
-                    onFaq = { openUrl(faqUrl) },
-                    onContactSupport = { sendEmail("support@cleanlyai.app", "Cleanly AI support") },
-                    onReportIssue = { sendEmail("support@cleanlyai.app", "Cleanly AI bug report") },
-                    onPremiumFeatureRequested = viewModel::onPremiumFeatureRequested,
-                    onDeleteClicked = viewModel::onDeleteClicked,
-                    onDeleteMediaRequest = { items, origin ->
-                        Log.d("DELETE_FLOW", "Step 1: Delete button clicked")
-                        Log.d("DELETE_DEBUG", "Delete button click from $origin with ${items.size} selected items")
-                        val rawUris = items.map { item -> item.uri }
-                        rawUris.forEachIndexed { index, uri -> Log.d("DELETE_DEBUG", "Raw URI[$index]=$uri") }
+            WhatsCleanAppRoot(
+                state = state,
+                onRefreshClick = viewModel::refreshMedia,
+                onFilterChange = viewModel::setFilter,
+                onSuggestionChange = viewModel::setSuggestion,
+                onFrequencyChange = viewModel::setFrequency,
+                onTimeChange = viewModel::setTime,
+                onRemindersToggle = viewModel::toggleReminders,
+                onOpenInSystem = { item -> openFileInSystem(item.uri) },
+                onOpenSystemStorage = {
+                    viewModel.onStorageScreenOpened()
+                    openSystemStorage()
+                },
+                onRequestPermission = ::requestStoragePermissions,
+                onSettingsOpened = viewModel::onSettingsOpened,
+                onThemeSelected = viewModel::setThemeMode,
+                onSmartAlertsToggle = viewModel::setSmartAlerts,
+                onAutoCleanFrequencySelected = viewModel::setAutoCleanFrequency,
+                onFileSizeFilterSelected = viewModel::setFileSizeFilter,
+                onShowOnlyLargeToggle = viewModel::setShowOnlyLargeFiles,
+                onIncludeScreenshotsToggle = viewModel::setIncludeScreenshots,
+                onIncludeMemesToggle = viewModel::setIncludeMemes,
+                onIncludeDuplicatesToggle = viewModel::setIncludeDuplicates,
+                onUpgradeToPro = { viewModel.notePaywallViewed("settings_upgrade") },
+                onRestorePurchase = viewModel::restorePurchases,
+                onManageSubscription = ::openManageSubscription,
+                onPurchasePlan = { product, source ->
+                    // TODO: RE-ENABLE SUBSCRIPTION LATER
+                    /*
+                    viewModel.notePaywallViewed(source)
+                    Log.d(TAG, "Paywall CTA clicked for product=${product.productId}, source=$source")
+                    runCatching { subscriptionRepository.launchPurchase(this@MainActivity, product, source) }
+                        .onFailure { error -> Log.e(TAG, "Unable to launch purchase flow.", error) }
+                    */
+                },
+                onShareText = ::shareText,
+                onShareResult = { shareText(viewModel.shareResultText()) },
+                onInviteFriends = { shareText(viewModel.shareInviteText()) },
+                onRateApp = ::rateApp,
+                onPrivacyPolicy = { openUrl(privacyPolicyUrl) },
+                onFaq = { openUrl(faqUrl) },
+                onContactSupport = { sendEmail("support@cleanlyai.app", "Cleanly AI support") },
+                onReportIssue = { sendEmail("support@cleanlyai.app", "Cleanly AI bug report") },
+                onPremiumFeatureRequested = viewModel::onPremiumFeatureRequested,
+                onDeleteClicked = viewModel::onDeleteClicked,
+                onDeleteMediaRequest = { items, origin ->
+                    Log.d("DELETE_FLOW", "Step 1: Delete button clicked")
+                    Log.d("DELETE_DEBUG", "Delete button click from $origin with ${items.size} selected items")
+                    val rawUris = items.map { item -> item.uri }
+                    rawUris.forEachIndexed { index, uri -> Log.d("DELETE_DEBUG", "Raw URI[$index]=$uri") }
 
-                        when (val execution = viewModel.requestMediaDeletion(items, origin, Build.VERSION.SDK_INT)) {
-                            is DeleteExecution.NeedsUserApproval -> {
-                                val validUris = execution.uris.distinct()
-                                if (validUris.isEmpty()) {
-                                    showDeleteError("Some files cannot be deleted due to system restrictions")
-                                    viewModel.onMediaDeleteCancelled()
-                                } else {
-                                    Log.d("DELETE_DEBUG", "Valid MediaStore URI list size=${validUris.size}")
-                                    validUris.forEachIndexed { index, uri -> Log.d("DELETE_DEBUG", "Valid delete URI[$index]=$uri") }
-                                    Log.d("DELETE_FLOW", "Step 2.5: Calling launchDeleteRequest")
-                                    launchDeleteRequest(validUris)
-                                }
+                    when (val execution = viewModel.requestMediaDeletion(items, origin, Build.VERSION.SDK_INT)) {
+                        is DeleteExecution.NeedsUserApproval -> {
+                            val validUris = execution.uris.distinct()
+                            if (validUris.isEmpty()) {
+                                showDeleteError("Some files cannot be deleted due to system restrictions")
+                                viewModel.onMediaDeleteCancelled()
+                            } else {
+                                Log.d("DELETE_DEBUG", "Valid MediaStore URI list size=${validUris.size}")
+                                validUris.forEachIndexed { index, uri -> Log.d("DELETE_DEBUG", "Valid delete URI[$index]=$uri") }
+                                Log.d("DELETE_FLOW", "Step 2.5: Calling launchDeleteRequest")
+                                launchDeleteRequest(validUris)
                             }
-                            is DeleteExecution.StartedInBackground -> {
-                                val validUris = execution.uris.distinct()
-                                if (validUris.isNotEmpty()) {
-                                    Log.d("DELETE_FLOW", "Step 2.5: Calling launchDeleteRequest")
-                                    launchDeleteRequest(validUris)
-                                }
-                            }
-                            DeleteExecution.Ignored -> Unit
                         }
-                    },
-                    onUndoDelete = viewModel::undoLastDelete,
-                    onDeleteSnackbarConsumed = viewModel::clearDeleteSnackbar,
-                    onReviewClicked = viewModel::onReviewClicked,
-                    onCleanupRecorded = viewModel::recordCleanupResult,
-                    versionLabel = versionLabel
-                )
-            }
-
+                        is DeleteExecution.StartedInBackground -> {
+                            val validUris = execution.uris.distinct()
+                            if (validUris.isNotEmpty()) {
+                                Log.d("DELETE_FLOW", "Step 2.5: Calling launchDeleteRequest")
+                                launchDeleteRequest(validUris)
+                            }
+                        }
+                        DeleteExecution.Ignored -> Unit
+                    }
+                },
+                onUndoDelete = viewModel::undoLastDelete,
+                onDeleteSnackbarConsumed = viewModel::clearDeleteSnackbar,
+                onReviewClicked = viewModel::onReviewClicked,
+                onCleanupRecorded = viewModel::recordCleanupResult,
+                versionLabel = versionLabel
+            )
         }
     }
-
 }
