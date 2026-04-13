@@ -35,6 +35,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.annotation.MainThread
 
 enum class PremiumFeature(val analyticsKey: String, val paywallSource: String) {
     SMART_CLEAN_ADVANCED("smart_clean_clicked", "smart_clean_advanced"),
@@ -155,6 +156,34 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private var hasLoadedInitialCache = false
     private var refreshInProgress = false
 
+    private data class MediaComputation(
+        val allItems: List<SimpleMediaItem>,
+        val filteredItems: List<SimpleMediaItem>,
+        val summaryInfo: String,
+        val largeTodayCount: Int,
+        val largeTodaySizeText: String,
+        val screenshotTodayCount: Int,
+        val screenshotTodaySizeText: String,
+        val memeCount: Int,
+        val memeItems: List<SimpleMediaItem>,
+        val junkCount: Int,
+        val duplicateCount: Int,
+        val spamCount: Int,
+        val totalFiles: Int,
+        val totalSize: Long,
+        val duplicateItems: List<SimpleMediaItem>,
+        val spamItems: List<SimpleMediaItem>,
+        val largeFileItems: List<SimpleMediaItem>,
+        val sentFileItems: List<SimpleMediaItem>,
+        val smartSuggestionSummary: SmartSuggestionSummary,
+        val smartSuggestedItems: List<SimpleMediaItem>,
+        val suggestionReasonsByUri: Map<String, List<String>>,
+        val report: StorageReport,
+        val duplicateGroups: List<List<SimpleMediaItem>>,
+        val oldFileItems: List<SimpleMediaItem>,
+        val whatsappJunkItems: List<SimpleMediaItem>
+    )
+
     init {
         loadPreferences()
         // TODO: RE-ENABLE SUBSCRIPTION LATER
@@ -187,41 +216,41 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     fun refreshMedia(forceRefresh: Boolean = false, showLoading: Boolean = true) {
         if (!_uiState.value.permissionGranted) return
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             if (refreshInProgress) {
                 Log.d(TAG, "Skipping refresh request because a scan is already in progress.")
                 return@launch
             }
             if (hasLoadedInitialCache && !forceRefresh && _uiState.value.allItems.isNotEmpty()) {
                 Log.d(TAG, "Using cached media list; skipping full rescan.")
-                _uiState.update { current ->
-                    current.copy(
-                        filteredItems = filterList(current.allItems, current.currentFilter, current.activeSuggestion, current.settings),
-                        summaryInfo = "Found ${current.allItems.size} files (${formatSize(current.totalSize)})",
-                        isLoading = false
-                    )
+                withContext(Dispatchers.Main) {
+                    _uiState.update { current ->
+                        current.copy(
+                            filteredItems = filterList(current.allItems, current.currentFilter, current.activeSuggestion, current.settings),
+                            summaryInfo = "Found ${current.allItems.size} files (${formatSize(current.totalSize)})",
+                            isLoading = false
+                        )
+                    }
                 }
                 return@launch
             }
             refreshInProgress = true
             Log.d(TAG, "Refreshing media library.")
             if (showLoading) {
-                _uiState.update { currentState -> currentState.copy(summaryInfo = "Scanning files...", isLoading = true) }
+                withContext(Dispatchers.Main) {
+                    _uiState.update { currentState -> currentState.copy(summaryInfo = "Scanning files...", isLoading = true) }
+                }
             }
             try {
-                val initialItems = withContext(Dispatchers.IO) {
-                    val images = mediaLoader.loadAllDeviceMedia("image", limit = INITIAL_LOAD_LIMIT)
-                    val videos = mediaLoader.loadAllDeviceMedia("video", limit = INITIAL_LOAD_LIMIT)
-                    (images + videos).sortedByDescending { mediaItem -> mediaItem.addedMillis }
-                }
+                val images = mediaLoader.loadAllDeviceMedia("image", limit = INITIAL_LOAD_LIMIT)
+                val videos = mediaLoader.loadAllDeviceMedia("video", limit = INITIAL_LOAD_LIMIT)
+                val initialItems = (images + videos).sortedByDescending { mediaItem -> mediaItem.addedMillis }
                 applyLoadedMediaState(initialItems)
                 hasLoadedInitialCache = true
 
-                val allItems = withContext(Dispatchers.IO) {
-                    val images = mediaLoader.loadAllDeviceMedia("image")
-                    val videos = mediaLoader.loadAllDeviceMedia("video")
-                    (images + videos).sortedByDescending { mediaItem -> mediaItem.addedMillis }
-                }
+                val fullImages = mediaLoader.loadAllDeviceMedia("image")
+                val fullVideos = mediaLoader.loadAllDeviceMedia("video")
+                val allItems = (fullImages + fullVideos).sortedByDescending { mediaItem -> mediaItem.addedMillis }
 
                 if (allItems.size != initialItems.size) {
                     applyLoadedMediaState(allItems)
@@ -229,13 +258,17 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 hasLoadedInitialCache = true
             } catch (error: SecurityException) {
                 Log.e(TAG, "Media scan failed due to permission issue.", error)
-                _uiState.update { currentState ->
-                    currentState.copy(summaryInfo = "Scan failed: permission denied", isLoading = false)
+                withContext(Dispatchers.Main) {
+                    _uiState.update { currentState ->
+                        currentState.copy(summaryInfo = "Scan failed: permission denied", isLoading = false)
+                    }
                 }
             } catch (error: Exception) {
                 Log.e(TAG, "Media scan failed.", error)
-                _uiState.update { currentState ->
-                    currentState.copy(summaryInfo = "Scan failed: ${error.message ?: "Unknown error"}", isLoading = false)
+                withContext(Dispatchers.Main) {
+                    _uiState.update { currentState ->
+                        currentState.copy(summaryInfo = "Scan failed: ${error.message ?: "Unknown error"}", isLoading = false)
+                    }
                 }
             } finally {
                 refreshInProgress = false
@@ -257,67 +290,67 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
 
-        val junkBreakdown = withContext(Dispatchers.Default) { smartJunkAnalyzer.buildBreakdown(allItems) }
-        val junkItems = withContext(Dispatchers.Default) { smartJunkAnalyzer.findJunk(allItems) }
-        val spamItems = withContext(Dispatchers.Default) { spamMediaAnalyzer.findSpamMedia(allItems) }
-        val baseReport = withContext(Dispatchers.Default) { phoneRealityAnalyzer.generateReport(allItems) }
-        val totalSize = allItems.sumOf { mediaItem -> mediaItem.sizeKb.toLong() * 1024L }
-        val now = System.currentTimeMillis()
-        val oldFileCutoff = now - (OLD_FILE_AGE_DAYS * 24L * 60L * 60L * 1000L)
-        val duplicateGroups = allItems
-            .groupBy { mediaItem -> "${mediaItem.name.lowercase()}_${mediaItem.size}" }
-            .values
-            .filter { groupedItems -> groupedItems.size > 1 }
-        val duplicateSuggestedItems = duplicateGroups.flatten()
-        val largeSuggestedItems = allItems
-            .filter { mediaItem -> mediaItem.size > LARGE_FILE_THRESHOLD_BYTES }
-            .sortedByDescending { mediaItem -> mediaItem.size }
-        val oldSuggestedItems = allItems.filter { mediaItem -> mediaItem.addedMillis < oldFileCutoff }
-        val whatsappJunkItems = allItems.filter { mediaItem ->
-            mediaItem.mimeType?.startsWith("image") == true &&
-                mediaItem.size < 200L * 1024L &&
-                (mediaItem.uri.toString().contains("whatsapp", ignoreCase = true) || mediaItem.name.contains("IMG-", ignoreCase = true))
-        }
+        val computedState = withContext(Dispatchers.Default) {
+            val junkBreakdown = smartJunkAnalyzer.buildBreakdown(allItems)
+            val junkItems = smartJunkAnalyzer.findJunk(allItems)
+            val spamItems = spamMediaAnalyzer.findSpamMedia(allItems)
+            val baseReport = phoneRealityAnalyzer.generateReport(allItems)
+            val totalSize = allItems.sumOf { mediaItem -> mediaItem.sizeKb.toLong() * 1024L }
+            val now = System.currentTimeMillis()
+            val oldFileCutoff = now - (OLD_FILE_AGE_DAYS * 24L * 60L * 60L * 1000L)
+            val duplicateGroups = allItems
+                .groupBy { mediaItem -> "${mediaItem.name.lowercase()}_${mediaItem.size}" }
+                .values
+                .filter { groupedItems -> groupedItems.size > 1 }
+            val duplicateSuggestedItems = duplicateGroups.flatten()
+            val largeSuggestedItems = allItems
+                .filter { mediaItem -> mediaItem.size > LARGE_FILE_THRESHOLD_BYTES }
+                .sortedByDescending { mediaItem -> mediaItem.size }
+            val oldSuggestedItems = allItems.filter { mediaItem -> mediaItem.addedMillis < oldFileCutoff }
+            val whatsappJunkItems = allItems.filter { mediaItem ->
+                mediaItem.mimeType?.startsWith("image") == true &&
+                    mediaItem.size < 200L * 1024L &&
+                    (mediaItem.uri.toString().contains("whatsapp", ignoreCase = true) || mediaItem.name.contains("IMG-", ignoreCase = true))
+            }
 
-        val suggestedReasonMap = mutableMapOf<String, MutableSet<String>>()
-        duplicateSuggestedItems.forEach { item ->
-            suggestedReasonMap.getOrPut(item.uri.toString()) { linkedSetOf() }
-                .add("Duplicate name")
-        }
-        largeSuggestedItems.forEach { item ->
-            suggestedReasonMap.getOrPut(item.uri.toString()) { linkedSetOf() }
-                .add("Large file (>10MB)")
-        }
-        oldSuggestedItems.forEach { item ->
-            suggestedReasonMap.getOrPut(item.uri.toString()) { linkedSetOf() }
-                .add("Old file (>30 days)")
-        }
-        val smartSuggestedItems = allItems.filter { item -> suggestedReasonMap.containsKey(item.uri.toString()) }
-        val smartSuggestionSummary = SmartSuggestionSummary(
-            duplicateFiles = duplicateSuggestedItems.size,
-            duplicateGroups = duplicateGroups.size,
-            largeFiles = largeSuggestedItems.size,
-            oldFiles = oldSuggestedItems.size,
-            totalSuggestedFiles = smartSuggestedItems.size,
-            totalSpaceToFree = smartSuggestedItems.sumOf { item -> item.size }
-        )
-        val summary = if (allItems.isEmpty()) {
-            Log.d(TAG, "No media items found on device.")
-            "No media found."
-        } else {
-            Log.d(TAG, "Loaded ${allItems.size} media items.")
-            "Found ${allItems.size} files (${formatSize(totalSize)})"
-        }
-        val today = System.currentTimeMillis() - 86400000
-        val largeItems = allItems.filter { mediaItem -> mediaItem.addedMillis > today && mediaItem.sizeKb > 5000 }
-        val screenshots = allItems.filter { mediaItem -> mediaItem.addedMillis > today && mediaItem.name.startsWith("Screenshot", true) }
+            val suggestedReasonMap = mutableMapOf<String, MutableSet<String>>()
+            duplicateSuggestedItems.forEach { item ->
+                suggestedReasonMap.getOrPut(item.uri.toString()) { linkedSetOf() }
+                    .add("Duplicate name")
+            }
+            largeSuggestedItems.forEach { item ->
+                suggestedReasonMap.getOrPut(item.uri.toString()) { linkedSetOf() }
+                    .add("Large file (>10MB)")
+            }
+            oldSuggestedItems.forEach { item ->
+                suggestedReasonMap.getOrPut(item.uri.toString()) { linkedSetOf() }
+                    .add("Old file (>30 days)")
+            }
+            val smartSuggestedItems = allItems.filter { item -> suggestedReasonMap.containsKey(item.uri.toString()) }
+            val smartSuggestionSummary = SmartSuggestionSummary(
+                duplicateFiles = duplicateSuggestedItems.size,
+                duplicateGroups = duplicateGroups.size,
+                largeFiles = largeSuggestedItems.size,
+                oldFiles = oldSuggestedItems.size,
+                totalSuggestedFiles = smartSuggestedItems.size,
+                totalSpaceToFree = smartSuggestedItems.sumOf { item -> item.size }
+            )
+            val summary = if (allItems.isEmpty()) {
+                Log.d(TAG, "No media items found on device.")
+                "No media found."
+            } else {
+                Log.d(TAG, "Loaded ${allItems.size} media items.")
+                "Found ${allItems.size} files (${formatSize(totalSize)})"
+            }
+            val today = System.currentTimeMillis() - 86400000
+            val largeItems = allItems.filter { mediaItem -> mediaItem.addedMillis > today && mediaItem.sizeKb > 5000 }
+            val screenshots = allItems.filter { mediaItem -> mediaItem.addedMillis > today && mediaItem.name.startsWith("Screenshot", true) }
+            val filteredItems = filterList(allItems, _uiState.value.currentFilter, _uiState.value.activeSuggestion, _uiState.value.settings)
 
-        _uiState.update { current ->
-            current.copy(
+            MediaComputation(
                 allItems = allItems,
-                filteredItems = filterList(allItems, current.currentFilter, current.activeSuggestion, current.settings),
+                filteredItems = filteredItems,
                 summaryInfo = summary,
-                isLoading = false,
                 largeTodayCount = largeItems.size,
                 largeTodaySizeText = formatSize(largeItems.sumOf { i -> i.sizeKb.toLong() * 1024 }),
                 screenshotTodayCount = screenshots.size,
@@ -346,7 +379,45 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 whatsappJunkItems = whatsappJunkItems
             )
         }
-        _items.value = allItems
+
+        applyComputedState(computedState)
+    }
+
+    @MainThread
+    private suspend fun applyComputedState(computed: MediaComputation) {
+        withContext(Dispatchers.Main) {
+            _uiState.update { current ->
+                current.copy(
+                    allItems = computed.allItems,
+                    filteredItems = computed.filteredItems,
+                    summaryInfo = computed.summaryInfo,
+                    isLoading = false,
+                    largeTodayCount = computed.largeTodayCount,
+                    largeTodaySizeText = computed.largeTodaySizeText,
+                    screenshotTodayCount = computed.screenshotTodayCount,
+                    screenshotTodaySizeText = computed.screenshotTodaySizeText,
+                    memeCount = computed.memeCount,
+                    memeItems = computed.memeItems,
+                    junkCount = computed.junkCount,
+                    duplicateCount = computed.duplicateCount,
+                    spamCount = computed.spamCount,
+                    totalFiles = computed.totalFiles,
+                    totalSize = computed.totalSize,
+                    duplicateItems = computed.duplicateItems,
+                    spamItems = computed.spamItems,
+                    largeFileItems = computed.largeFileItems,
+                    sentFileItems = computed.sentFileItems,
+                    smartSuggestionSummary = computed.smartSuggestionSummary,
+                    smartSuggestedItems = computed.smartSuggestedItems,
+                    suggestionReasonsByUri = computed.suggestionReasonsByUri,
+                    report = computed.report,
+                    duplicateGroups = computed.duplicateGroups,
+                    oldFileItems = computed.oldFileItems,
+                    whatsappJunkItems = computed.whatsappJunkItems
+                )
+            }
+            _items.value = computed.allItems
+        }
     }
 
     private suspend fun isMeme(item: SimpleMediaItem, classifier: MemeClassifier): Boolean {
