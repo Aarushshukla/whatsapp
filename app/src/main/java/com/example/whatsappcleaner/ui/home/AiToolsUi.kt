@@ -5,6 +5,7 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.clickable
@@ -43,6 +44,7 @@ import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -68,7 +70,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.whatsappcleaner.data.local.formatSize
 import com.example.whatsappcleaner.ui.components.LegitButton
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 
 enum class AiFeature(
     val title: String,
@@ -493,8 +497,12 @@ fun AiFeatureDetailScreen(
     items: List<com.example.whatsappcleaner.data.local.SimpleMediaItem>,
     onBack: () -> Unit,
     onActionClick: () -> Unit,
-    onDeleteItemsRequested: (List<com.example.whatsappcleaner.data.local.SimpleMediaItem>) -> Unit
+    onDeleteItemsRequested: (List<com.example.whatsappcleaner.data.local.SimpleMediaItem>) -> Unit,
+    processItems: suspend (List<com.example.whatsappcleaner.data.local.SimpleMediaItem>) -> List<com.example.whatsappcleaner.data.local.SimpleMediaItem> = { source -> source }
 ) {
+    var isProcessing by remember { mutableStateOf(false) }
+    var hasResults by remember { mutableStateOf(false) }
+    var processedItems by remember(items) { mutableStateOf(items) }
     AiFeatureScreenScaffold(feature = feature, onBack = onBack) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
@@ -515,19 +523,37 @@ fun AiFeatureDetailScreen(
             }
             item {
                 Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
-                    Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Column(modifier = Modifier.padding(14.dp).animateContentSize(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text(text = "Take action", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
-                        SmoothPrimaryButton(text = feature.actionLabel, onClick = onActionClick)
-                        if (items.isNotEmpty()) {
-                            SmoothPrimaryButton(text = "Delete all shown (${items.size})", onClick = { onDeleteItemsRequested(items) })
+                        SmoothPrimaryButton(
+                            text = if (isProcessing) "Scanning..." else feature.actionLabel,
+                            onClick = {
+                                if (isProcessing) return@SmoothPrimaryButton
+                                onActionClick()
+                                isProcessing = true
+                            }
+                        )
+                        if (isProcessing) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                                Text("Scanning...", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            LaunchedEffect(feature, items) {
+                                processedItems = withContext(Dispatchers.Default) { processItems(items) }
+                                hasResults = true
+                                isProcessing = false
+                            }
+                        }
+                        if (hasResults && processedItems.isNotEmpty()) {
+                            SmoothPrimaryButton(text = "Delete all shown (${processedItems.size})", onClick = { onDeleteItemsRequested(processedItems) })
                         }
                     }
                 }
             }
-            if (items.isEmpty()) {
+            if (!hasResults || processedItems.isEmpty()) {
                 item { EmptyStateCard(title = "No processed results yet", body = "Run ${feature.actionLabel.lowercase()} to prepare an actionable list for review.") }
             } else {
-                items(items.take(60), key = { it.id }) { item ->
+                items(processedItems.take(60), key = { it.id }) { item ->
                     StatsCard(
                         title = item.name,
                         value = formatSize(item.size),
@@ -565,7 +591,13 @@ fun DuplicateDetectorFeatureScreen(duplicateCount: Int, onBack: () -> Unit, item
         items = items,
         onBack = onBack,
         onActionClick = {},
-        onDeleteItemsRequested = onDeleteItemsRequested
+        onDeleteItemsRequested = onDeleteItemsRequested,
+        processItems = { source ->
+            source.groupBy { "${it.name.lowercase()}_${it.size}" }
+                .values
+                .filter { group -> group.size > 1 }
+                .flatten()
+        }
     )
 }
 
@@ -580,7 +612,8 @@ fun LargeFilesFinderFeatureScreen(count: Int, totalBytes: Long, onBack: () -> Un
         items = items,
         onBack = onBack,
         onActionClick = {},
-        onDeleteItemsRequested = onDeleteItemsRequested
+        onDeleteItemsRequested = onDeleteItemsRequested,
+        processItems = { source -> source.sortedByDescending { it.size } }
     )
 }
 
