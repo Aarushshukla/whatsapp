@@ -192,6 +192,8 @@ fun SettingsScreen(
             }
             item {
                 SettingsSection(title = "Subscription") {
+                    // TODO: RE-ENABLE SUBSCRIPTION LATER
+                    /*
                     ActionRow(
                         "Upgrade to Pro",
                         if (subscriptionState.isProUser) "Current plan: ${subscriptionState.currentPlan.displayName}" else "Unlock Smart Clean, duplicate review, meme detection, and bulk delete",
@@ -205,6 +207,8 @@ fun SettingsScreen(
                         Icons.Default.Subscriptions,
                         onManageSubscription
                     )
+                    */
+                    ActionRow("All features unlocked", "Subscription actions are temporarily disabled", Icons.Default.CheckCircle, {})
                 }
             }
             item {

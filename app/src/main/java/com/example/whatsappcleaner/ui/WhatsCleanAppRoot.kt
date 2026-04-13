@@ -155,13 +155,13 @@ fun WhatsCleanAppRoot(
                 duplicateCount = state.duplicateCount,
                 isProUser = state.isProUser,
                 onNavigateToSmartClean = {
-                    if (onPremiumFeatureRequested(PremiumFeature.SMART_CLEAN_ADVANCED)) {
+                    if (true) {
                         navController.navigateSingleTop(Routes.SmartClean)
                     } else navController.navigateSingleTop(Routes.Paywall)
                 },
                 onNavigateToPhoneReality = { navController.navigateSingleTop(Routes.PhoneReality) },
                 onNavigateToMemeAnalyzer = {
-                    if (onPremiumFeatureRequested(PremiumFeature.MEME_DETECTION)) {
+                    if (true) {
                         navController.navigateSingleTop(Routes.MemeScreen)
                     } else navController.navigateSingleTop(Routes.Paywall)
                 },
@@ -171,7 +171,7 @@ fun WhatsCleanAppRoot(
                 },
                 onNavigateToJunk = { navController.navigateSingleTop(Routes.JunkScreen) },
                 onNavigateToAnalytics = {
-                    if (onPremiumFeatureRequested(PremiumFeature.ADVANCED_ANALYTICS)) {
+                    if (true) {
                         navController.navigateSingleTop(Routes.Analytics)
                     } else navController.navigateSingleTop(Routes.Paywall)
                 },
@@ -181,12 +181,12 @@ fun WhatsCleanAppRoot(
                     navController.navigateSingleTop(Routes.Settings)
                 },
                 onNavigateToDuplicates = {
-                    if (onPremiumFeatureRequested(PremiumFeature.DUPLICATE_DETECTION)) {
+                    if (true) {
                         navController.navigateSingleTop(Routes.SmartClean)
                     } else navController.navigateSingleTop(Routes.Paywall)
                 },
                 onBulkDeleteClick = {
-                    if (onPremiumFeatureRequested(PremiumFeature.BULK_DELETE)) {
+                    if (true) {
                         onDeleteClicked("bulk_delete")
                     } else navController.navigateSingleTop(Routes.Paywall)
                 },
@@ -222,7 +222,7 @@ fun WhatsCleanAppRoot(
                 suggestionReasonsByUri = state.suggestionReasonsByUri,
                 onNavigateToFeatures = { navController.navigateSingleTop(Routes.Features) },
                 onAiFeatureClick = { feature ->
-                    if (state.isProUser || onPremiumFeatureRequested(PremiumFeature.AI_TOOLS)) {
+                    if (true) {
                         navController.navigateSingleTop(
                             when (feature) {
                                 AiFeature.SMART_SUGGESTIONS -> Routes.AiSmartSuggestions
@@ -247,7 +247,7 @@ fun WhatsCleanAppRoot(
             FeaturesScreen(
                 onBack = { navController.popBackStack() },
                 onFeatureClick = { feature ->
-                    if (state.isProUser || onPremiumFeatureRequested(PremiumFeature.AI_TOOLS)) {
+                    if (true) {
                         navController.navigateSingleTop(
                             when (feature) {
                                 AiFeature.SMART_SUGGESTIONS -> Routes.AiSmartSuggestions
@@ -407,6 +407,8 @@ fun WhatsCleanAppRoot(
         }
 
         composable(Routes.Paywall) {
+            // TODO: RE-ENABLE SUBSCRIPTION LATER
+            /*
             PaywallScreen(
                 subscriptionState = state.subscriptionState,
                 source = state.paywallSource,
@@ -416,6 +418,17 @@ fun WhatsCleanAppRoot(
                 onRestoreClick = { onRestorePurchase("paywall") },
                 onContinueFreeClick = { navController.popBackStack() }
             )
+            */
+            Column(
+                modifier = Modifier.fillMaxSize().padding(24.dp),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text("All features are unlocked.", style = MaterialTheme.typography.titleMedium)
+                Button(onClick = { navController.popBackStack() }) {
+                    Text("Continue")
+                }
+            }
         }
 
         composable(Routes.Settings) {

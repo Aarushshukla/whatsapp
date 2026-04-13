@@ -88,7 +88,11 @@ data class HomeUiState(
     val deleteSnackbarMessage: String? = null,
     val lastDeletedItems: List<SimpleMediaItem> = emptyList()
 ) {
+    // TODO: RE-ENABLE SUBSCRIPTION LATER
+    /*
     val isProUser: Boolean get() = subscriptionState.isProUser
+    */
+    val isProUser: Boolean get() = true
     val isDeleting: Boolean get() = isDeleteInProgress
 }
 
@@ -137,6 +141,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         loadPreferences()
+        // TODO: RE-ENABLE SUBSCRIPTION LATER
+        /*
         subscriptionRepository.start()
         subscriptionRepository.refreshPurchases()
         viewModelScope.launch {
@@ -152,6 +158,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
         }
+        */
     }
 
     fun updatePermissionStatus(granted: Boolean) {
@@ -487,6 +494,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun onPremiumFeatureRequested(feature: PremiumFeature): Boolean {
+        // TODO: RE-ENABLE SUBSCRIPTION LATER
+        /*
         if (feature == PremiumFeature.SMART_CLEAN_ADVANCED) analytics.trackSmartCleanClicked()
         val isPro = _uiState.value.isProUser
         if (isPro) return true
@@ -499,9 +508,14 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
         analytics.trackPaywallViewed(feature.paywallSource)
         return false
+        */
+        if (true) return true
+        return false
     }
 
     fun notePaywallViewed(source: String) {
+        // TODO: RE-ENABLE SUBSCRIPTION LATER
+        /*
         _uiState.update { currentState ->
             currentState.copy(
                 paywallSource = source,
@@ -509,10 +523,14 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             )
         }
         analytics.trackPaywallViewed(source)
+        */
     }
 
     fun restorePurchases(source: String) {
+        // TODO: RE-ENABLE SUBSCRIPTION LATER
+        /*
         subscriptionRepository.restorePurchases(source)
+        */
     }
 
     fun recordCleanupResult(bytes: Long) {
