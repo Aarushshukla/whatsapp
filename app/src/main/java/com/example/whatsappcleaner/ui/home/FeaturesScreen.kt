@@ -31,7 +31,9 @@ fun FeaturesScreen(
     onBack: () -> Unit,
     onFeatureClick: (AiFeature) -> Unit,
     aiScanSummary: AiScanSummary,
-    onAiScanClick: () -> Unit
+    deepCleanCredits: Int,
+    onAiScanClick: () -> Unit,
+    onDeepCleanWatchAd: () -> Unit
 ) {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -78,6 +80,18 @@ fun FeaturesScreen(
                             Text(aiScanSummary.status, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         LegitButton(text = if (aiScanSummary.isRunning) "Scanning..." else "AI Scan", enabled = !aiScanSummary.isRunning, onClick = onAiScanClick)
+                        LegitButton(
+                            text = if (aiScanSummary.isRunning) "Scanning..." else "Deep Clean (Watch Ad)",
+                            enabled = !aiScanSummary.isRunning,
+                            onClick = onDeepCleanWatchAd
+                        )
+                        if (deepCleanCredits > 0) {
+                            Text(
+                                text = "Deep clean unlocked: $deepCleanCredits",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
                     }
                 }
             }

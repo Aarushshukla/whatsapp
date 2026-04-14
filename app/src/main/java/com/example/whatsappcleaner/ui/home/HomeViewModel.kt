@@ -94,7 +94,10 @@ data class HomeUiState(
     val oldFileItems: List<SimpleMediaItem> = emptyList(),
     val whatsappJunkItems: List<SimpleMediaItem> = emptyList(),
     val blurryImageItems: List<SimpleMediaItem> = emptyList(),
-    val aiScanSummary: AiScanSummary = AiScanSummary()
+    val aiScanSummary: AiScanSummary = AiScanSummary(),
+    val shouldShowInterstitialForAiScan: Boolean = false,
+    val deepCleanCredits: Int = 0,
+    val shouldShowInterstitialForDelete: Boolean = false
 ) {
     // TODO: RE-ENABLE SUBSCRIPTION LATER
     /*
@@ -427,9 +430,11 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         return classification.category == ImageCategory.MEME || likelyByName
     }
 
-    fun runAiScan() {
-        val allItems = _uiState.value.allItems
+    fun runAiScan(isDeepClean: Boolean = false) {
+        val currentState = _uiState.value
+        val allItems = currentState.allItems
         if (allItems.isEmpty()) return
+        if (isDeepClean && currentState.deepCleanCredits <= 0) return
         viewModelScope.launch(Dispatchers.Default) {
             _uiState.update { it.copy(aiScanSummary = AiScanSummary(isRunning = true, progress = 0.1f, status = "Checking duplicates...")) }
             val duplicateItems = allItems
@@ -451,7 +456,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     mediaItem.size < 200L * 1024L &&
                     mediaItem.uri.toString().contains("whatsapp", ignoreCase = true)
             }
-            val blurryItems = detectBlurryImages(allItems)
+            val blurryItems = detectBlurryImages(allItems, if (isDeepClean) 200 else 80)
 
             val union = (duplicateItems + largeItems + oldItems + junkItems + blurryItems).distinctBy { it.uri.toString() }
             _uiState.update {
@@ -464,19 +469,35 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     aiScanSummary = AiScanSummary(
                         isRunning = false,
                         progress = 1f,
-                        status = "Scan complete",
+                        status = if (isDeepClean) "Deep clean complete" else "Scan complete",
                         cleanableBytes = union.sumOf { item -> item.size },
                         junkCount = union.size
-                    )
+                    ),
+                    shouldShowInterstitialForAiScan = true,
+                    deepCleanCredits = if (isDeepClean) (it.deepCleanCredits - 1).coerceAtLeast(0) else it.deepCleanCredits
                 )
             }
         }
     }
 
-    private fun detectBlurryImages(items: List<SimpleMediaItem>): List<SimpleMediaItem> =
+    fun unlockDeepCleanCredit() {
+        _uiState.update { current ->
+            current.copy(deepCleanCredits = current.deepCleanCredits + 1)
+        }
+    }
+
+    fun consumeAiScanInterstitialRequest() {
+        _uiState.update { current -> current.copy(shouldShowInterstitialForAiScan = false) }
+    }
+
+    fun consumeDeleteInterstitialRequest() {
+        _uiState.update { current -> current.copy(shouldShowInterstitialForDelete = false) }
+    }
+
+    private fun detectBlurryImages(items: List<SimpleMediaItem>, limit: Int): List<SimpleMediaItem> =
         items.asSequence()
             .filter { it.mimeType?.startsWith("image") == true }
-            .take(80)
+            .take(limit)
             .filter { isLikelyBlurry(it.uri) }
             .toList()
 
@@ -967,7 +988,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     spamCount = remainingSpamItems.size
                 ),
                 deleteSnackbarMessage = deleteMessage,
-                lastDeletedItems = emptyList()
+                lastDeletedItems = emptyList(),
+                shouldShowInterstitialForDelete = true
             )
         }
         _uiState.value = updatedState
