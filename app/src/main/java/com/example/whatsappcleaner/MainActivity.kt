@@ -21,9 +21,11 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.whatsappcleaner.ads.AdManager
 import com.example.whatsappcleaner.data.billing.SubscriptionRepository
 import com.example.whatsappcleaner.ui.WhatsCleanAppRoot
 import com.example.whatsappcleaner.ui.home.DeleteExecution
@@ -39,6 +41,8 @@ class MainActivity : ComponentActivity() {
 
     private val viewModel: HomeViewModel by viewModels()
     private val subscriptionRepository by lazy(LazyThreadSafetyMode.NONE) { SubscriptionRepository.get(this) }
+    private val adManager by lazy(LazyThreadSafetyMode.NONE) { AdManager(this) }
+    private var hasShownExitAdThisSession = false
     private val deleteLauncher =
         registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
             try {
@@ -82,6 +86,7 @@ class MainActivity : ComponentActivity() {
             .onFailure { error -> Log.e(TAG, "Unable to initialize subscriptions during onCreate.", error) }
         */
         ensureMediaAccessForSignedInUser()
+        adManager.initialize()
         setContent {
             MainActivityContent(versionLabel = safeVersionLabel())
         }
@@ -309,6 +314,36 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+
+    private fun showExitAdOncePerSession() {
+        if (hasShownExitAdThisSession) {
+            finish()
+            return
+        }
+        hasShownExitAdThisSession = true
+        adManager.showInterstitial(this) {
+            finish()
+        }
+    }
+
+    private fun showInterstitialIfReady(onDone: () -> Unit = {}) {
+        adManager.showInterstitial(this) {
+            onDone()
+        }
+    }
+
+    private fun showRewardedForDeepClean() {
+        if (viewModel.uiState.value.aiScanSummary.isRunning) return
+        adManager.showRewarded(
+            activity = this,
+            onRewarded = {
+                viewModel.unlockDeepCleanCredit()
+                viewModel.runAiScan(isDeepClean = true)
+            },
+            onDismissed = { }
+        )
+    }
+
     private fun safeVersionLabel(): String {
         val versionName = BuildConfig.VERSION_NAME.takeIf { candidateName -> candidateName.isNotBlank() } ?: "1.0"
         val versionCode = BuildConfig.VERSION_CODE.takeIf { candidateCode -> candidateCode > 0 } ?: 1
@@ -326,6 +361,21 @@ class MainActivity : ComponentActivity() {
         }
         val privacyPolicyUrl = "https://www.google.com/search?q=Cleanly+AI+privacy+policy"
         val faqUrl = "https://www.google.com/search?q=Cleanly+AI+FAQ"
+        val latestShowInterstitialIfReady = rememberUpdatedState(newValue = ::showInterstitialIfReady)
+
+        LaunchedEffect(state.shouldShowInterstitialForAiScan) {
+            if (state.shouldShowInterstitialForAiScan && !state.aiScanSummary.isRunning) {
+                latestShowInterstitialIfReady.value.invoke()
+                viewModel.consumeAiScanInterstitialRequest()
+            }
+        }
+
+        LaunchedEffect(state.shouldShowInterstitialForDelete) {
+            if (state.shouldShowInterstitialForDelete && !state.isDeleteInProgress) {
+                latestShowInterstitialIfReady.value.invoke()
+                viewModel.consumeDeleteInterstitialRequest()
+            }
+        }
 
         LaunchedEffect(state.deleteRequestId, mediaItems.size) {
             if (state.pendingDeleteUris.isEmpty()) {
@@ -416,6 +466,8 @@ class MainActivity : ComponentActivity() {
                 onDeleteSnackbarConsumed = viewModel::clearDeleteSnackbar,
                 onReviewClicked = viewModel::onReviewClicked,
                 onCleanupRecorded = viewModel::recordCleanupResult,
+                onDeepCleanWatchAd = ::showRewardedForDeepClean,
+                onExitRequested = ::showExitAdOncePerSession,
                 versionLabel = versionLabel
             )
         }

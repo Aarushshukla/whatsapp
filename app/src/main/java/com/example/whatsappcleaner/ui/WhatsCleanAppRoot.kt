@@ -1,5 +1,6 @@
 package com.example.whatsappcleaner.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -22,6 +23,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.whatsappcleaner.data.ReminderFreq
 import com.example.whatsappcleaner.data.ReminderTime
@@ -122,6 +124,8 @@ fun WhatsCleanAppRoot(
     onDeleteSnackbarConsumed: () -> Unit,
     onReviewClicked: () -> Unit,
     onCleanupRecorded: (Long) -> Unit,
+    onDeepCleanWatchAd: () -> Unit,
+    onExitRequested: () -> Unit,
     versionLabel: String,
     modifier: Modifier = Modifier
 ) {
@@ -134,6 +138,12 @@ fun WhatsCleanAppRoot(
         return
     }
     val navController = rememberNavController()
+    val navBackStackEntry = navController.currentBackStackEntryAsState()
+    val currentRoute = navBackStackEntry.value?.destination?.route
+
+    BackHandler(enabled = currentRoute == Routes.Home) {
+        onExitRequested()
+    }
 
     AnimatedNavHost(
         navController = navController,
@@ -267,7 +277,9 @@ fun WhatsCleanAppRoot(
                     }
                 },
                 aiScanSummary = state.aiScanSummary,
-                onAiScanClick = onAiScanClick
+                deepCleanCredits = state.deepCleanCredits,
+                onAiScanClick = onAiScanClick,
+                onDeepCleanWatchAd = onDeepCleanWatchAd
             )
         }
 
