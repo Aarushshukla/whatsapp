@@ -21,11 +21,12 @@
         android:icon="@mipmap/ic_launcher"
         android:label="WhatsAppCleaner"
         android:theme="@style/Theme.WhatsAppCleaner"
-        tools:replace="android:allowBackup,android:label">
+        tools:replace="android:label,android:allowBackup">
 
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
-            android:value="ca-app-pub-3940256099942544~3347511713" />
+            android:value="ca-app-pub-3940256099942544~3347511713"
+            tools:node="merge" />
 
         <provider
             android:name="androidx.startup.InitializationProvider"
