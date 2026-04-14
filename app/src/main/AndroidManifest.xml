@@ -20,7 +20,8 @@
         android:hardwareAccelerated="true"
         android:icon="@mipmap/ic_launcher"
         android:label="WhatsAppCleaner"
-        android:theme="@style/Theme.WhatsAppCleaner">
+        android:theme="@style/Theme.WhatsAppCleaner"
+        tools:replace="android:allowBackup,android:label">
 
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
@@ -29,6 +30,7 @@
         <provider
             android:name="androidx.startup.InitializationProvider"
             android:authorities="${applicationId}.androidx-startup"
+            tools:node="merge"
             tools:replace="android:authorities" />
 
         <activity
