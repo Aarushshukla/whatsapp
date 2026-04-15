@@ -41,6 +41,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CleaningServices
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Done
 import androidx.compose.material.icons.filled.FilterAlt
@@ -281,7 +282,7 @@ fun PolishedSmartCleanScreen(
             if (smartCleanItems.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     FriendlyState(
-                        icon = Icons.Default.CheckCircle,
+                        icon = Icons.Filled.CheckCircle,
                         title = "You're all caught up",
                         subtitle = "No duplicate, large, spam, or screenshot/video files were found."
                     )
