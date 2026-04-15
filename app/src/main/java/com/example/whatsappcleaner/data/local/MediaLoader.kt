@@ -6,7 +6,9 @@ import android.content.Context
 import android.net.Uri
 import android.provider.MediaStore
 import android.util.Log
+import androidx.compose.runtime.Immutable
 
+@Immutable
 data class SimpleMediaItem(
     val uri: Uri,
     val id: Long,
