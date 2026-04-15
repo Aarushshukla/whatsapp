@@ -361,7 +361,7 @@ class MainActivity : ComponentActivity() {
         }
         val privacyPolicyUrl = "https://www.google.com/search?q=Cleanly+AI+privacy+policy"
         val faqUrl = "https://www.google.com/search?q=Cleanly+AI+FAQ"
-        val latestShowInterstitialIfReady = rememberUpdatedState(newValue = ::showInterstitialIfReady)
+        val latestShowInterstitialIfReady = rememberUpdatedState(newValue = { showInterstitialIfReady() })
 
         LaunchedEffect(state.shouldShowInterstitialForAiScan) {
             if (state.shouldShowInterstitialForAiScan && !state.aiScanSummary.isRunning) {
