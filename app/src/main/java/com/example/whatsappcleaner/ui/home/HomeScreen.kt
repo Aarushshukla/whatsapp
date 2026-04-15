@@ -11,7 +11,6 @@ import android.os.Environment
 import android.os.StatFs
 import android.util.Log
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
@@ -106,7 +105,9 @@ import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -127,7 +128,11 @@ import androidx.compose.ui.zIndex
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.statusBarsPadding
 import coil.compose.AsyncImage
+import coil.compose.AsyncImagePainter
+import coil.compose.rememberConstraintsSizeResolver
 import coil.request.ImageRequest
+import coil.size.Precision
+import coil.request.CachePolicy
 import coil.request.videoFrameMillis
 import com.example.whatsappcleaner.data.ReminderFreq
 import com.example.whatsappcleaner.data.ReminderTime
@@ -210,16 +215,27 @@ fun SimpleHomeScreen(
 ) {
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
-    val selectedItems = remember { mutableStateOf(setOf<Long>()) }
+    val selectedItems = remember { mutableStateMapOf<Long, Boolean>() }
+    val selectedCount by remember { derivedStateOf { selectedItems.count { it.value } } }
+    val selectedIdSet by remember {
+        derivedStateOf {
+            selectedItems.asSequence()
+                .filter { it.value }
+                .map { it.key }
+                .toSet()
+        }
+    }
+    val allItemsSelected by remember(items.size, selectedCount) {
+        derivedStateOf { items.isNotEmpty() && selectedCount == items.size }
+    }
 
     fun toggleSelection(item: SimpleMediaItem) {
-        val current = selectedItems.value.toMutableSet()
-        if (current.contains(item.id)) {
-            current.remove(item.id)
+        val isSelected = selectedItems[item.id] == true
+        if (isSelected) {
+            selectedItems.remove(item.id)
         } else {
-            current.add(item.id)
+            selectedItems[item.id] = true
         }
-        selectedItems.value = current
     }
     var pendingDeleteItems by remember { mutableStateOf<List<SimpleMediaItem>>(emptyList()) }
     var previewItem by remember { mutableStateOf<SimpleMediaItem?>(null) }
@@ -234,12 +250,14 @@ fun SimpleHomeScreen(
     }
     LaunchedEffect(items) {
         val validIds = items.map { mediaItem -> mediaItem.id }.toSet()
-        selectedItems.value = selectedItems.value.filterTo(linkedSetOf()) { selectedId -> selectedId in validIds }
+        val staleIds = selectedItems.keys.filterNot { selectedId -> selectedId in validIds }
+        staleIds.forEach { staleId -> selectedItems.remove(staleId) }
     }
     LaunchedEffect(smartSuggestedItems) {
         val suggestionIds = smartSuggestedItems.map { mediaItem -> mediaItem.id }.toSet()
         if (suggestionIds.isNotEmpty()) {
-            selectedItems.value = suggestionIds
+            selectedItems.clear()
+            suggestionIds.forEach { selectedId -> selectedItems[selectedId] = true }
         }
     }
     LaunchedEffect(deleteSnackbarMessage) {
@@ -359,10 +377,10 @@ fun SimpleHomeScreen(
             }
             item(span = { GridItemSpan(maxLineSpan) }) {
                 QuickActionsRow(
-                    selectedCount = selectedItems.value.size,
+                    selectedCount = selectedCount,
                     onDeleteClick = {
                         if (isDeleteInProgress) return@QuickActionsRow
-                        val itemsToDelete = items.filter { mediaItem -> mediaItem.id in selectedItems.value }
+                        val itemsToDelete = items.filter { mediaItem -> mediaItem.id in selectedIdSet }
                         if (itemsToDelete.isNotEmpty()) {
                             pendingDeleteItems = itemsToDelete
                         } else {
@@ -370,7 +388,12 @@ fun SimpleHomeScreen(
                         }
                     },
                     onSelectAllClick = {
-                        selectedItems.value = if (selectedItems.value.size == items.size) emptySet() else items.map { it.id }.toSet()
+                        if (allItemsSelected) {
+                            selectedItems.clear()
+                        } else {
+                            selectedItems.clear()
+                            items.forEach { selectedItem -> selectedItems[selectedItem.id] = true }
+                        }
                     },
                     onFilterClick = {
                         val nextFilter = when (currentFilter) {
@@ -416,7 +439,7 @@ fun SimpleHomeScreen(
                     key = { mediaItem -> mediaItem.id },
                     span = { GridItemSpan(maxLineSpan) }
                 ) { item ->
-                    val isSelected = selectedItems.value.contains(item.id)
+                    val isSelected = selectedItems[item.id] == true
                     PremiumMediaRow(
                         item = item,
                         selected = isSelected,
@@ -462,7 +485,7 @@ fun SimpleHomeScreen(
                     onClick = {
                         val itemsToDelete = pendingDeleteItems
                         pendingDeleteItems = emptyList()
-                        selectedItems.value = selectedItems.value - itemsToDelete.map { itemToDelete -> itemToDelete.id }.toSet()
+                        itemsToDelete.forEach { itemToDelete -> selectedItems.remove(itemToDelete.id) }
                         onDeleteConfirmed()
                         onDeleteItemsRequested(itemsToDelete)
                     }
@@ -1148,13 +1171,17 @@ private fun PremiumMediaRow(
         animationSpec = tween(240),
         label = "media_alpha"
     )
+    val imageSizeResolver = rememberConstraintsSizeResolver()
     val mediaSource = remember(item.uri) { item.uri.takeIf { uri -> uri != Uri.EMPTY } }
     val model = remember(mediaSource, item.mimeType) {
         mediaSource?.let { source ->
             ImageRequest.Builder(context)
                 .data(source)
-                .crossfade(true)
-                .size(300)
+                .crossfade(false)
+                .size(imageSizeResolver)
+                .precision(Precision.INEXACT)
+                .memoryCachePolicy(CachePolicy.ENABLED)
+                .diskCachePolicy(CachePolicy.ENABLED)
                 .apply {
                     if (item.mimeType?.startsWith("video") == true) {
                         videoFrameMillis(0)
@@ -1170,7 +1197,6 @@ private fun PremiumMediaRow(
             .shadow(if (selected) 10.dp else 4.dp, RoundedCornerShape(22.dp))
             .scale(scale)
             .alpha(contentAlpha)
-            .animateContentSize()
             .border(width = 1.6.dp, color = selectedBorder, shape = RoundedCornerShape(22.dp))
             .combinedClickable(
                 interactionSource = interactionSource,
@@ -1192,7 +1218,14 @@ private fun PremiumMediaRow(
                     AsyncImage(
                         model = model,
                         contentDescription = item.safeDisplayName(),
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .then(imageSizeResolver),
+                        onState = { imageState ->
+                            if (imageState is AsyncImagePainter.State.Error) {
+                                Log.w(HOME_SCREEN_TAG, "Thumbnail load failed for ${item.uri}")
+                            }
+                        },
                         contentScale = ContentScale.Crop
                     )
                 } else {

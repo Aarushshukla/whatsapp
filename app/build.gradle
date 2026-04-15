@@ -33,6 +33,18 @@ android {
         targetCompatibility JavaVersion.VERSION_17
     }
 
+    buildTypes {
+        debug {
+            minifyEnabled false
+            shrinkResources false
+        }
+        release {
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
     kotlinOptions {
         jvmTarget = '17'
     }
