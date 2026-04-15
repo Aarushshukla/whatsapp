@@ -5,6 +5,8 @@
 
 package com.example.whatsappcleaner.ui.home
 
+import android.os.Environment
+import android.os.StatFs
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateContentSize
@@ -47,6 +49,8 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Done
 import androidx.compose.material.icons.filled.FilterAlt
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.SelectAll
@@ -222,6 +226,7 @@ fun SpamMediaScreen(items: List<SimpleMediaItem>, onOpenInSystem: (SimpleMediaIt
 @Composable
 @Suppress("UNUSED_PARAMETER")
 fun PolishedSmartCleanScreen(
+    allItems: List<SimpleMediaItem>,
     duplicateItems: List<SimpleMediaItem>,
     spamItems: List<SimpleMediaItem>,
     largeFileItems: List<SimpleMediaItem>,
@@ -232,10 +237,87 @@ fun PolishedSmartCleanScreen(
     onShareResult: () -> Unit,
     onCleanupRecorded: (Long) -> Unit
 ) {
-    val smartCleanItems = remember(duplicateItems, spamItems, largeFileItems, sentFiles) {
-        (duplicateItems + spamItems + largeFileItems + sentFiles).distinctBy { item -> item.uri }
+    var isScanning by remember { mutableStateOf(true) }
+    var scanningStatus by remember { mutableStateOf("Scanning your files...") }
+    var activeCategory by remember { mutableStateOf("Duplicates") }
+
+    val duplicateKeys = remember(allItems, duplicateItems) {
+        val knownDuplicateKeys = duplicateItems
+            .map { item -> "${item.name.lowercase()}_${item.size}" }
+            .toSet()
+
+        allItems
+            .groupBy { mediaItem -> "${mediaItem.name.lowercase()}_${mediaItem.size}" }
+            .filterValues { groupedItems -> groupedItems.size > 1 }
+            .keys + knownDuplicateKeys
     }
-    val selectedItems = remember { mutableStateListOf<SimpleMediaItem>() }
+
+    val fileItems = remember(allItems, duplicateKeys) {
+        allItems.map { mediaItem ->
+            FileItem(
+                uri = mediaItem.uri,
+                name = mediaItem.name,
+                size = mediaItem.size,
+                lastModified = mediaItem.addedMillis,
+                path = mediaItem.path,
+                mimeType = mediaItem.mimeType.orEmpty(),
+                isDuplicate = duplicateKeys.contains("${mediaItem.name.lowercase()}_${mediaItem.size}"),
+                isScreenshot = mediaItem.name.contains("screenshot", ignoreCase = true) || mediaItem.path.contains("screenshot", ignoreCase = true),
+                isWhatsapp = mediaItem.path.contains("whatsapp", ignoreCase = true) || mediaItem.uri.toString().contains("whatsapp", ignoreCase = true)
+            )
+        }
+    }
+
+    val mediaByUri = remember(allItems) { allItems.associateBy { it.uri.toString() } }
+    val smartCandidates = remember(fileItems, spamItems, sentFiles, largeFileItems) {
+        val extraUris = (spamItems + sentFiles + largeFileItems).map { it.uri.toString() }.toSet()
+        fileItems.filter { file -> calculateJunkScore(file) >= 30 || file.uri.toString() in extraUris }
+    }
+
+    val duplicateCategoryItems = remember(smartCandidates) { smartCandidates.filter { it.isDuplicate } }
+    val largeCategoryItems = remember(smartCandidates) { smartCandidates.filter { it.size > LARGE_FILE_BYTES } }
+    val screenshotCategoryItems = remember(smartCandidates) { smartCandidates.filter { it.isScreenshot } }
+    val videoCategoryItems = remember(smartCandidates) { smartCandidates.filter { it.mimeType.startsWith("video") } }
+
+    val categories = remember(duplicateCategoryItems, largeCategoryItems, screenshotCategoryItems, videoCategoryItems) {
+        listOf(
+            SmartCleanCategoryUiModel("Duplicates", duplicateCategoryItems, Icons.Default.ContentCopy),
+            SmartCleanCategoryUiModel("Large Files", largeCategoryItems, Icons.Default.FolderOpen),
+            SmartCleanCategoryUiModel("Screenshots", screenshotCategoryItems, Icons.Default.Image),
+            SmartCleanCategoryUiModel("Videos", videoCategoryItems, Icons.Default.VideoLibrary)
+        )
+    }
+    val selectedCategory = remember(activeCategory, categories) {
+        categories.firstOrNull { it.title == activeCategory } ?: categories.first()
+    }
+
+    val selectedUris = remember { mutableStateListOf<String>() }
+    val selectedSimpleItems = remember(selectedUris, mediaByUri) {
+        selectedUris.mapNotNull { uri -> mediaByUri[uri] }
+    }
+
+    val statFs = remember { runCatching { StatFs(Environment.getDataDirectory().path) }.getOrNull() }
+    val totalStorage = statFs?.totalBytes ?: 0L
+    val usedStorage = ((statFs?.totalBytes ?: 0L) - (statFs?.availableBytes ?: 0L)).coerceAtLeast(0L).coerceAtMost(totalStorage)
+    val freeStorage = (totalStorage - usedStorage).coerceAtLeast(0L)
+    val usedPercent = if (totalStorage <= 0L) 0f else (usedStorage.toFloat() / totalStorage.toFloat()).coerceIn(0f, 1f)
+
+    LaunchedEffect(fileItems, smartCandidates) {
+        isScanning = true
+        val startedAt = System.currentTimeMillis()
+        listOf(
+            "Scanning your files...",
+            "Finding duplicates...",
+            "Analyzing large videos..."
+        ).forEach { stage ->
+            scanningStatus = stage
+            delay(kotlin.random.Random.nextLong(280L, 520L))
+        }
+        val elapsed = System.currentTimeMillis() - startedAt
+        val minDelay = 1100L
+        if (elapsed < minDelay) delay(minDelay - elapsed)
+        isScanning = false
+    }
 
     Scaffold(
         topBar = {
@@ -250,128 +332,202 @@ fun PolishedSmartCleanScreen(
         },
         containerColor = Color(0xFFF8FAFC)
     ) { paddingValues ->
-        Column(
+        if (isScanning) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    CircularProgressIndicator()
+                    Text(scanningStatus, color = TextSecondary, style = MaterialTheme.typography.bodyLarge)
+                }
+            }
+            return@Scaffold
+        }
+
+        LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "${smartCleanItems.size} smart-clean candidates",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = TextSecondary
+            item {
+                PremiumMetricCard(
+                    totalFiles = smartCandidates.size,
+                    totalSize = formatSize(smartCandidates.sumOf { file -> file.size })
                 )
-                AnimatedVisibility(visible = selectedItems.isNotEmpty()) {
-                    LegitButton(
-                        text = "Delete (${selectedItems.size})",
-                        onClick = {
-                            val toDelete = selectedItems.toList()
-                            onCleanupRecorded(toDelete.sumOf { it.size })
-                            onDeleteItemsRequested(toDelete)
-                            selectedItems.clear()
-                        }
+            }
+
+            item {
+                StoragePremiumCard(
+                    usedBytes = usedStorage,
+                    freeBytes = freeStorage,
+                    cleanableBytes = smartCandidates.sumOf { file -> file.size },
+                    progress = usedPercent
+                )
+            }
+
+            item {
+                Text("Categories", style = MaterialTheme.typography.titleMedium, color = TextMain)
+            }
+
+            item {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    categories.forEach { category ->
+                        QuickActionChip(
+                            label = "${category.title} (${category.items.size})",
+                            icon = category.icon,
+                            selected = activeCategory == category.title,
+                            onClick = { activeCategory = category.title }
+                        )
+                    }
+                }
+            }
+
+            item {
+                if (selectedCategory.items.isEmpty()) {
+                    FriendlyState(
+                        icon = Icons.Default.CheckCircle,
+                        title = "Nothing to clean here",
+                        subtitle = "No files matched ${selectedCategory.title.lowercase()} right now."
+                    )
+                } else {
+                    Text(
+                        text = "${selectedCategory.items.size} files in ${selectedCategory.title}",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = TextSecondary
                     )
                 }
             }
 
-            if (smartCleanItems.isEmpty()) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    FriendlyState(
-                        icon = Icons.Filled.CheckCircle,
-                        title = "You're all caught up",
-                        subtitle = "No duplicate, large, spam, or screenshot/video files were found."
+            if (selectedCategory.items.isNotEmpty()) {
+                itemsIndexed(selectedCategory.items, key = { _, item -> item.uri.toString() }) { _, item ->
+                    val isSelected = selectedUris.contains(item.uri.toString())
+                    SmartCleanFileCard(
+                        file = item,
+                        isSelected = isSelected,
+                        onOpenPreview = {
+                            mediaByUri[item.uri.toString()]?.let(onOpenInSystem)
+                        },
+                        onToggleSelection = {
+                            if (isSelected) {
+                                selectedUris.remove(item.uri.toString())
+                            } else {
+                                selectedUris.add(item.uri.toString())
+                            }
+                        }
                     )
                 }
-            } else {
-                LazyVerticalGrid(
-                    columns = GridCells.Adaptive(minSize = 320.dp),
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    items(smartCleanItems, key = { item -> item.uri.toString() }) { item ->
-                        val isSelected = selectedItems.any { selected -> selected.uri == item.uri }
-                        Card(
-                            shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color.White),
-                            elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 5.dp else 2.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    if (isSelected) {
-                                        selectedItems.removeAll { selected -> selected.uri == item.uri }
-                                    } else {
-                                        selectedItems.add(item)
-                                    }
-                                }
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(12.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                AsyncImage(
-                                    model = item.uri,
-                                    contentDescription = item.name,
-                                    modifier = Modifier
-                                        .size(56.dp)
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .background(Color(0xFFE8ECFF))
-                                )
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = item.name,
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        color = TextMain,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                    Text(
-                                        text = formatSize(item.sizeKb.toLong() * 1024L),
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = TextSecondary
-                                    )
-                                }
-                                Checkbox(
-                                    checked = isSelected,
-                                    onCheckedChange = { checked ->
-                                        if (checked) {
-                                            if (!selectedItems.any { selected -> selected.uri == item.uri }) {
-                                                selectedItems.add(item)
-                                            }
-                                        } else {
-                                            selectedItems.removeAll { selected -> selected.uri == item.uri }
-                                        }
-                                    }
-                                )
-                            }
-                            LegitButton(
-                                text = "Open",
-                                onClick = { onOpenInSystem(item) },
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 0.dp)
-                            )
-                            Spacer(modifier = Modifier.height(16.dp))
-                        }
-                    }
+
+                item {
+                    LegitButton(
+                        text = "Delete selected (${selectedSimpleItems.size})",
+                        enabled = selectedSimpleItems.isNotEmpty(),
+                        onClick = {
+                            if (selectedSimpleItems.isEmpty()) return@LegitButton
+                            onCleanupRecorded(selectedSimpleItems.sumOf { it.size })
+                            onDeleteItemsRequested(selectedSimpleItems)
+                            selectedUris.clear()
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
             }
         }
     }
 }
 
+private const val LARGE_FILE_BYTES = 50L * 1024L * 1024L
+
+private data class FileItem(
+    val uri: android.net.Uri,
+    val name: String,
+    val size: Long,
+    val lastModified: Long,
+    val path: String,
+    val mimeType: String,
+    val isDuplicate: Boolean = false,
+    val isScreenshot: Boolean = false,
+    val isWhatsapp: Boolean = false
+)
+
+private fun calculateJunkScore(file: FileItem): Int {
+    var score = 0
+    if (file.size > LARGE_FILE_BYTES) score += 20
+    val daysOld = (System.currentTimeMillis() - file.lastModified) / (1000L * 60L * 60L * 24L)
+    if (daysOld > 30) score += 20
+    if (file.isDuplicate) score += 40
+    if (file.isScreenshot) score += 10
+    if (file.isWhatsapp) score += 10
+    return score.coerceIn(0, 100)
+}
+
+private fun junkReasons(file: FileItem): List<String> {
+    val daysOld = (System.currentTimeMillis() - file.lastModified) / (1000L * 60L * 60L * 24L)
+    return buildList {
+        if (file.isDuplicate) add("Duplicate file")
+        if (daysOld > 30) add("Not used for ${daysOld} days")
+        if (file.size > LARGE_FILE_BYTES) add("Large file")
+        if (file.isWhatsapp) add("WhatsApp media")
+        if (file.isScreenshot) add("Screenshot")
+    }
+}
+
+@Composable
+private fun SmartCleanFileCard(
+    file: FileItem,
+    isSelected: Boolean,
+    onOpenPreview: () -> Unit,
+    onToggleSelection: () -> Unit
+) {
+    val score = remember(file) { calculateJunkScore(file) }
+    val reasonText = remember(file) { junkReasons(file).firstOrNull().orEmpty() }
+    val statusText = when {
+        score > 60 -> "Safe to delete"
+        score >= 30 -> "Review"
+        else -> "Keep"
+    }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onToggleSelection() },
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 5.dp else 2.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            AsyncImage(
+                model = file.uri,
+                contentDescription = file.name,
+                modifier = Modifier
+                    .size(58.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable(onClick = onOpenPreview)
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(file.name, maxLines = 1, overflow = TextOverflow.Ellipsis, color = TextMain)
+                Text(formatSize(file.size), style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                if (reasonText.isNotBlank()) {
+                    Text(reasonText, style = MaterialTheme.typography.bodySmall, color = AccentBlue)
+                }
+                Text(statusText, style = MaterialTheme.typography.labelSmall, color = AccentGreen)
+            }
+            Checkbox(checked = isSelected, onCheckedChange = { onToggleSelection() })
+        }
+    }
+}
+
 private data class SmartCleanCategoryUiModel(
     val title: String,
-    val items: List<SimpleMediaItem>,
+    val items: List<FileItem>,
     val icon: ImageVector
 )
 
@@ -511,7 +667,8 @@ private fun StoragePremiumCard(usedBytes: Long, freeBytes: Long, cleanableBytes:
         ) {
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Storage overview", color = Color(0xFF1A1A1A), style = MaterialTheme.typography.titleMedium)
-                Text("Used ${formatSize(usedBytes)} • Free ${formatSize(freeBytes)}", color = Color(0xFF6B7280))
+                Text("Used: ${formatSize(usedBytes)}", color = Color(0xFF6B7280))
+                Text("Free: ${formatSize(freeBytes)}", color = Color(0xFF6B7280))
                 Surface(shape = RoundedCornerShape(999.dp), color = Color(0xFFE9F9EE)) {
                     Text(
                         "Cleanable ${formatSize(cleanableBytes)}",
@@ -523,7 +680,7 @@ private fun StoragePremiumCard(usedBytes: Long, freeBytes: Long, cleanableBytes:
             }
             Box(contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(progress = progress, color = Color(0xFF4A6CF7), trackColor = Color(0xFFE8ECFF), strokeWidth = 7.dp, modifier = Modifier.size(58.dp))
-                Text("${(progress * 100).toInt()}%", style = MaterialTheme.typography.labelMedium, color = Color(0xFF1A1A1A))
+                Text("${(progress.coerceIn(0f, 1f) * 100).toInt()}%", style = MaterialTheme.typography.labelMedium, color = Color(0xFF1A1A1A))
             }
         }
     }

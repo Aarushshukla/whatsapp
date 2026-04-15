@@ -269,9 +269,14 @@ fun SimpleHomeScreen(
 
     val statFs = remember { runCatching { StatFs(Environment.getDataDirectory().path) }.getOrNull() }
     val totalDeviceBytes = statFs?.totalBytes ?: 0L
-    val freeBytes = statFs?.availableBytes ?: 0L
-    val usedBytes = (totalDeviceBytes - freeBytes).coerceAtLeast(0L)
-    val storageProgress = if (totalDeviceBytes == 0L) 0f else usedBytes.toFloat() / totalDeviceBytes.toFloat()
+    val rawUsedBytes = ((statFs?.totalBytes ?: 0L) - (statFs?.availableBytes ?: 0L)).coerceAtLeast(0L)
+    val usedBytes = rawUsedBytes.coerceAtMost(totalDeviceBytes)
+    val freeBytes = (totalDeviceBytes - usedBytes).coerceAtLeast(0L)
+    val storageProgress = if (totalDeviceBytes <= 0L) {
+        0f
+    } else {
+        (usedBytes.toFloat() / totalDeviceBytes.toFloat()).coerceIn(0f, 1f)
+    }
     var contentVisible by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         delay(90)
