@@ -6,9 +6,12 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
@@ -17,6 +20,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
@@ -130,7 +134,7 @@ fun WhatsCleanAppRoot(
     modifier: Modifier = Modifier
 ) {
     if (state.isLoading && state.filteredItems.isEmpty() && state.permissionGranted) {
-        FullScreenLoading(modifier = modifier)
+        LoadingScreen(modifier = modifier)
         return
     }
     if (!state.permissionGranted) {
@@ -290,6 +294,7 @@ fun WhatsCleanAppRoot(
                 largeFileItems = state.largeFileItems,
                 sentFiles = state.sentFileItems,
                 onOpenInSystem = onOpenInSystem,
+                onDeleteItemsRequested = { items -> onDeleteMediaRequest(items, "smart_clean") },
                 onBack = { navController.popBackStack() },
                 onShareResult = onShareResult,
                 onCleanupRecorded = onCleanupRecorded
@@ -538,18 +543,22 @@ private fun AnimatedNavHost(
 }
 
 @Composable
-private fun FullScreenLoading(modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
+private fun LoadingScreen(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        contentAlignment = Alignment.Center
     ) {
-        CircularProgressIndicator()
-        Text(
-            text = "Preparing Cleaner…",
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.padding(top = 16.dp)
-        )
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            CircularProgressIndicator()
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = "Preparing cleaner...",
+                style = MaterialTheme.typography.bodyLarge,
+                color = Color(0xFF1F2937)
+            )
+        }
     }
 }
 

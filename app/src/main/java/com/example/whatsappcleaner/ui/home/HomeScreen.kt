@@ -80,6 +80,7 @@ import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -275,6 +276,10 @@ fun SimpleHomeScreen(
     LaunchedEffect(Unit) {
         delay(90)
         contentVisible = true
+    }
+    if (isLoading && items.isEmpty()) {
+        HomeLoadingScreen()
+        return
     }
 
     Scaffold(
@@ -491,6 +496,24 @@ fun SimpleHomeScreen(
             containerColor = MaterialTheme.colorScheme.surface,
             tonalElevation = 0.dp
         )
+    }
+}
+
+@Composable
+private fun HomeLoadingScreen() {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            CircularProgressIndicator()
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = "Preparing cleaner...",
+                style = MaterialTheme.typography.bodyLarge,
+                color = Color(0xFF1F2937)
+            )
+        }
     }
 }
 

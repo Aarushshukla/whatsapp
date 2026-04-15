@@ -36,6 +36,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.annotation.MainThread
+import kotlinx.coroutines.delay
 
 enum class PremiumFeature(val analyticsKey: String, val paywallSource: String) {
     SMART_CLEAN_ADVANCED("smart_clean_clicked", "smart_clean_advanced"),
@@ -52,7 +53,7 @@ data class HomeUiState(
     val filteredItems: List<SimpleMediaItem> = emptyList(),
     val summaryInfo: String = "Loading...",
     val permissionGranted: Boolean = false,
-    val isLoading: Boolean = false,
+    val isLoading: Boolean = true,
     val currentFilter: MediaFilter = MediaFilter.ALL,
     val activeSuggestion: SuggestionType = SuggestionType.NONE,
     val largeTodayCount: Int = 0,
@@ -239,6 +240,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             }
             refreshInProgress = true
             Log.d(TAG, "Refreshing media library.")
+            val loadStartedAt = System.currentTimeMillis()
             if (showLoading) {
                 withContext(Dispatchers.Main) {
                     _uiState.update { currentState -> currentState.copy(summaryInfo = "Scanning files...", isLoading = true) }
@@ -248,6 +250,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 val images = mediaLoader.loadAllDeviceMedia("image", limit = INITIAL_LOAD_LIMIT)
                 val videos = mediaLoader.loadAllDeviceMedia("video", limit = INITIAL_LOAD_LIMIT)
                 val initialItems = (images + videos).sortedByDescending { mediaItem -> mediaItem.addedMillis }
+                if (showLoading) {
+                    ensureMinimumLoadingDuration(loadStartedAt)
+                }
                 applyLoadedMediaState(initialItems)
                 hasLoadedInitialCache = true
 
@@ -276,6 +281,14 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             } finally {
                 refreshInProgress = false
             }
+        }
+    }
+
+    private suspend fun ensureMinimumLoadingDuration(startedAtMillis: Long) {
+        val minimumDurationMillis = 800L
+        val elapsed = System.currentTimeMillis() - startedAtMillis
+        if (elapsed < minimumDurationMillis) {
+            delay(minimumDurationMillis - elapsed)
         }
     }
 

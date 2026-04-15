@@ -31,6 +31,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.filled.AutoFixHigh
 import androidx.compose.material.icons.Icons
@@ -53,6 +56,7 @@ import androidx.compose.material.ripple.rememberRipple
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -66,6 +70,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -80,6 +85,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.example.whatsappcleaner.ai.StorageReport
 import com.example.whatsappcleaner.data.local.SimpleMediaItem
 import com.example.whatsappcleaner.data.local.formatSize
@@ -218,39 +224,15 @@ fun PolishedSmartCleanScreen(
     largeFileItems: List<SimpleMediaItem>,
     sentFiles: List<SimpleMediaItem>,
     onOpenInSystem: (SimpleMediaItem) -> Unit,
+    onDeleteItemsRequested: (List<SimpleMediaItem>) -> Unit,
     onBack: () -> Unit,
     onShareResult: () -> Unit,
     onCleanupRecorded: (Long) -> Unit
 ) {
-    val screenshotItems = remember(sentFiles) {
-        sentFiles.filter { item ->
-            val normalizedName = item.name.lowercase()
-            val mimeType = item.mimeType.orEmpty()
-            normalizedName.contains("screenshot") || mimeType.startsWith("image/")
-        }
+    val smartCleanItems = remember(duplicateItems, spamItems, largeFileItems, sentFiles) {
+        (duplicateItems + spamItems + largeFileItems + sentFiles).distinctBy { item -> item.uri }
     }
-    val videoItems = remember(sentFiles, largeFileItems) {
-        (sentFiles + largeFileItems)
-            .filter { item ->
-                val mimeType = item.mimeType.orEmpty()
-                val normalizedName = item.name.lowercase()
-                mimeType.startsWith("video/") || normalizedName.endsWith(".mp4") || normalizedName.endsWith(".mov")
-            }
-            .distinctBy { item -> item.uri }
-    }
-
-    val smartCleanCategories = remember(duplicateItems, largeFileItems, screenshotItems, videoItems) {
-        buildList {
-            add(SmartCleanCategoryUiModel("Duplicates", duplicateItems, Icons.Default.AutoAwesome))
-            add(SmartCleanCategoryUiModel("Large Files", largeFileItems, Icons.Default.Analytics))
-            if (screenshotItems.isNotEmpty()) {
-                add(SmartCleanCategoryUiModel("Screenshots", screenshotItems, Icons.Default.Image))
-            }
-            if (videoItems.isNotEmpty()) {
-                add(SmartCleanCategoryUiModel("Videos", videoItems, Icons.Default.VideoLibrary))
-            }
-        }
-    }
+    val selectedItems = remember { mutableStateListOf<SimpleMediaItem>() }
 
     Scaffold(
         topBar = {
@@ -265,38 +247,118 @@ fun PolishedSmartCleanScreen(
         },
         containerColor = Color(0xFFF8FAFC)
     ) { paddingValues ->
-        LazyColumn(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            item {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Text(
-                    text = "Review and clean unnecessary files",
-                    style = MaterialTheme.typography.bodyLarge,
+                    text = "${smartCleanItems.size} smart-clean candidates",
+                    style = MaterialTheme.typography.titleMedium,
                     color = TextSecondary
                 )
+                AnimatedVisibility(visible = selectedItems.isNotEmpty()) {
+                    LegitButton(
+                        text = "Delete (${selectedItems.size})",
+                        onClick = {
+                            val toDelete = selectedItems.toList()
+                            onCleanupRecorded(toDelete.sumOf { it.size })
+                            onDeleteItemsRequested(toDelete)
+                            selectedItems.clear()
+                        }
+                    )
+                }
             }
-            if (smartCleanCategories.isEmpty()) {
-                item {
+
+            if (smartCleanItems.isEmpty()) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     FriendlyState(
-                        icon = Icons.Default.CleaningServices,
-                        title = "Nothing to clean",
-                        subtitle = "Your storage is already optimized."
+                        icon = Icons.Default.CheckCircle,
+                        title = "You're all caught up",
+                        subtitle = "No duplicate, large, spam, or screenshot/video files were found."
                     )
                 }
             } else {
-                itemsIndexed(
-                    smartCleanCategories,
-                    key = { _, category -> category.title }
-                ) { index, category ->
-                    AnimatedListItem(index = index) {
-                        SmartCleanCategoryCard(
-                            category = category,
-                            onReview = { category.items.firstOrNull()?.let(onOpenInSystem) }
-                        )
+                LazyVerticalGrid(
+                    columns = GridCells.Adaptive(minSize = 320.dp),
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(smartCleanItems, key = { item -> item.uri.toString() }) { item ->
+                        val isSelected = selectedItems.any { selected -> selected.uri == item.uri }
+                        Card(
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color.White),
+                            elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 5.dp else 2.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    if (isSelected) {
+                                        selectedItems.removeAll { selected -> selected.uri == item.uri }
+                                    } else {
+                                        selectedItems.add(item)
+                                    }
+                                }
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                AsyncImage(
+                                    model = item.uri,
+                                    contentDescription = item.name,
+                                    modifier = Modifier
+                                        .size(56.dp)
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(Color(0xFFE8ECFF))
+                                )
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = item.name,
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        color = TextMain,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        text = formatSize(item.sizeKb.toLong() * 1024L),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = TextSecondary
+                                    )
+                                }
+                                Checkbox(
+                                    checked = isSelected,
+                                    onCheckedChange = { checked ->
+                                        if (checked) {
+                                            if (!selectedItems.any { selected -> selected.uri == item.uri }) {
+                                                selectedItems.add(item)
+                                            }
+                                        } else {
+                                            selectedItems.removeAll { selected -> selected.uri == item.uri }
+                                        }
+                                    }
+                                )
+                            }
+                            LegitButton(
+                                text = "Open",
+                                onClick = { onOpenInSystem(item) },
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 0.dp)
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                        }
                     }
                 }
             }
