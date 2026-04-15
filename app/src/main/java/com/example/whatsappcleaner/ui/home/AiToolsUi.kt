@@ -648,15 +648,6 @@ private fun AiResultImageCard(
     onOpenPreview: () -> Unit,
     onToggleSelection: () -> Unit
 ) {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    val model = remember(mediaItem.uri) {
-        coil.request.ImageRequest.Builder(context)
-            .data(mediaItem.uri)
-            .crossfade(true)
-            .size(300)
-            .build()
-    }
-
     Card(
         modifier = Modifier
             .padding(6.dp)
@@ -669,7 +660,7 @@ private fun AiResultImageCard(
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             coil.compose.AsyncImage(
-                model = model,
+                model = mediaItem.uri,
                 contentDescription = null,
                 contentScale = androidx.compose.ui.layout.ContentScale.Crop,
                 modifier = Modifier.fillMaxSize()

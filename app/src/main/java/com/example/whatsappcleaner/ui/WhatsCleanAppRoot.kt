@@ -289,6 +289,7 @@ fun WhatsCleanAppRoot(
 
         composable(Routes.SmartClean) {
             PolishedSmartCleanScreen(
+                allItems = state.allItems,
                 duplicateItems = state.duplicateItems,
                 spamItems = state.spamItems,
                 largeFileItems = state.largeFileItems,
