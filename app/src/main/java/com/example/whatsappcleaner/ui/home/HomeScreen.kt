@@ -128,13 +128,6 @@ import androidx.compose.ui.zIndex
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.statusBarsPadding
 import coil.compose.AsyncImage
-import coil.compose.rememberAsyncImagePainter
-import coil.compose.AsyncImagePainter
-import coil.compose.rememberConstraintsSizeResolver
-import coil.request.ImageRequest
-import coil.size.Precision
-import coil.request.CachePolicy
-import coil.request.videoFrameMillis
 import com.example.whatsappcleaner.data.ReminderFreq
 import com.example.whatsappcleaner.data.ReminderTime
 import com.example.whatsappcleaner.data.local.SimpleMediaItem
@@ -1154,7 +1147,6 @@ private fun PremiumMediaRow(
     onKeep: () -> Unit,
     onDelete: () -> Unit
 ) {
-    val context = androidx.compose.ui.platform.LocalContext.current
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(
@@ -1172,25 +1164,7 @@ private fun PremiumMediaRow(
         animationSpec = tween(240),
         label = "media_alpha"
     )
-    val imageSizeResolver = rememberConstraintsSizeResolver()
-    val mediaSource = remember(item.uri) { item.uri.takeIf { uri -> uri != Uri.EMPTY } }
-    val model = remember(mediaSource, item.mimeType) {
-        mediaSource?.let { source ->
-            ImageRequest.Builder(context)
-                .data(source)
-                .crossfade(false)
-                .size(imageSizeResolver)
-                .precision(Precision.INEXACT)
-                .memoryCachePolicy(CachePolicy.ENABLED)
-                .diskCachePolicy(CachePolicy.ENABLED)
-                .apply {
-                    if (item.mimeType?.startsWith("video") == true) {
-                        videoFrameMillis(0)
-                    }
-                }
-                .build()
-        }
-    }
+    val imageUri = remember(item.uri) { item.uri.takeIf { uri -> uri != Uri.EMPTY } }
 
     Card(
         modifier = Modifier
@@ -1213,20 +1187,15 @@ private fun PremiumMediaRow(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .aspectRatio(1f)
+                    .height(150.dp)
             ) {
-                if (model != null) {
+                if (imageUri != null) {
                     AsyncImage(
-                        model = model,
-                        contentDescription = item.safeDisplayName(),
+                        model = imageUri,
+                        contentDescription = null,
                         modifier = Modifier
-                            .fillMaxSize()
-                            .then(imageSizeResolver),
-                        onState = { imageState ->
-                            if (imageState is AsyncImagePainter.State.Error) {
-                                Log.w(HOME_SCREEN_TAG, "Thumbnail load failed for ${item.uri}")
-                            }
-                        },
+                            .fillMaxWidth()
+                            .height(150.dp),
                         contentScale = ContentScale.Crop
                     )
                 } else {
