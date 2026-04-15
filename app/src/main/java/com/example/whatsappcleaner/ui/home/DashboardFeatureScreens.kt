@@ -330,7 +330,7 @@ fun PolishedSmartCleanScreen(
                 }
             )
         },
-        containerColor = Color(0xFFF8FAFC)
+        containerColor = MaterialTheme.colorScheme.background
     ) { paddingValues ->
         if (isScanning) {
             Box(
@@ -602,13 +602,13 @@ private fun SmartCleanCategoryCard(
 private fun PremiumMetricCard(totalFiles: Int, totalSize: String) {
     Card(
         shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Smart Clean", color = Color(0xFF1A1A1A), fontSize = 22.sp, fontWeight = FontWeight.Bold)
-            Text("AI-powered cleanup suggestions", color = Color(0xFF6B7280).copy(alpha = 0.82f))
+            Text("Smart Clean", color = MaterialTheme.colorScheme.onSurface, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            Text("AI-powered cleanup suggestions", color = MaterialTheme.colorScheme.onSurfaceVariant)
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 PremiumPillStat("$totalFiles", "Total files")
                 PremiumPillStat(totalSize, "Total size")
@@ -619,10 +619,10 @@ private fun PremiumMetricCard(totalFiles: Int, totalSize: String) {
 
 @Composable
 private fun PremiumPillStat(value: String, label: String) {
-    Surface(color = Color(0xFFF7F8FA), shape = RoundedCornerShape(14.dp)) {
+    Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(14.dp)) {
         Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
-            Text(value, color = Color(0xFF1A1A1A), fontWeight = FontWeight.Bold)
-            Text(label, color = Color(0xFF6B7280), style = MaterialTheme.typography.labelMedium)
+            Text(value, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
+            Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelMedium)
         }
     }
 }
@@ -648,7 +648,7 @@ private fun SmartCleaningActionButton(onClick: () -> Unit) {
             },
         contentAlignment = Alignment.Center
     ) {
-        Text("✨ Start Smart Cleaning", color = Color.White, fontWeight = FontWeight.Bold)
+        Text("✨ Start Smart Cleaning", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold)
     }
 }
 
@@ -656,7 +656,7 @@ private fun SmartCleaningActionButton(onClick: () -> Unit) {
 private fun StoragePremiumCard(usedBytes: Long, freeBytes: Long, cleanableBytes: Long, progress: Float) {
     Card(
         shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -666,13 +666,13 @@ private fun StoragePremiumCard(usedBytes: Long, freeBytes: Long, cleanableBytes:
             horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Storage overview", color = Color(0xFF1A1A1A), style = MaterialTheme.typography.titleMedium)
-                Text("Used: ${formatSize(usedBytes)}", color = Color(0xFF6B7280))
-                Text("Free: ${formatSize(freeBytes)}", color = Color(0xFF6B7280))
-                Surface(shape = RoundedCornerShape(999.dp), color = Color(0xFFE9F9EE)) {
+                Text("Storage overview", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleMedium)
+                Text("Used: ${formatSize(usedBytes)}", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Free: ${formatSize(freeBytes)}", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Surface(shape = RoundedCornerShape(999.dp), color = MaterialTheme.colorScheme.secondaryContainer) {
                     Text(
                         "Cleanable ${formatSize(cleanableBytes)}",
-                        color = Color(0xFF1F9D55),
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
                         fontWeight = FontWeight.SemiBold,
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
                     )
@@ -680,7 +680,7 @@ private fun StoragePremiumCard(usedBytes: Long, freeBytes: Long, cleanableBytes:
             }
             Box(contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(progress = progress, color = Color(0xFF4A6CF7), trackColor = Color(0xFFE8ECFF), strokeWidth = 7.dp, modifier = Modifier.size(58.dp))
-                Text("${(progress.coerceIn(0f, 1f) * 100).toInt()}%", style = MaterialTheme.typography.labelMedium, color = Color(0xFF1A1A1A))
+                Text("${(progress.coerceIn(0f, 1f) * 100).toInt()}%", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurface)
             }
         }
     }
@@ -737,8 +737,8 @@ private fun FileCandidateCard(
                 Icon(Icons.Default.Image, contentDescription = null, tint = Color(0xFF4A6CF7))
             }
             Column(modifier = Modifier.weight(1f)) {
-                Text(item.name, color = Color(0xFF1A1A1A), maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyLarge)
-                Text(formatSize(item.sizeKb.toLong() * 1024L), color = Color(0xFF6B7280), style = MaterialTheme.typography.bodyMedium)
+                Text(item.name, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyLarge)
+                Text(formatSize(item.sizeKb.toLong() * 1024L), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
             }
             Icon(
                 imageVector = if (isSelected) Icons.Default.Done else Icons.Default.RadioButtonUnchecked,
