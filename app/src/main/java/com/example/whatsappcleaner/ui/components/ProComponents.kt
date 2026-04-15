@@ -185,8 +185,11 @@ fun Modifier.shimmerEffect(): Modifier = composed {
 fun FriendlyState(
     icon: ImageVector,
     title: String,
-    message: String
+    subtitle: String = "",
+    message: String = subtitle
 ) {
+    val supportingText = subtitle.ifEmpty { message }
+
     Column(
         modifier = Modifier.fillMaxWidth().padding(32.dp),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -202,7 +205,14 @@ fun FriendlyState(
         Spacer(Modifier.height(16.dp))
         Text(title, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface)
         Spacer(Modifier.height(8.dp))
-        Text(message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
+        if (supportingText.isNotEmpty()) {
+            Text(
+                supportingText,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+        }
     }
 }
 
