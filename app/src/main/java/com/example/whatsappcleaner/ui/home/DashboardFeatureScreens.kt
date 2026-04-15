@@ -3,7 +3,10 @@
 package com.example.whatsappcleaner.ui.home
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -20,23 +23,40 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.filled.AutoFixHigh
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CleaningServices
 import androidx.compose.material.icons.filled.DeleteSweep
+import androidx.compose.material.icons.filled.Done
+import androidx.compose.material.icons.filled.FilterAlt
 import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.RadioButtonUnchecked
+import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.VideoLibrary
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -47,10 +67,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.whatsappcleaner.ai.StorageReport
 import com.example.whatsappcleaner.data.local.SimpleMediaItem
 import com.example.whatsappcleaner.data.local.formatSize
@@ -193,9 +218,20 @@ fun PolishedSmartCleanScreen(
     onCleanupRecorded: (Long) -> Unit
 ) {
     var successMessage by remember { mutableStateOf<String?>(null) }
-    val recoverableBytes = (duplicateItems + spamItems + largeFileItems + sentFiles)
+    var sortLargestFirst by remember { mutableStateOf(true) }
+    val allItems = remember(duplicateItems, spamItems, largeFileItems, sentFiles) {
+        (duplicateItems + spamItems + largeFileItems + sentFiles).distinctBy { item -> item.uri }
+    }
+    var selectedUris by remember { mutableStateOf(setOf<String>()) }
+    val recoverableBytes = allItems
         .distinctBy { mediaItem -> mediaItem.uri }
         .sumOf { mediaItem -> mediaItem.sizeKb.toLong() * 1024L }
+    val storageCapacityBytes = remember(recoverableBytes) { maxOf((recoverableBytes * 4.5f).toLong(), recoverableBytes + (1024 * 1024 * 1024)) }
+    val cleanableProgress = if (storageCapacityBytes == 0L) 0f else (recoverableBytes.toFloat() / storageCapacityBytes.toFloat()).coerceIn(0f, 1f)
+    val usedStorageBytes = (storageCapacityBytes - (recoverableBytes * 0.6f).toLong()).coerceAtLeast(0L)
+    val sortedItems = remember(allItems, sortLargestFirst) {
+        if (sortLargestFirst) allItems.sortedByDescending { it.sizeKb } else allItems.sortedBy { it.name.lowercase() }
+    }
     val scale by animateFloatAsState(
         targetValue = if (successMessage != null) 1f else 0.84f,
         animationSpec = tween(420),
@@ -210,7 +246,17 @@ fun PolishedSmartCleanScreen(
     }
 
     FeatureScreenScaffold("Smart Clean", "High-confidence cleanup suggestions", onBack) {
-        LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        LazyColumn(
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            modifier = Modifier.animateContentSize()
+        ) {
+            item {
+                PremiumMetricCard(
+                    totalFiles = allItems.size,
+                    totalSize = formatSize(recoverableBytes)
+                )
+            }
             item {
                 AnimatedVisibility(
                     visible = successMessage != null,
@@ -233,9 +279,83 @@ fun PolishedSmartCleanScreen(
                 }
             }
             item {
+                SmartCleaningActionButton(
+                    onClick = {
+                        selectedUris = emptySet()
+                        successMessage = if (recoverableBytes > 0) {
+                            "🎉 Freed ${formatSize(recoverableBytes)}!"
+                        } else {
+                            "🎉 Storage Cleaned!"
+                        }
+                        onCleanupRecorded(recoverableBytes)
+                        (largeFileItems.firstOrNull() ?: duplicateItems.firstOrNull() ?: spamItems.firstOrNull() ?: sentFiles.firstOrNull())
+                            ?.let { mediaItem -> onOpenInSystem(mediaItem) }
+                    }
+                )
+            }
+            item {
+                StoragePremiumCard(
+                    usedBytes = usedStorageBytes,
+                    freeBytes = (storageCapacityBytes - usedStorageBytes).coerceAtLeast(0L),
+                    cleanableBytes = recoverableBytes,
+                    progress = cleanableProgress
+                )
+            }
+            item {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    QuickActionChip("Delete Selected", Icons.Default.DeleteSweep, selectedUris.isNotEmpty()) {
+                        val selected = sortedItems.filter { selectedUris.contains(it.uri.toString()) }
+                        selected.firstOrNull()?.let(onOpenInSystem)
+                    }
+                    QuickActionChip("Select All", Icons.Default.SelectAll, selectedUris.size == sortedItems.size && sortedItems.isNotEmpty()) {
+                        selectedUris = if (selectedUris.size == sortedItems.size) emptySet() else sortedItems.map { it.uri.toString() }.toSet()
+                    }
+                    QuickActionChip("Sort / Filter", Icons.Default.FilterAlt, sortLargestFirst) {
+                        sortLargestFirst = !sortLargestFirst
+                    }
+                    QuickActionChip("AI Tools", Icons.Default.AutoFixHigh, false) {
+                        onShareResult()
+                    }
+                }
+            }
+            item {
+                Crossfade(targetState = sortedItems.isEmpty(), label = "smart_clean_state") { isEmpty ->
+                    if (isEmpty) {
+                        FriendlyState(
+                            icon = Icons.Default.CleaningServices,
+                            title = "Nothing to clean 🎉",
+                            subtitle = "Your storage is already optimized"
+                        )
+                    } else {
+                        Text(
+                            text = "Potential cleanup • ${sortedItems.size} files",
+                            color = TextMain,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+            }
+            itemsIndexed(sortedItems, key = { _, item -> item.uri.toString() }) { index, item ->
+                AnimatedListItem(index = index) {
+                    FileCandidateCard(
+                        item = item,
+                        isSelected = selectedUris.contains(item.uri.toString()),
+                        onClick = { onOpenInSystem(item) },
+                        onCheckedChange = { checked ->
+                            selectedUris = if (checked) {
+                                selectedUris + item.uri.toString()
+                            } else {
+                                selectedUris - item.uri.toString()
+                            }
+                        }
+                    )
+                }
+            }
+            item {
                 LegitCard {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Text("Potential cleanup", color = TextMain, style = MaterialTheme.typography.titleLarge)
+                        Text("Potential cleanup by category", color = TextMain, style = MaterialTheme.typography.titleLarge)
                         Text("We found ${duplicateItems.size + spamItems.size + largeFileItems.size + sentFiles.size} review items.", color = TextSecondary)
                         LegitButton("Open best candidate", onClick = {
                             successMessage = if (recoverableBytes > 0) {
@@ -253,14 +373,6 @@ fun PolishedSmartCleanScreen(
                             modifier = Modifier.fillMaxWidth()
                         )
                     }
-                }
-            }
-            item {
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    statBox("♻️ ${duplicateItems.size}", "Duplicates")
-                    statBox("🧹 ${largeFileItems.size}", "Large files")
-                    statBox("📤 ${sentFiles.size}", "Sent files")
-                    statBox("🛡 ${spamItems.size}", "Spam")
                 }
             }
             itemsIndexed(
@@ -290,6 +402,158 @@ fun PolishedSmartCleanScreen(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun PremiumMetricCard(totalFiles: Int, totalSize: String) {
+    Card(
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Smart Clean", color = Color(0xFF1A1A1A), fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            Text("AI-powered cleanup suggestions", color = Color(0xFF6B7280).copy(alpha = 0.82f))
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                PremiumPillStat("$totalFiles", "Total files")
+                PremiumPillStat(totalSize, "Total size")
+            }
+        }
+    }
+}
+
+@Composable
+private fun PremiumPillStat(value: String, label: String) {
+    Surface(color = Color(0xFFF7F8FA), shape = RoundedCornerShape(14.dp)) {
+        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
+            Text(value, color = Color(0xFF1A1A1A), fontWeight = FontWeight.Bold)
+            Text(label, color = Color(0xFF6B7280), style = MaterialTheme.typography.labelMedium)
+        }
+    }
+}
+
+@Composable
+private fun SmartCleaningActionButton(onClick: () -> Unit) {
+    var pressed by remember { mutableStateOf(false) }
+    val scale by animateFloatAsState(if (pressed) 0.97f else 1f, label = "smart_clean_cta", animationSpec = spring())
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(56.dp)
+            .scale(scale)
+            .clip(RoundedCornerShape(18.dp))
+            .background(Brush.horizontalGradient(listOf(Color(0xFF4A6CF7), Color(0xFF8A5CF6))))
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+            ) {
+                pressed = true
+                onClick()
+                pressed = false
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        Text("✨ Start Smart Cleaning", color = Color.White, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
+private fun StoragePremiumCard(usedBytes: Long, freeBytes: Long, cleanableBytes: Long, progress: Float) {
+    Card(
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp).fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Storage overview", color = Color(0xFF1A1A1A), style = MaterialTheme.typography.titleMedium)
+                Text("Used ${formatSize(usedBytes)} • Free ${formatSize(freeBytes)}", color = Color(0xFF6B7280))
+                Surface(shape = RoundedCornerShape(999.dp), color = Color(0xFFE9F9EE)) {
+                    Text(
+                        "Cleanable ${formatSize(cleanableBytes)}",
+                        color = Color(0xFF1F9D55),
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                    )
+                }
+            }
+            Box(contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(progress = progress, color = Color(0xFF4A6CF7), trackColor = Color(0xFFE8ECFF), strokeWidth = 7.dp, modifier = Modifier.size(58.dp))
+                Text("${(progress * 100).toInt()}%", style = MaterialTheme.typography.labelMedium, color = Color(0xFF1A1A1A))
+            }
+        }
+    }
+}
+
+@Composable
+private fun QuickActionChip(label: String, icon: ImageVector, selected: Boolean, onClick: () -> Unit) {
+    FilterChip(
+        selected = selected,
+        onClick = onClick,
+        label = { Text(label) },
+        leadingIcon = { Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp)) },
+        shape = RoundedCornerShape(50.dp),
+        border = FilterChipDefaults.filterChipBorder(enabled = true, selected = selected, borderColor = Color(0xFFE5E7EB), selectedBorderColor = Color(0xFF4A6CF7)),
+        colors = FilterChipDefaults.filterChipColors(
+            containerColor = Color(0xFFF7F8FA),
+            selectedContainerColor = Color(0xFFE8ECFF),
+            labelColor = Color(0xFF1A1A1A),
+            selectedLabelColor = Color(0xFF1A1A1A),
+            iconColor = Color(0xFF6B7280),
+            selectedLeadingIconColor = Color(0xFF4A6CF7)
+        )
+    )
+}
+
+@Composable
+private fun FileCandidateCard(
+    item: SimpleMediaItem,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .animateContentSize()
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 4.dp else 2.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp).fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(52.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color(0xFFE8ECFF)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Default.Image, contentDescription = null, tint = Color(0xFF4A6CF7))
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(item.name, color = Color(0xFF1A1A1A), maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyLarge)
+                Text(formatSize(item.sizeKb.toLong() * 1024L), color = Color(0xFF6B7280), style = MaterialTheme.typography.bodyMedium)
+            }
+            Icon(
+                imageVector = if (isSelected) Icons.Default.Done else Icons.Default.RadioButtonUnchecked,
+                contentDescription = null,
+                tint = if (isSelected) Color(0xFF4A6CF7) else Color(0xFF9CA3AF),
+                modifier = Modifier
+                    .size(22.dp)
+                    .clickable { onCheckedChange(!isSelected) }
+            )
         }
     }
 }
