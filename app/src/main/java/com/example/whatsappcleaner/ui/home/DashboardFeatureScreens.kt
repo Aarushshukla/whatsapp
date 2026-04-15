@@ -208,6 +208,7 @@ fun SpamMediaScreen(items: List<SimpleMediaItem>, onOpenInSystem: (SimpleMediaIt
 }
 
 @Composable
+@Suppress("UNUSED_PARAMETER")
 fun PolishedSmartCleanScreen(
     duplicateItems: List<SimpleMediaItem>,
     spamItems: List<SimpleMediaItem>,
@@ -218,191 +219,157 @@ fun PolishedSmartCleanScreen(
     onShareResult: () -> Unit,
     onCleanupRecorded: (Long) -> Unit
 ) {
-    var successMessage by remember { mutableStateOf<String?>(null) }
-    var sortLargestFirst by remember { mutableStateOf(true) }
-    val allItems = remember(duplicateItems, spamItems, largeFileItems, sentFiles) {
-        (duplicateItems + spamItems + largeFileItems + sentFiles).distinctBy { item -> item.uri }
+    val screenshotItems = remember(sentFiles) {
+        sentFiles.filter { item ->
+            val normalizedName = item.name.lowercase()
+            val mimeType = item.mimeType.orEmpty()
+            normalizedName.contains("screenshot") || mimeType.startsWith("image/")
+        }
     }
-    var selectedUris by remember { mutableStateOf(setOf<String>()) }
-    val recoverableBytes = allItems
-        .distinctBy { mediaItem -> mediaItem.uri }
-        .sumOf { mediaItem -> mediaItem.sizeKb.toLong() * 1024L }
-    val storageCapacityBytes = remember(recoverableBytes) { maxOf((recoverableBytes * 4.5f).toLong(), recoverableBytes + (1024 * 1024 * 1024)) }
-    val cleanableProgress = if (storageCapacityBytes == 0L) 0f else (recoverableBytes.toFloat() / storageCapacityBytes.toFloat()).coerceIn(0f, 1f)
-    val usedStorageBytes = (storageCapacityBytes - (recoverableBytes * 0.6f).toLong()).coerceAtLeast(0L)
-    val sortedItems = remember(allItems, sortLargestFirst) {
-        if (sortLargestFirst) allItems.sortedByDescending { it.sizeKb } else allItems.sortedBy { it.name.lowercase() }
+    val videoItems = remember(sentFiles, largeFileItems) {
+        (sentFiles + largeFileItems)
+            .filter { item ->
+                val mimeType = item.mimeType.orEmpty()
+                val normalizedName = item.name.lowercase()
+                mimeType.startsWith("video/") || normalizedName.endsWith(".mp4") || normalizedName.endsWith(".mov")
+            }
+            .distinctBy { item -> item.uri }
     }
-    val scale by animateFloatAsState(
-        targetValue = if (successMessage != null) 1f else 0.84f,
-        animationSpec = tween(420),
-        label = "success_scale"
-    )
 
-    LaunchedEffect(successMessage) {
-        if (successMessage != null) {
-            delay(1800)
-            successMessage = null
+    val smartCleanCategories = remember(duplicateItems, largeFileItems, screenshotItems, videoItems) {
+        buildList {
+            add(SmartCleanCategoryUiModel("Duplicates", duplicateItems, Icons.Default.AutoAwesome))
+            add(SmartCleanCategoryUiModel("Large Files", largeFileItems, Icons.Default.Analytics))
+            if (screenshotItems.isNotEmpty()) {
+                add(SmartCleanCategoryUiModel("Screenshots", screenshotItems, Icons.Default.Image))
+            }
+            if (videoItems.isNotEmpty()) {
+                add(SmartCleanCategoryUiModel("Videos", videoItems, Icons.Default.VideoLibrary))
+            }
         }
     }
 
-    FeatureScreenScaffold("Smart Clean", "High-confidence cleanup suggestions", onBack) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Smart Clean", color = TextMain) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = TextMain)
+                    }
+                }
+            )
+        },
+        containerColor = Color(0xFFF8FAFC)
+    ) { paddingValues ->
         LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues),
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
-            modifier = Modifier.animateContentSize()
         ) {
             item {
-                PremiumMetricCard(
-                    totalFiles = allItems.size,
-                    totalSize = formatSize(recoverableBytes)
+                Text(
+                    text = "Review and clean unnecessary files",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = TextSecondary
                 )
             }
-            item {
-                AnimatedVisibility(
-                    visible = successMessage != null,
-                    enter = fadeIn(animationSpec = tween(360)) + scaleIn(animationSpec = tween(360), initialScale = 0.8f),
-                    exit = fadeOut(animationSpec = tween(260)) + scaleOut(animationSpec = tween(260), targetScale = 0.92f)
+            if (smartCleanCategories.isEmpty()) {
+                item {
+                    FriendlyState(
+                        icon = Icons.Default.CleaningServices,
+                        title = "Nothing to clean",
+                        subtitle = "Your storage is already optimized."
+                    )
+                }
+            } else {
+                itemsIndexed(
+                    smartCleanCategories,
+                    key = { _, category -> category.title }
+                ) { index, category ->
+                    AnimatedListItem(index = index) {
+                        SmartCleanCategoryCard(
+                            category = category,
+                            onReview = { category.items.firstOrNull()?.let(onOpenInSystem) }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+private data class SmartCleanCategoryUiModel(
+    val title: String,
+    val items: List<SimpleMediaItem>,
+    val icon: ImageVector
+)
+
+@Composable
+private fun SmartCleanCategoryCard(
+    category: SmartCleanCategoryUiModel,
+    onReview: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
+                    contentAlignment = Alignment.Center
                 ) {
-                    successMessage?.let { message ->
-                        LegitCard {
-                            Box(modifier = Modifier.fillMaxWidth().padding(18.dp), contentAlignment = Alignment.Center) {
-                                Text(
-                                    text = message,
-                                    color = AccentGreen,
-                                    modifier = Modifier.scale(scale),
-                                    fontWeight = FontWeight.Bold,
-                                    style = MaterialTheme.typography.titleLarge
-                                )
-                            }
-                        }
-                    }
+                    Icon(
+                        imageVector = category.icon,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary
+                    )
                 }
-            }
-            item {
-                SmartCleaningActionButton(
-                    onClick = {
-                        selectedUris = emptySet()
-                        successMessage = if (recoverableBytes > 0) {
-                            "🎉 Freed ${formatSize(recoverableBytes)}!"
-                        } else {
-                            "🎉 Storage Cleaned!"
-                        }
-                        onCleanupRecorded(recoverableBytes)
-                        (largeFileItems.firstOrNull() ?: duplicateItems.firstOrNull() ?: spamItems.firstOrNull() ?: sentFiles.firstOrNull())
-                            ?.let { mediaItem -> onOpenInSystem(mediaItem) }
-                    }
-                )
-            }
-            item {
-                StoragePremiumCard(
-                    usedBytes = usedStorageBytes,
-                    freeBytes = (storageCapacityBytes - usedStorageBytes).coerceAtLeast(0L),
-                    cleanableBytes = recoverableBytes,
-                    progress = cleanableProgress
-                )
-            }
-            item {
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    QuickActionChip("Delete Selected", Icons.Default.DeleteSweep, selectedUris.isNotEmpty()) {
-                        val selected = sortedItems.filter { selectedUris.contains(it.uri.toString()) }
-                        selected.firstOrNull()?.let(onOpenInSystem)
-                    }
-                    QuickActionChip("Select All", Icons.Default.SelectAll, selectedUris.size == sortedItems.size && sortedItems.isNotEmpty()) {
-                        selectedUris = if (selectedUris.size == sortedItems.size) emptySet() else sortedItems.map { it.uri.toString() }.toSet()
-                    }
-                    QuickActionChip("Sort / Filter", Icons.Default.FilterAlt, sortLargestFirst) {
-                        sortLargestFirst = !sortLargestFirst
-                    }
-                    QuickActionChip("AI Tools", Icons.Default.AutoFixHigh, false) {
-                        onShareResult()
-                    }
-                }
-            }
-            item {
-                Crossfade(targetState = sortedItems.isEmpty(), label = "smart_clean_state") { isEmpty ->
-                    if (isEmpty) {
-                        FriendlyState(
-                            icon = Icons.Default.CleaningServices,
-                            title = "Nothing to clean 🎉",
-                            subtitle = "Your storage is already optimized"
-                        )
-                    } else {
-                        Text(
-                            text = "Potential cleanup • ${sortedItems.size} files",
-                            color = TextMain,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
-                }
-            }
-            itemsIndexed(sortedItems, key = { _, item -> item.uri.toString() }) { index, item ->
-                AnimatedListItem(index = index) {
-                    FileCandidateCard(
-                        item = item,
-                        isSelected = selectedUris.contains(item.uri.toString()),
-                        onClick = { onOpenInSystem(item) },
-                        onCheckedChange = { checked ->
-                            selectedUris = if (checked) {
-                                selectedUris + item.uri.toString()
-                            } else {
-                                selectedUris - item.uri.toString()
-                            }
-                        }
+                Column {
+                    Text(
+                        text = category.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = TextMain
+                    )
+                    Text(
+                        text = "${category.items.size} files",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = TextSecondary
                     )
                 }
             }
-            item {
-                LegitCard {
-                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Text("Potential cleanup by category", color = TextMain, style = MaterialTheme.typography.titleLarge)
-                        Text("We found ${duplicateItems.size + spamItems.size + largeFileItems.size + sentFiles.size} review items.", color = TextSecondary)
-                        LegitButton("Open best candidate", onClick = {
-                            successMessage = if (recoverableBytes > 0) {
-                                "🎉 Freed ${formatSize(recoverableBytes)}!"
-                            } else {
-                                "🎉 Storage Cleaned!"
-                            }
-                            onCleanupRecorded(recoverableBytes)
-                            (largeFileItems.firstOrNull() ?: duplicateItems.firstOrNull() ?: spamItems.firstOrNull() ?: sentFiles.firstOrNull())
-                                ?.let { mediaItem -> onOpenInSystem(mediaItem) }
-                        })
-                        LegitButton(
-                            text = "Share Result",
-                            onClick = onShareResult,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
+
+            category.items
+                .take(3)
+                .forEach { item ->
+                    Text(
+                        text = "• ${item.name}",
+                        color = TextSecondary,
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
-            }
-            itemsIndexed(
-                listOf(
-                    Triple("Duplicates", duplicateItems, Icons.Default.AutoAwesome),
-                    Triple("Spam Media", spamItems, Icons.Default.Security),
-                    Triple("Large Files", largeFileItems, Icons.Default.Analytics),
-                    Triple("Sent Files", sentFiles, Icons.Default.VideoLibrary)
-                )
-            ) { index, section ->
-                val (title, sectionItems, icon) = section
-                AnimatedListItem(index = index) {
-                    LegitCard {
-                        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                Icon(icon, contentDescription = null, tint = AccentBlue)
-                                Text(title, color = TextMain, style = MaterialTheme.typography.titleMedium)
-                            }
-                            Text("${sectionItems.size} files", color = TextSecondary)
-                            sectionItems.take(3).forEach { item ->
-                                Text("• ${item.name}", color = TextMain)
-                            }
-                            sectionItems.firstOrNull()?.let { firstItem ->
-                                LegitButton("Review sample", onClick = { onOpenInSystem(firstItem) })
-                            }
-                        }
-                    }
-                }
-            }
+
+            LegitButton(
+                text = "Review",
+                onClick = onReview,
+                modifier = Modifier.fillMaxWidth()
+            )
         }
     }
 }
