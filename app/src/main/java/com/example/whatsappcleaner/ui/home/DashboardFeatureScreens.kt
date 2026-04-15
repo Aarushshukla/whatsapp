@@ -1,3 +1,4 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 
 package com.example.whatsappcleaner.ui.home
