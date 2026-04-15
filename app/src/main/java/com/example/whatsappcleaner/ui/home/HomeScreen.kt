@@ -128,6 +128,7 @@ import androidx.compose.ui.zIndex
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.statusBarsPadding
 import coil.compose.AsyncImage
+import coil.compose.rememberAsyncImagePainter
 import coil.compose.AsyncImagePainter
 import coil.compose.rememberConstraintsSizeResolver
 import coil.request.ImageRequest
