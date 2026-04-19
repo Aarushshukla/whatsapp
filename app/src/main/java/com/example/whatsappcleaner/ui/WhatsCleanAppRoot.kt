@@ -53,10 +53,12 @@ import com.example.whatsappcleaner.ui.home.MediaViewerScreen
 import com.example.whatsappcleaner.ui.home.PolishedMemeScreen
 import com.example.whatsappcleaner.ui.home.PolishedPhoneRealityScreen
 import com.example.whatsappcleaner.ui.home.PolishedSmartCleanScreen
+import com.example.whatsappcleaner.ui.home.PrivacyPolicyScreen
 import com.example.whatsappcleaner.ui.home.PremiumFeature
 import com.example.whatsappcleaner.ui.home.SimpleHomeScreen
 import com.example.whatsappcleaner.ui.home.SpamMediaScreen
 import com.example.whatsappcleaner.ui.home.SuggestionType
+import com.example.whatsappcleaner.ui.home.TermsAndConditionsScreen
 import com.example.whatsappcleaner.ui.paywall.PaywallScreen
 import com.example.whatsappcleaner.ui.settings.AppThemeMode
 import com.example.whatsappcleaner.ui.settings.ReminderFrequencyOption
@@ -76,6 +78,8 @@ private object Routes {
     const val ScreenshotsCleaner = "screenshots_cleaner"
     const val Paywall = "paywall"
     const val Settings = "settings"
+    const val PrivacyPolicy = "privacy_policy"
+    const val Terms = "terms"
     const val AiSmartSuggestions = "ai_smart_suggestions"
     const val AiDuplicateDetector = "ai_duplicate_detector"
     const val AiLargeFilesFinder = "ai_large_files_finder"
@@ -492,7 +496,8 @@ fun WhatsCleanAppRoot(
                 },
                 onRestorePurchase = { onRestorePurchase("settings") },
                 onManageSubscription = onManageSubscription,
-                onPrivacyPolicy = onPrivacyPolicy,
+                onPrivacyPolicy = { navController.navigateSingleTop(Routes.PrivacyPolicy) },
+                onTerms = { navController.navigateSingleTop(Routes.Terms) },
                 onFaq = onFaq,
                 onContactSupport = onContactSupport,
                 onReportIssue = onReportIssue,
@@ -500,6 +505,14 @@ fun WhatsCleanAppRoot(
                 onShareApp = { onShareText("Clean smarter. Free space instantly with Cleanly AI.") },
                 onInviteFriends = onInviteFriends
             )
+        }
+
+        composable(Routes.PrivacyPolicy) {
+            PrivacyPolicyScreen(onBack = { navController.popBackStack() })
+        }
+
+        composable(Routes.Terms) {
+            TermsAndConditionsScreen(onBack = { navController.popBackStack() })
         }
     }
 }
