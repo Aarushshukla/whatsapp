@@ -46,12 +46,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.items as rowItems
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.foundation.lazy.grid.items as gridItems
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -438,7 +438,7 @@ fun SimpleHomeScreen(
                     }
                 }
             } else {
-                gridItems(
+                items(
                     items,
                     key = { mediaItem -> mediaItem.id },
                     span = { GridItemSpan(maxLineSpan) }
@@ -1049,7 +1049,7 @@ fun FilterTabs(currentFilter: MediaFilter, onFilterChange: (MediaFilter) -> Unit
     )
 
     LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        items(filters) { (filter, descriptor) ->
+        rowItems(filters) { (filter, descriptor) ->
             FilterChip(
                 selected = currentFilter == filter,
                 onClick = { onFilterChange(filter) },
