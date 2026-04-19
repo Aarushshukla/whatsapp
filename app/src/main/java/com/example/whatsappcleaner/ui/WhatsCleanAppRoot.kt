@@ -127,6 +127,8 @@ fun WhatsCleanAppRoot(
     onReportIssue: () -> Unit,
     onPremiumFeatureRequested: (PremiumFeature) -> Boolean,
     onDeleteClicked: (String) -> Unit,
+    onSmartCleanClicked: () -> Unit,
+    onAiToolOpened: (AiFeature) -> Unit,
     onDeleteMediaRequest: (List<SimpleMediaItem>, String) -> Unit,
     onUndoDelete: () -> Unit,
     onDeleteSnackbarConsumed: () -> Unit,
@@ -134,6 +136,7 @@ fun WhatsCleanAppRoot(
     onCleanupRecorded: (Long) -> Unit,
     onDeepCleanWatchAd: () -> Unit,
     onExitRequested: () -> Unit,
+    onDebugCrashTest: () -> Unit,
     versionLabel: String,
     modifier: Modifier = Modifier
 ) {
@@ -175,6 +178,7 @@ fun WhatsCleanAppRoot(
                 isProUser = state.isProUser,
                 onNavigateToSmartClean = {
                     if (true) {
+                        onSmartCleanClicked()
                         navController.navigateSingleTop(Routes.SmartClean)
                     } else navController.navigateSingleTop(Routes.Paywall)
                 },
@@ -242,6 +246,7 @@ fun WhatsCleanAppRoot(
                 onNavigateToFeatures = { navController.navigateSingleTop(Routes.Features) },
                 onAiFeatureClick = { feature ->
                     if (true) {
+                        onAiToolOpened(feature)
                         navController.navigateSingleTop(
                             when (feature) {
                                 AiFeature.SMART_SUGGESTIONS -> Routes.AiSmartSuggestions
@@ -503,7 +508,8 @@ fun WhatsCleanAppRoot(
                 onReportIssue = onReportIssue,
                 onRateApp = onRateApp,
                 onShareApp = { onShareText("Clean smarter. Free space instantly with Cleanly AI.") },
-                onInviteFriends = onInviteFriends
+                onInviteFriends = onInviteFriends,
+                onDebugCrashTest = onDebugCrashTest
             )
         }
 

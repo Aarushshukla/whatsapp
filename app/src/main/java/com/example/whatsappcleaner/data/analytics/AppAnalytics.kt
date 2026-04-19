@@ -63,3 +63,10 @@ class AppAnalytics private constructor(context: Context) {
             }
     }
 }
+
+fun trackEvent(context: Context, eventName: String) {
+    val analytics = FirebaseAnalytics.getInstance(context.applicationContext)
+    val bundle = Bundle()
+    bundle.putString("action", eventName)
+    analytics.logEvent(eventName, bundle)
+}

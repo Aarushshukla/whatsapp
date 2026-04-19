@@ -49,6 +49,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Button
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -68,6 +69,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.whatsappcleaner.data.billing.SubscriptionPlan
 import com.example.whatsappcleaner.data.billing.SubscriptionState
+import com.example.whatsappcleaner.BuildConfig
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -96,7 +98,8 @@ fun SettingsScreen(
     onReportIssue: () -> Unit,
     onRateApp: () -> Unit,
     onShareApp: () -> Unit,
-    onInviteFriends: () -> Unit
+    onInviteFriends: () -> Unit,
+    onDebugCrashTest: () -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
     Scaffold(
@@ -230,6 +233,15 @@ fun SettingsScreen(
                     ActionRow("Rate app", "Leave a Play Store review", Icons.Default.Star, onRateApp)
                     ActionRow("Share app", "Share app with friends", Icons.Default.Share, onShareApp)
                     ActionRow("Invite friends", "Send a quick invite message", Icons.Default.Upgrade, onInviteFriends)
+                }
+            }
+            if (BuildConfig.DEBUG) {
+                item {
+                    SettingsSection(title = "Debug") {
+                        Button(onClick = onDebugCrashTest) {
+                            Text("Test Crash")
+                        }
+                    }
                 }
             }
         }

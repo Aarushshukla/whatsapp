@@ -26,12 +26,15 @@ import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.whatsappcleaner.ads.AdManager
+import com.example.whatsappcleaner.data.analytics.trackEvent
 import com.example.whatsappcleaner.data.billing.SubscriptionRepository
 import com.example.whatsappcleaner.ui.WhatsCleanAppRoot
 import com.example.whatsappcleaner.ui.home.DeleteExecution
 import com.example.whatsappcleaner.ui.home.HomeViewModel
 import com.example.whatsappcleaner.ui.settings.AppThemeMode
 import com.example.whatsappcleaner.ui.theme.WhatsCleanTheme
+import com.google.firebase.analytics.FirebaseAnalytics
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 
 class MainActivity : ComponentActivity() {
 
@@ -42,6 +45,7 @@ class MainActivity : ComponentActivity() {
     private val viewModel: HomeViewModel by viewModels()
     private val subscriptionRepository by lazy(LazyThreadSafetyMode.NONE) { SubscriptionRepository.get(this) }
     private val adManager by lazy(LazyThreadSafetyMode.NONE) { AdManager(this) }
+    private lateinit var firebaseAnalytics: FirebaseAnalytics
     private var hasShownExitAdThisSession = false
     private val deleteLauncher =
         registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
@@ -56,6 +60,7 @@ class MainActivity : ComponentActivity() {
                 }
             } catch (error: Exception) {
                 Log.e(TAG, "Failed while handling delete launcher result.", error)
+                FirebaseCrashlytics.getInstance().recordException(error)
                 viewModel.onMediaDeleteFailed()
                 showDeleteError("Unable to process delete result.")
             }
@@ -79,6 +84,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
+        firebaseAnalytics = FirebaseAnalytics.getInstance(this)
         Log.d(TAG, "onCreate called.")
         // TODO: RE-ENABLE SUBSCRIPTION LATER
         /*
@@ -221,6 +227,7 @@ class MainActivity : ComponentActivity() {
                 Log.d("DELETE_DEBUG", "deleteLauncher.launch() executed for MediaStore delete request")
             } catch (error: Exception) {
                 Log.e("DELETE_DEBUG", "Unable to launch MediaStore delete request", error)
+                FirebaseCrashlytics.getInstance().recordException(error)
                 viewModel.onMediaDeleteFailed()
                 showDeleteError("Unable to delete files right now.")
             }
@@ -241,6 +248,7 @@ class MainActivity : ComponentActivity() {
             }
         } catch (error: Exception) {
             Log.e("DELETE_DEBUG", "Unable to delete media via contentResolver.delete", error)
+            FirebaseCrashlytics.getInstance().recordException(error)
             viewModel.onMediaDeleteFailed()
             showDeleteError("Unable to delete files right now.")
         }
@@ -392,8 +400,14 @@ class MainActivity : ComponentActivity() {
         WhatsCleanTheme(darkTheme = darkTheme) {
             WhatsCleanAppRoot(
                 state = state,
-                onRefreshClick = viewModel::refreshMedia,
-                onAiScanClick = viewModel::runAiScan,
+                onRefreshClick = {
+                    trackEvent(this@MainActivity, "scan_started")
+                    viewModel.refreshMedia()
+                },
+                onAiScanClick = {
+                    trackEvent(this@MainActivity, "scan_started")
+                    viewModel.runAiScan()
+                },
                 onFilterChange = viewModel::setFilter,
                 onSuggestionChange = viewModel::setSuggestion,
                 onFrequencyChange = viewModel::setFrequency,
@@ -435,9 +449,18 @@ class MainActivity : ComponentActivity() {
                 onContactSupport = { sendEmail("support@cleanlyai.app", "Cleanly AI support") },
                 onReportIssue = { sendEmail("support@cleanlyai.app", "Cleanly AI bug report") },
                 onPremiumFeatureRequested = viewModel::onPremiumFeatureRequested,
-                onDeleteClicked = viewModel::onDeleteClicked,
+                onDeleteClicked = { origin ->
+                    trackEvent(this@MainActivity, "delete_clicked")
+                    viewModel.onDeleteClicked(origin)
+                },
+                onSmartCleanClicked = { trackEvent(this@MainActivity, "smart_clean_clicked") },
+                onAiToolOpened = { feature ->
+                    Log.d("AI_TOOLS", "Opened AI tool: ${feature.name}")
+                    trackEvent(this@MainActivity, "ai_tool_opened")
+                },
                 onDeleteMediaRequest = { items, origin ->
                     Log.d("DELETE_FLOW", "Step 1: Delete button clicked")
+                    trackEvent(this@MainActivity, "delete_clicked")
                     Log.d("DELETE_DEBUG", "Delete button click from $origin with ${items.size} selected items")
                     val rawUris = items.map { item -> item.uri }
                     rawUris.forEachIndexed { index, uri -> Log.d("DELETE_DEBUG", "Raw URI[$index]=$uri") }
@@ -471,6 +494,7 @@ class MainActivity : ComponentActivity() {
                 onCleanupRecorded = viewModel::recordCleanupResult,
                 onDeepCleanWatchAd = ::showRewardedForDeepClean,
                 onExitRequested = ::showExitAdOncePerSession,
+                onDebugCrashTest = { throw RuntimeException("Test Crash") },
                 versionLabel = versionLabel
             )
         }
