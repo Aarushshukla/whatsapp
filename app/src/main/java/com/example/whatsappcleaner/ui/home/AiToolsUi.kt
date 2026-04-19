@@ -2,6 +2,7 @@
 
 package com.example.whatsappcleaner.ui.home
 
+import android.util.Log
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
@@ -359,10 +360,15 @@ fun AiToolsSection(
     onFeatureClick: (AiFeature) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var isLoading by remember { mutableStateOf(true) }
     var groupsVisible by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
+        Log.d("AI_TOOLS", "AI tools loading started")
+        delay(2000)
+        isLoading = false
         delay(60)
         groupsVisible = true
+        Log.d("AI_TOOLS", "AI tools loading completed")
     }
 
     Card(
@@ -379,13 +385,22 @@ fun AiToolsSection(
                 title = "AI Tools",
                 subtitle = "Premium cleanup intelligence built for faster media decisions."
             )
-            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                AiGroups.forEach { group ->
-                    AiGroup(
-                        group = group,
-                        onFeatureClick = onFeatureClick,
-                        visible = groupsVisible
-                    )
+            if (isLoading) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    CircularProgressIndicator()
+                }
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    AiGroups.forEach { group ->
+                        AiGroup(
+                            group = group,
+                            onFeatureClick = onFeatureClick,
+                            visible = groupsVisible
+                        )
+                    }
                 }
             }
         }
@@ -664,7 +679,10 @@ private fun AiResultImageCard(
                 model = mediaItem.uri,
                 contentDescription = null,
                 contentScale = androidx.compose.ui.layout.ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier.fillMaxSize(),
+                onError = {
+                    Log.e("ERROR", "Image loading failed: ${mediaItem.uri}")
+                }
             )
             if (selected) {
                 Box(

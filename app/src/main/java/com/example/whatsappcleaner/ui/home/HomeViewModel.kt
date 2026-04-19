@@ -16,6 +16,7 @@ import com.example.whatsappcleaner.ai.SmartJunkAnalyzer
 import com.example.whatsappcleaner.data.ReminderFreq
 import com.example.whatsappcleaner.data.ReminderTime
 import com.example.whatsappcleaner.data.analytics.AppAnalytics
+import com.example.whatsappcleaner.data.analytics.trackEvent
 import com.example.whatsappcleaner.data.billing.SubscriptionRepository
 import com.example.whatsappcleaner.data.billing.SubscriptionState
 import com.example.whatsappcleaner.data.local.MediaLoader
@@ -37,6 +38,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.annotation.MainThread
 import kotlinx.coroutines.delay
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 
 enum class PremiumFeature(val analyticsKey: String, val paywallSource: String) {
     SMART_CLEAN_ADVANCED("smart_clean_clicked", "smart_clean_advanced"),
@@ -220,6 +222,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     fun refreshMedia(forceRefresh: Boolean = false, showLoading: Boolean = true) {
         if (!_uiState.value.permissionGranted) return
+        Log.d("SCAN", "Scan started")
+        trackEvent(appContext, "scan_started")
         viewModelScope.launch(Dispatchers.IO) {
             if (refreshInProgress) {
                 Log.d(TAG, "Skipping refresh request because a scan is already in progress.")
@@ -259,6 +263,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 val fullImages = mediaLoader.loadAllDeviceMedia("image")
                 val fullVideos = mediaLoader.loadAllDeviceMedia("video")
                 val allItems = (fullImages + fullVideos).sortedByDescending { mediaItem -> mediaItem.addedMillis }
+                Log.d("FILES", "Files found: ${allItems.size}")
 
                 if (allItems.size != initialItems.size) {
                     applyLoadedMediaState(allItems)
@@ -266,6 +271,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 hasLoadedInitialCache = true
             } catch (error: SecurityException) {
                 Log.e(TAG, "Media scan failed due to permission issue.", error)
+                FirebaseCrashlytics.getInstance().recordException(error)
                 withContext(Dispatchers.Main) {
                     _uiState.update { currentState ->
                         currentState.copy(summaryInfo = "Scan failed: permission denied", isLoading = false)
@@ -273,6 +279,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 }
             } catch (error: Exception) {
                 Log.e(TAG, "Media scan failed.", error)
+                FirebaseCrashlytics.getInstance().recordException(error)
                 withContext(Dispatchers.Main) {
                     _uiState.update { currentState ->
                         currentState.copy(summaryInfo = "Scan failed: ${error.message ?: "Unknown error"}", isLoading = false)
@@ -448,6 +455,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         val allItems = currentState.allItems
         if (allItems.isEmpty()) return
         if (isDeepClean && currentState.deepCleanCredits <= 0) return
+        Log.d("SCAN", "AI scan started. deepClean=$isDeepClean")
         viewModelScope.launch(Dispatchers.IO) {
             _uiState.update { it.copy(aiScanSummary = AiScanSummary(isRunning = true, progress = 0.1f, status = "Checking duplicates...")) }
             val duplicateItems = allItems
