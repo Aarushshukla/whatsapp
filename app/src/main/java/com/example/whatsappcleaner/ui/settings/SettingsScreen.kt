@@ -90,6 +90,7 @@ fun SettingsScreen(
     onRestorePurchase: () -> Unit,
     onManageSubscription: () -> Unit,
     onPrivacyPolicy: () -> Unit,
+    onTerms: () -> Unit,
     onFaq: () -> Unit,
     onContactSupport: () -> Unit,
     onReportIssue: () -> Unit,
@@ -214,6 +215,7 @@ fun SettingsScreen(
             item {
                 SettingsSection(title = "Privacy & support") {
                     ActionRow("Privacy Policy", "Review our privacy commitments", Icons.Default.Policy, onPrivacyPolicy)
+                    ActionRow("Terms & Conditions", "Read usage terms and responsibilities", Icons.Default.Gavel, onTerms)
                     ActionRow("Local scanning", "Scanning happens on-device where supported", Icons.Default.PrivacyTip, onPrivacyPolicy)
                     ActionRow("Permission explanation", "Media access is used only to analyze files", Icons.Default.Shield, onPrivacyPolicy)
                     ActionRow("Data usage note", "Analytics and billing are optional services", Icons.Default.Gavel, onPrivacyPolicy)

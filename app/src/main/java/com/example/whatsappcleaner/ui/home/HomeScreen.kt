@@ -1343,7 +1343,7 @@ fun ImagePreviewScreen(uri: Uri, onBack: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black)
+            .background(MaterialTheme.colorScheme.background)
             .zIndex(2f)
     ) {
         AsyncImage(
@@ -1359,7 +1359,7 @@ fun ImagePreviewScreen(uri: Uri, onBack: () -> Unit) {
                 .align(Alignment.TopStart)
                 .statusBarsPadding()
         ) {
-            Icon(Icons.Default.ArrowBack, contentDescription = null, tint = Color.White)
+            Icon(Icons.Default.ArrowBack, contentDescription = null, tint = MaterialTheme.colorScheme.onBackground)
         }
     }
 }

@@ -448,7 +448,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         val allItems = currentState.allItems
         if (allItems.isEmpty()) return
         if (isDeepClean && currentState.deepCleanCredits <= 0) return
-        viewModelScope.launch(Dispatchers.Default) {
+        viewModelScope.launch(Dispatchers.IO) {
             _uiState.update { it.copy(aiScanSummary = AiScanSummary(isRunning = true, progress = 0.1f, status = "Checking duplicates...")) }
             val duplicateItems = allItems
                 .groupBy { "${it.name.lowercase()}_${it.size}" }

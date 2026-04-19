@@ -56,6 +56,8 @@ import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.VideoLibrary
+import androidx.compose.material.icons.filled.Gavel
+import androidx.compose.material.icons.filled.Policy
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -271,7 +273,7 @@ fun PolishedSmartCleanScreen(
     val mediaByUri = remember(allItems) { allItems.associateBy { it.uri.toString() } }
     val smartCandidates = remember(fileItems, spamItems, sentFiles, largeFileItems) {
         val extraUris = (spamItems + sentFiles + largeFileItems).map { it.uri.toString() }.toSet()
-        fileItems.filter { file -> calculateJunkScore(file) >= 30 || file.uri.toString() in extraUris }
+        fileItems.filter { file -> calculateScore(file) >= 30 || file.uri.toString() in extraUris }
     }
 
     val duplicateCategoryItems = remember(smartCandidates) { smartCandidates.filter { it.isDuplicate } }
@@ -300,7 +302,7 @@ fun PolishedSmartCleanScreen(
     val totalStorage = statFs?.totalBytes ?: 0L
     val usedStorage = ((statFs?.totalBytes ?: 0L) - (statFs?.availableBytes ?: 0L)).coerceAtLeast(0L).coerceAtMost(totalStorage)
     val freeStorage = (totalStorage - usedStorage).coerceAtLeast(0L)
-    val usedPercent = if (totalStorage <= 0L) 0f else (usedStorage.toFloat() / totalStorage.toFloat()).coerceIn(0f, 1f)
+    val usedPercent = if (totalStorage <= 0L) 0f else ((usedStorage.toFloat() / totalStorage.toFloat()) * 100f).coerceIn(0f, 100f)
 
     LaunchedEffect(fileItems, smartCandidates) {
         isScanning = true
@@ -366,7 +368,7 @@ fun PolishedSmartCleanScreen(
                     usedBytes = usedStorage,
                     freeBytes = freeStorage,
                     cleanableBytes = smartCandidates.sumOf { file -> file.size },
-                    progress = usedPercent
+                    percent = usedPercent
                 )
             }
 
@@ -442,19 +444,19 @@ fun PolishedSmartCleanScreen(
 
 private const val LARGE_FILE_BYTES = 50L * 1024L * 1024L
 
-private data class FileItem(
+data class FileItem(
     val uri: android.net.Uri,
     val name: String,
     val size: Long,
     val lastModified: Long,
-    val path: String,
-    val mimeType: String,
     val isDuplicate: Boolean = false,
     val isScreenshot: Boolean = false,
-    val isWhatsapp: Boolean = false
+    val isWhatsapp: Boolean = false,
+    val path: String = "",
+    val mimeType: String = ""
 )
 
-private fun calculateJunkScore(file: FileItem): Int {
+private fun calculateScore(file: FileItem): Int {
     var score = 0
     if (file.size > LARGE_FILE_BYTES) score += 20
     val daysOld = (System.currentTimeMillis() - file.lastModified) / (1000L * 60L * 60L * 24L)
@@ -483,7 +485,7 @@ private fun SmartCleanFileCard(
     onOpenPreview: () -> Unit,
     onToggleSelection: () -> Unit
 ) {
-    val score = remember(file) { calculateJunkScore(file) }
+    val score = remember(file) { calculateScore(file) }
     val reasonText = remember(file) { junkReasons(file).firstOrNull().orEmpty() }
     val statusText = when {
         score > 60 -> "Safe to delete"
@@ -495,12 +497,12 @@ private fun SmartCleanFileCard(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onToggleSelection() },
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 5.dp else 2.dp)
     ) {
         Row(
-            modifier = Modifier.padding(12.dp),
+            modifier = Modifier.padding(16.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
@@ -508,17 +510,17 @@ private fun SmartCleanFileCard(
                 model = file.uri,
                 contentDescription = file.name,
                 modifier = Modifier
-                    .size(58.dp)
+                    .size(56.dp)
                     .clip(RoundedCornerShape(12.dp))
                     .clickable(onClick = onOpenPreview)
             )
             Column(modifier = Modifier.weight(1f)) {
-                Text(file.name, maxLines = 1, overflow = TextOverflow.Ellipsis, color = TextMain)
-                Text(formatSize(file.size), style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                Text(file.name, maxLines = 1, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurface)
+                Text(formatSize(file.size), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 if (reasonText.isNotBlank()) {
                     Text(reasonText, style = MaterialTheme.typography.bodySmall, color = AccentBlue)
                 }
-                Text(statusText, style = MaterialTheme.typography.labelSmall, color = AccentGreen)
+                Text(statusText, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
             }
             Checkbox(checked = isSelected, onCheckedChange = { onToggleSelection() })
         }
@@ -539,7 +541,7 @@ private fun SmartCleanCategoryCard(
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
     ) {
         Column(
@@ -567,12 +569,12 @@ private fun SmartCleanCategoryCard(
                     Text(
                         text = category.title,
                         style = MaterialTheme.typography.titleMedium,
-                        color = TextMain
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
                         text = "${category.items.size} files",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = TextSecondary
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -582,7 +584,7 @@ private fun SmartCleanCategoryCard(
                 .forEach { item ->
                     Text(
                         text = "• ${item.name}",
-                        color = TextSecondary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodyMedium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
@@ -653,7 +655,7 @@ private fun SmartCleaningActionButton(onClick: () -> Unit) {
 }
 
 @Composable
-private fun StoragePremiumCard(usedBytes: Long, freeBytes: Long, cleanableBytes: Long, progress: Float) {
+private fun StoragePremiumCard(usedBytes: Long, freeBytes: Long, cleanableBytes: Long, percent: Float) {
     Card(
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -679,8 +681,14 @@ private fun StoragePremiumCard(usedBytes: Long, freeBytes: Long, cleanableBytes:
                 }
             }
             Box(contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(progress = progress, color = Color(0xFF4A6CF7), trackColor = Color(0xFFE8ECFF), strokeWidth = 7.dp, modifier = Modifier.size(58.dp))
-                Text("${(progress.coerceIn(0f, 1f) * 100).toInt()}%", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurface)
+                CircularProgressIndicator(
+                    progress = { (percent / 100f).coerceIn(0f, 1f) },
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                    strokeWidth = 7.dp,
+                    modifier = Modifier.size(58.dp)
+                )
+                Text("${percent.toInt()}%", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurface)
             }
         }
     }
@@ -694,14 +702,19 @@ private fun QuickActionChip(label: String, icon: ImageVector, selected: Boolean,
         label = { Text(label) },
         leadingIcon = { Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp)) },
         shape = RoundedCornerShape(50.dp),
-        border = FilterChipDefaults.filterChipBorder(enabled = true, selected = selected, borderColor = Color(0xFFE5E7EB), selectedBorderColor = Color(0xFF4A6CF7)),
+        border = FilterChipDefaults.filterChipBorder(
+            enabled = true,
+            selected = selected,
+            borderColor = MaterialTheme.colorScheme.outlineVariant,
+            selectedBorderColor = MaterialTheme.colorScheme.primary
+        ),
         colors = FilterChipDefaults.filterChipColors(
-            containerColor = Color(0xFFF7F8FA),
-            selectedContainerColor = Color(0xFFE8ECFF),
-            labelColor = Color(0xFF1A1A1A),
-            selectedLabelColor = Color(0xFF1A1A1A),
-            iconColor = Color(0xFF6B7280),
-            selectedLeadingIconColor = Color(0xFF4A6CF7)
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+            labelColor = MaterialTheme.colorScheme.onSurface,
+            selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            iconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            selectedLeadingIconColor = MaterialTheme.colorScheme.primary
         )
     )
 }
@@ -719,7 +732,7 @@ private fun FileCandidateCard(
             .animateContentSize()
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 4.dp else 2.dp)
     ) {
         Row(
@@ -823,7 +836,13 @@ private fun AnimatedListItem(index: Int, content: @Composable () -> Unit) {
 }
 
 @Composable
-private fun SimpleActionCard(icon: ImageVector, title: String, subtitle: String, onClick: () -> Unit) {
+private fun SimpleActionCard(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    onClick: () -> Unit,
+    showAction: Boolean = true
+) {
     LegitCard {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -833,7 +852,9 @@ private fun SimpleActionCard(icon: ImageVector, title: String, subtitle: String,
                     Text(subtitle, color = TextSecondary, style = MaterialTheme.typography.bodySmall)
                 }
             }
-            LegitButton("Open", onClick = onClick)
+            if (showAction) {
+                LegitButton("Open", onClick = onClick)
+            }
         }
     }
 }
@@ -844,6 +865,84 @@ private fun statBox(value: String, label: String) {
         Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(value, color = TextMain, style = MaterialTheme.typography.titleMedium)
             Text(label, color = TextSecondary, style = MaterialTheme.typography.bodySmall)
+        }
+    }
+}
+
+@Composable
+fun PrivacyPolicyScreen(onBack: () -> Unit) {
+    FeatureScreenScaffold("Privacy Policy", "How your data is handled", onBack) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            item {
+                SimpleActionCard(
+                    icon = Icons.Default.Policy,
+                    title = "No personal data collection",
+                    subtitle = "This app does not collect personal information, contacts, or message contents.",
+                    onClick = {},
+                    showAction = false
+                )
+            }
+            item {
+                SimpleActionCard(
+                    icon = Icons.Default.Security,
+                    title = "Local processing only",
+                    subtitle = "Scanning and cleanup recommendations run on your device.",
+                    onClick = {},
+                    showAction = false
+                )
+            }
+            item {
+                SimpleActionCard(
+                    icon = Icons.Default.FolderOpen,
+                    title = "Storage permission usage",
+                    subtitle = "Media permission is used only to read files for analysis and cleanup.",
+                    onClick = {},
+                    showAction = false
+                )
+            }
+            item {
+                SimpleActionCard(
+                    icon = Icons.Default.CheckCircle,
+                    title = "No data sharing",
+                    subtitle = "Your media files are not uploaded, sold, or shared with third parties.",
+                    onClick = {},
+                    showAction = false
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun TermsAndConditionsScreen(onBack: () -> Unit) {
+    FeatureScreenScaffold("Terms & Conditions", "Usage responsibilities", onBack) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            item {
+                SimpleActionCard(
+                    icon = Icons.Default.Gavel,
+                    title = "Suggestions, not guarantees",
+                    subtitle = "The app provides cleanup suggestions to help you decide what to remove.",
+                    onClick = {},
+                    showAction = false
+                )
+            }
+            item {
+                SimpleActionCard(
+                    icon = Icons.Default.DeleteSweep,
+                    title = "User responsibility",
+                    subtitle = "You are responsible for confirming deletions and keeping important files backed up.",
+                    onClick = {},
+                    showAction = false
+                )
+            }
         }
     }
 }

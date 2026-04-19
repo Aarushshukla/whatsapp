@@ -65,6 +65,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
 import com.example.whatsappcleaner.data.local.formatSize
 import com.example.whatsappcleaner.ui.components.LegitButton
 import kotlinx.coroutines.Dispatchers
@@ -616,7 +617,7 @@ fun AiFeatureDetailScreen(
                 } else {
                     items(
                         processedItems,
-                        key = { it.id }
+                        key = { it.uri.toString() }
                     ) { mediaItem ->
                         AiResultImageCard(
                             mediaItem = mediaItem,
@@ -659,7 +660,7 @@ private fun AiResultImageCard(
         shape = RoundedCornerShape(16.dp)
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
-            coil.compose.AsyncImage(
+            AsyncImage(
                 model = mediaItem.uri,
                 contentDescription = null,
                 contentScale = androidx.compose.ui.layout.ContentScale.Crop,
@@ -674,10 +675,11 @@ private fun AiResultImageCard(
                 Icon(
                     imageVector = Icons.Default.CheckCircle,
                     contentDescription = null,
-                    tint = androidx.compose.ui.graphics.Color.White,
+                    tint = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(6.dp)
+                        .size(24.dp)
                 )
             }
         }
