@@ -69,8 +69,11 @@ configurations.configureEach {
 
 configurations.all {
     resolutionStrategy {
-        force 'com.google.android.gms:play-services-measurement-api:21.5.0'
-        force 'com.google.android.gms:play-services-measurement-impl:21.5.0'
+        force 'com.google.android.gms:play-services-measurement:21.6.2'
+        force 'com.google.android.gms:play-services-measurement-base:21.6.2'
+        force 'com.google.android.gms:play-services-measurement-api:21.6.2'
+        force 'com.google.android.gms:play-services-measurement-sdk-api:21.6.2'
+        force 'com.google.android.gms:play-services-measurement-impl:21.6.2'
     }
 }
 
