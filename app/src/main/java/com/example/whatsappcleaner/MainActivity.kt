@@ -89,6 +89,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         val analytics = Firebase.analytics
         firebaseAnalytics = FirebaseAnalytics.getInstance(this)
+        Log.d("TEST", "APP STARTED")
+        Firebase.analytics.logEvent("test_event", null)
         Log.d(TAG, "Firebase analytics ready: $analytics")
         Log.d(TAG, "onCreate called.")
         // TODO: RE-ENABLE SUBSCRIPTION LATER
@@ -462,6 +464,8 @@ class MainActivity : ComponentActivity() {
                     viewModel.onDeleteClicked(origin)
                 },
                 onSmartCleanClicked = {
+                    Log.d("TEST", "SMART CLEAN CLICKED")
+                    Firebase.analytics.logEvent("smart_clean_clicked", null)
                     AnalyticsHelper.logSmartClean()
                     trackEvent(this@MainActivity, "smart_clean_clicked")
                 },
