@@ -39,7 +39,6 @@ import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Subscriptions
 import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material.icons.filled.Upgrade
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
@@ -232,7 +231,7 @@ fun SettingsScreen(
                 SettingsSection(title = "Growth") {
                     ActionRow("Rate app", "Leave a Play Store review", Icons.Default.Star, onRateApp)
                     ActionRow("Share app", "Share app with friends", Icons.Default.Share, onShareApp)
-                    ActionRow("Invite friends", "Send a quick invite message", Icons.Default.Upgrade, onInviteFriends)
+                    ActionRow("Invite friends", "Send a quick invite message", Icons.Default.Share, onInviteFriends)
                 }
             }
             if (BuildConfig.DEBUG) {
