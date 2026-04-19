@@ -26,6 +26,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.whatsappcleaner.ads.AdManager
+import com.example.whatsappcleaner.data.analytics.AnalyticsHelper
 import com.example.whatsappcleaner.data.analytics.trackEvent
 import com.example.whatsappcleaner.data.billing.SubscriptionRepository
 import com.example.whatsappcleaner.ui.WhatsCleanAppRoot
@@ -34,7 +35,9 @@ import com.example.whatsappcleaner.ui.home.HomeViewModel
 import com.example.whatsappcleaner.ui.settings.AppThemeMode
 import com.example.whatsappcleaner.ui.theme.WhatsCleanTheme
 import com.google.firebase.analytics.FirebaseAnalytics
+import com.google.firebase.analytics.ktx.analytics
 import com.google.firebase.crashlytics.FirebaseCrashlytics
+import com.google.firebase.ktx.Firebase
 
 class MainActivity : ComponentActivity() {
 
@@ -84,7 +87,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
+        val analytics = Firebase.analytics
         firebaseAnalytics = FirebaseAnalytics.getInstance(this)
+        Log.d(TAG, "Firebase analytics ready: $analytics")
         Log.d(TAG, "onCreate called.")
         // TODO: RE-ENABLE SUBSCRIPTION LATER
         /*
@@ -401,10 +406,12 @@ class MainActivity : ComponentActivity() {
             WhatsCleanAppRoot(
                 state = state,
                 onRefreshClick = {
+                    AnalyticsHelper.logScanStarted()
                     trackEvent(this@MainActivity, "scan_started")
                     viewModel.refreshMedia()
                 },
                 onAiScanClick = {
+                    AnalyticsHelper.logScanStarted()
                     trackEvent(this@MainActivity, "scan_started")
                     viewModel.runAiScan()
                 },
@@ -450,16 +457,22 @@ class MainActivity : ComponentActivity() {
                 onReportIssue = { sendEmail("support@cleanlyai.app", "Cleanly AI bug report") },
                 onPremiumFeatureRequested = viewModel::onPremiumFeatureRequested,
                 onDeleteClicked = { origin ->
+                    AnalyticsHelper.logDelete(count = 0)
                     trackEvent(this@MainActivity, "delete_clicked")
                     viewModel.onDeleteClicked(origin)
                 },
-                onSmartCleanClicked = { trackEvent(this@MainActivity, "smart_clean_clicked") },
+                onSmartCleanClicked = {
+                    AnalyticsHelper.logSmartClean()
+                    trackEvent(this@MainActivity, "smart_clean_clicked")
+                },
                 onAiToolOpened = { feature ->
                     Log.d("AI_TOOLS", "Opened AI tool: ${feature.name}")
+                    AnalyticsHelper.logAITool(feature.name)
                     trackEvent(this@MainActivity, "ai_tool_opened")
                 },
                 onDeleteMediaRequest = { items, origin ->
                     Log.d("DELETE_FLOW", "Step 1: Delete button clicked")
+                    AnalyticsHelper.logDelete(items.size)
                     trackEvent(this@MainActivity, "delete_clicked")
                     Log.d("DELETE_DEBUG", "Delete button click from $origin with ${items.size} selected items")
                     val rawUris = items.map { item -> item.uri }
@@ -494,7 +507,10 @@ class MainActivity : ComponentActivity() {
                 onCleanupRecorded = viewModel::recordCleanupResult,
                 onDeepCleanWatchAd = ::showRewardedForDeepClean,
                 onExitRequested = ::showExitAdOncePerSession,
-                onDebugCrashTest = { throw RuntimeException("Test Crash") },
+                onDebugCrashTest = {
+                    Log.d("CRASH", "Test crash triggered")
+                    throw RuntimeException("Test Crash - Firebase Check")
+                },
                 versionLabel = versionLabel
             )
         }
