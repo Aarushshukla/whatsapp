@@ -6,3 +6,6 @@ local.properties
 *.iml
 *.log
 app/google-services.json
+
+# Keep machine-specific Android SDK path out of git
+local.properties
