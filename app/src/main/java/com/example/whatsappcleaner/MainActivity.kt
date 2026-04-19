@@ -36,6 +36,7 @@ import com.example.whatsappcleaner.ui.settings.AppThemeMode
 import com.example.whatsappcleaner.ui.theme.WhatsCleanTheme
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.google.firebase.analytics.ktx.analytics
+import com.google.firebase.FirebaseApp
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.google.firebase.ktx.Firebase
 
@@ -87,7 +88,11 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
+        FirebaseApp.initializeApp(this)
+        Log.d("TEST", "Firebase initialized")
         val analytics = Firebase.analytics
+        val app = FirebaseApp.getInstance()
+        Log.d("TEST", "FirebaseApp: ${app.name}")
         firebaseAnalytics = FirebaseAnalytics.getInstance(this)
         Log.d("TEST", "APP STARTED")
         Firebase.analytics.logEvent("test_event", null)
