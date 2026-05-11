@@ -293,9 +293,9 @@ fun SimpleHomeScreen(
             TopAppBar(
                 title = {
                     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text("WhatsApp Cleaner", color = MaterialTheme.colorScheme.onBackground, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                        Text("ChatSweep", color = MaterialTheme.colorScheme.onBackground, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                         Text(
-                            text = "Smart cleanup dashboard",
+                            text = "Private offline media cleaner",
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.labelMedium,
                             maxLines = 1,
@@ -341,8 +341,8 @@ fun SimpleHomeScreen(
                     enter = fadeIn(tween(360)) + slideInVertically(initialOffsetY = { it / 3 })
                 ) {
                     PremiumHeader(
-                        title = "WhatsApp Cleaner",
-                        subtitle = "Clear junk faster with AI-ranked cleanup suggestions",
+                        title = "ChatSweep",
+                        subtitle = "Private offline media cleaner",
                         remindersEnabled = remindersEnabled,
                         onRemindersToggle = onRemindersToggle
                     )
@@ -714,8 +714,8 @@ private fun DashboardHeader(
                     Icon(Icons.Default.Menu, contentDescription = "Menu", tint = MaterialTheme.colorScheme.onSurface)
                 }
                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("Cleanly AI", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurface)
-                    Text("Clean smarter. Free space instantly.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("ChatSweep", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurface)
+                    Text("Clean chat media storage", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
 

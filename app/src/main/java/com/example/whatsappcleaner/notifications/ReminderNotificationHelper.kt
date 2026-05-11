@@ -21,7 +21,7 @@ class ReminderNotificationHelper(
 
         val channel = NotificationChannel(
             CHANNEL_ID,
-            "Cleanly AI Reminders",
+            "ChatSweep Reminders",
             NotificationManager.IMPORTANCE_DEFAULT
         ).apply {
             description = "Smart reminders to keep storage clean"
@@ -45,7 +45,7 @@ class ReminderNotificationHelper(
         val spaceText = if (freeableBytes > 0) "Potential free space: ${com.example.whatsappcleaner.data.local.formatSize(freeableBytes)}" else "Quick storage check available"
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle("Cleanly AI")
+            .setContentTitle("ChatSweep")
             .setContentText(spaceText)
             .setStyle(NotificationCompat.BigTextStyle().bigText(messageBody))
             .setContentIntent(pendingIntent)

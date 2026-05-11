@@ -83,7 +83,7 @@ fun PaywallScreen(
         containerColor = PrimaryBackground,
         topBar = {
             TopAppBar(
-                title = { Text("Cleanly AI Pro", color = TextMain) },
+                title = { Text("ChatSweep Pro", color = TextMain) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = TextMain)

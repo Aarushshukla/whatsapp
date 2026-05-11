@@ -262,7 +262,7 @@ private fun BrandHeader(versionLabel: String, tagline: String) {
                 .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text("Cleanly AI", color = colors.onSurface, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            Text("ChatSweep", color = colors.onSurface, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
             Text(tagline, color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
             Text(versionLabel, color = colors.primary, style = MaterialTheme.typography.labelLarge)
         }

@@ -913,6 +913,15 @@ fun PrivacyPolicyScreen(onBack: () -> Unit) {
                     showAction = false
                 )
             }
+            item {
+                SimpleActionCard(
+                    icon = Icons.Default.Info,
+                    title = "Independent utility app",
+                    subtitle = "This app is not affiliated with, endorsed by, or sponsored by WhatsApp LLC or Meta Platforms, Inc.",
+                    onClick = {},
+                    showAction = false
+                )
+            }
         }
     }
 }
@@ -938,7 +947,16 @@ fun TermsAndConditionsScreen(onBack: () -> Unit) {
                 SimpleActionCard(
                     icon = Icons.Default.DeleteSweep,
                     title = "User responsibility",
-                    subtitle = "You are responsible for confirming deletions and keeping important files backed up.",
+                    subtitle = "You are responsible for confirming deletions, and deleted files may not be recoverable.",
+                    onClick = {},
+                    showAction = false
+                )
+            }
+            item {
+                SimpleActionCard(
+                    icon = Icons.Default.Info,
+                    title = "No affiliation",
+                    subtitle = "ChatSweep is an independent utility and is not affiliated with WhatsApp LLC or Meta Platforms, Inc.",
                     onClick = {},
                     showAction = false
                 )

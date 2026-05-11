@@ -762,12 +762,12 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     fun shareResultText(): String {
         val freed = formatSize(_uiState.value.lastCleanupBytes)
         analytics.trackShareResultClicked("cleanup_result")
-        return "I cleaned my phone and freed ${if (freed == "0 B") "space" else freed} using Cleanly AI."
+        return "I cleaned my phone and freed ${if (freed == "0 B") "space" else freed} using ChatSweep."
     }
 
     fun shareInviteText(): String {
         analytics.trackShareResultClicked("invite_friends")
-        return "Clean smarter. Free space instantly with Cleanly AI."
+        return "Clean chat media storage with ChatSweep."
     }
 
     fun onDeleteClicked(origin: String) {
