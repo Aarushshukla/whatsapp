@@ -280,12 +280,12 @@ class MainActivity : ComponentActivity() {
 
     private fun shareText(text: String?) {
         val safeText = text?.takeIf { candidateText -> candidateText.isNotBlank() }
-            ?: "Clean smarter. Free space instantly with Cleanly AI."
+            ?: "Clean smarter. Free space instantly with ChatSweep."
         val intent = Intent(Intent.ACTION_SEND).apply {
             type = "text/plain"
             putExtra(Intent.EXTRA_TEXT, safeText)
         }
-        runCatching { startActivity(Intent.createChooser(intent, "Share Cleanly AI")) }
+        runCatching { startActivity(Intent.createChooser(intent, "Share ChatSweep")) }
             .onFailure { error -> Log.e(TAG, "Unable to share text.", error) }
     }
 
@@ -327,10 +327,10 @@ class MainActivity : ComponentActivity() {
         val safeAddress = address.takeIf { candidateAddress -> candidateAddress.isNotBlank() } ?: return
         val intent = Intent(Intent.ACTION_SENDTO).apply {
             data = Uri.parse("mailto:$safeAddress")
-            putExtra(Intent.EXTRA_SUBJECT, subject.ifBlank { "Cleanly AI support" })
+            putExtra(Intent.EXTRA_SUBJECT, subject.ifBlank { "ChatSweep support" })
         }
         try {
-            startActivity(Intent.createChooser(intent, "Contact Cleanly AI"))
+            startActivity(Intent.createChooser(intent, "Contact ChatSweep"))
         } catch (error: ActivityNotFoundException) {
             Log.e(TAG, "No email app available.", error)
             shareText("Reach us at $safeAddress")
@@ -460,8 +460,8 @@ class MainActivity : ComponentActivity() {
                 onRateApp = ::rateApp,
                 onPrivacyPolicy = { openUrl(privacyPolicyUrl) },
                 onFaq = { openUrl(faqUrl) },
-                onContactSupport = { sendEmail("support@cleanlyai.app", "Cleanly AI support") },
-                onReportIssue = { sendEmail("support@cleanlyai.app", "Cleanly AI bug report") },
+                onContactSupport = { sendEmail("support@cleanlyai.app", "ChatSweep support") },
+                onReportIssue = { sendEmail("support@cleanlyai.app", "ChatSweep bug report") },
                 onPremiumFeatureRequested = viewModel::onPremiumFeatureRequested,
                 onDeleteClicked = { origin ->
                     AnalyticsHelper.logDelete(count = 0)

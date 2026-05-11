@@ -507,7 +507,7 @@ fun WhatsCleanAppRoot(
                 onContactSupport = onContactSupport,
                 onReportIssue = onReportIssue,
                 onRateApp = onRateApp,
-                onShareApp = { onShareText("Clean smarter. Free space instantly with Cleanly AI.") },
+                onShareApp = { onShareText("Clean chat media storage with ChatSweep.") },
                 onInviteFriends = onInviteFriends,
                 onDebugCrashTest = onDebugCrashTest
             )

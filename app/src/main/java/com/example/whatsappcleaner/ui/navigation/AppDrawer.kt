@@ -49,8 +49,8 @@ fun AppDrawer(onItemClick: (String) -> Unit) {
             Column {
                 Box(Modifier.size(50.dp).background(AccentBlue, RoundedCornerShape(12.dp)))
                 Spacer(Modifier.height(12.dp))
-                Text("Cleanly AI", style = MaterialTheme.typography.headlineSmall, color = BrandNavy)
-                Text("Clean smarter. Free space instantly.", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                Text("ChatSweep", style = MaterialTheme.typography.headlineSmall, color = BrandNavy)
+                Text("Clean chat media storage", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
             }
         }
 
