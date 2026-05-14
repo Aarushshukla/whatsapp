@@ -497,7 +497,10 @@ fun PolishedSmartCleanScreen(
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("${selectedSimpleItems.size} selected • ${formatSize(selectedSimpleItems.sumOf { it.size })}", modifier = Modifier.weight(1f))
+                        Text(
+                            text = "${selectedSimpleItems.size} selected • ${formatSize(selectedSimpleItems.sumOf { it.size })}",
+                            modifier = Modifier.weight(1f)
+                        )
                         LegitButton(text = "Delete selected", onClick = {
                             if (selectedSimpleItems.isEmpty()) {
                                 friendlyMessage = "Select files first, then try deleting."
@@ -541,10 +544,11 @@ fun PolishedSmartCleanScreen(
                     showDeleteConfirm = false
                     onDeleteItemsRequested(selectedSimpleItems)
                     onCleanupRecorded(selectedBytes)
+                    val timestamp = DateFormat.format("MMM d, h:mm a", System.currentTimeMillis())
                     friendlyMessage = buildString {
                         append("Your chat media is lighter now • ${selectedSimpleItems.size} files")
                         if (categoryNames.isNotEmpty()) append(" • ${categoryNames.joinToString()}")
-                        append(" • ${DateFormat.format(\"MMM d, h:mm a\", System.currentTimeMillis())}")
+                        append(" • $timestamp")
                     }
                 }) { Text("Delete Safely") }
             }
