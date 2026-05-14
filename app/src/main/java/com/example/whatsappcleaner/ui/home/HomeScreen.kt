@@ -114,6 +114,7 @@ fun SimpleHomeScreen(
     smartSuggestionSummary: SmartSuggestionSummary,
     smartSuggestedItems: List<SimpleMediaItem>,
     suggestionReasonsByUri: Map<String, List<String>>,
+    scanUiState: ScanUiState,
     onNavigateToFeatures: () -> Unit,
     onAiFeatureClick: (AiFeature) -> Unit
 ) {
@@ -124,6 +125,15 @@ fun SimpleHomeScreen(
             snackbarHostState.showSnackbar(it)
             onDeleteSnackbarConsumed()
         }
+    }
+
+    val scanProgress = (scanUiState as? ScanUiState.Loading)?.progress ?: if (totalSize > 0L) 0.72f else 0f
+    val scanStageText = when (scanUiState) {
+        is ScanUiState.Loading -> scanUiState.stage
+        is ScanUiState.Success -> scanUiState.result
+        ScanUiState.Empty -> "No files found."
+        is ScanUiState.Error -> "Scan failed: ${scanUiState.message}"
+        ScanUiState.Idle -> "Ready to scan"
     }
 
     val categoryCards = listOf(
@@ -151,7 +161,7 @@ fun SimpleHomeScreen(
                 Column(Modifier.fillMaxWidth().padding(18.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     Box(Modifier.size(136.dp), contentAlignment = Alignment.Center) {
                         androidx.compose.material3.CircularProgressIndicator(
-                            progress = { if (totalSize > 0L) 0.72f else 0.0f },
+                            progress = { scanProgress },
                             strokeWidth = 12.dp,
                             modifier = Modifier.fillMaxSize(),
                             color = MaterialTheme.colorScheme.primary,
@@ -163,9 +173,13 @@ fun SimpleHomeScreen(
                         }
                     }
                     Spacer(Modifier.height(10.dp))
-                    Text(if (totalSize > 0L) "${items.size} files found • Cleanup potential ${formatSize(smartSuggestionSummary.totalSpaceToFree)}" else "Ready to scan")
+                    Text(scanStageText)
                     Spacer(Modifier.height(12.dp))
-                    Button(onClick = onRefreshClick, modifier = Modifier.fillMaxWidth()) {
+                    Button(
+                        onClick = onRefreshClick,
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = scanUiState !is ScanUiState.Loading
+                    ) {
                         Text(if (isLoading) "Scanning..." else "Scan Chat Media")
                     }
                     Spacer(Modifier.height(8.dp))
