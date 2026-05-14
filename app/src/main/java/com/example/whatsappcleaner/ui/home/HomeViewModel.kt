@@ -22,6 +22,7 @@ import com.example.whatsappcleaner.data.billing.SubscriptionState
 import com.example.whatsappcleaner.data.local.MediaLoader
 import com.example.whatsappcleaner.data.local.SimpleMediaItem
 import com.example.whatsappcleaner.data.local.UserPrefs
+import com.example.whatsappcleaner.data.local.UserPrefs.ScanHistoryRecord
 import com.example.whatsappcleaner.data.local.formatSize
 import kotlin.math.abs
 import com.example.whatsappcleaner.reminder.ReminderScheduler
@@ -245,7 +246,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     fun refreshMedia(forceRefresh: Boolean = false, showLoading: Boolean = true) {
         if (!_uiState.value.permissionGranted) return
         Log.d("SCAN", "Scan started")
-        trackEvent(appContext, "scan_started")
+        analytics.trackScanStarted()
         viewModelScope.launch(Dispatchers.IO) {
             if (refreshInProgress) {
                 Log.d(TAG, "Skipping refresh request because a scan is already in progress.")
@@ -300,6 +301,19 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 _scanUiState.value = if (allItems.isEmpty()) ScanUiState.Empty else ScanUiState.Success(
                     "Found ${allItems.size} files (${formatSize(allItems.sumOf { it.sizeKb.toLong() * 1024L })})"
                 )
+                if (allItems.isNotEmpty()) {
+                    val totalSizeBytes = allItems.sumOf { it.sizeKb.toLong() * 1024L }
+                    prefs.appendScanHistory(
+                        ScanHistoryRecord(
+                            scanDateMillis = System.currentTimeMillis(),
+                            totalMediaSizeBytes = totalSizeBytes,
+                            imageSizeBytes = allItems.filter { it.mimeType?.startsWith("image") == true }.sumOf { it.sizeKb.toLong() * 1024L },
+                            videoSizeBytes = allItems.filter { it.mimeType?.startsWith("video") == true }.sumOf { it.sizeKb.toLong() * 1024L },
+                            duplicateSizeBytes = 0L
+                        )
+                    )
+                    analytics.trackScanCompleted(allItems.size, totalSizeBytes)
+                }
                 hasLoadedInitialCache = true
             } catch (error: SecurityException) {
                 Log.e(TAG, "Media scan failed due to permission issue.", error)
@@ -310,6 +324,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 }
                 _scanUiState.value = ScanUiState.Error("Permission denied")
+                analytics.trackScanFailed("permission_denied")
             } catch (error: Exception) {
                 Log.e(TAG, "Media scan failed.", error)
                 FirebaseCrashlytics.getInstance().recordException(error)
@@ -319,6 +334,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 }
                 _scanUiState.value = ScanUiState.Error(error.message ?: "Unknown error")
+                analytics.trackScanFailed(error.message ?: "unknown")
             } finally {
                 refreshInProgress = false
             }

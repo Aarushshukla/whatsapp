@@ -70,8 +70,12 @@ class AppAnalytics private constructor(context: Context) {
 }
 
 fun trackEvent(context: Context, eventName: String) {
-    val analytics = FirebaseAnalytics.getInstance(context.applicationContext)
-    val bundle = Bundle()
-    bundle.putString("action", eventName)
-    analytics.logEvent(eventName, bundle)
+    AppAnalytics.get(context).logEvent(eventName) { putString("action", eventName) }
 }
+
+fun AppAnalytics.trackScanStarted() = logEvent("scan_started")
+fun AppAnalytics.trackScanCompleted(totalFiles: Int, totalSizeBytes: Long) = logEvent("scan_completed") {
+    putInt("total_files", totalFiles)
+    putLong("total_size_bytes", totalSizeBytes)
+}
+fun AppAnalytics.trackScanFailed(reason: String) = logEvent("scan_failed") { putString("reason", reason.take(80)) }

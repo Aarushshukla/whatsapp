@@ -2,6 +2,8 @@ package com.example.whatsappcleaner.data.local
 
 import android.content.Context
 import android.content.SharedPreferences
+import org.json.JSONArray
+import org.json.JSONObject
 import com.example.whatsappcleaner.ui.settings.AppThemeMode
 import com.example.whatsappcleaner.ui.settings.ReminderFrequencyOption
 
@@ -27,7 +29,16 @@ class UserPrefs private constructor(context: Context) {
         private const val KEY_INCLUDE_MEMES = "include_memes"
         private const val KEY_INCLUDE_DUPLICATES = "include_duplicates"
         private const val KEY_FREE_PREMIUM_ATTEMPTS = "free_premium_attempts"
+        private const val KEY_SCAN_HISTORY = "scan_history_v1"
     }
+
+    data class ScanHistoryRecord(
+        val scanDateMillis: Long,
+        val totalMediaSizeBytes: Long,
+        val imageSizeBytes: Long = 0L,
+        val videoSizeBytes: Long = 0L,
+        val duplicateSizeBytes: Long = 0L
+    )
 
     fun hasSeenOnboarding(): Boolean = prefs.getBoolean(KEY_SEEN_ONBOARDING, false)
     fun setOnboardingSeen() = prefs.edit().putBoolean(KEY_SEEN_ONBOARDING, true).apply()
@@ -106,4 +117,41 @@ class UserPrefs private constructor(context: Context) {
     }
 
     fun resetFreePremiumAttempts() = prefs.edit().putInt(KEY_FREE_PREMIUM_ATTEMPTS, 0).apply()
+
+    fun appendScanHistory(record: ScanHistoryRecord) {
+        val existing = getScanHistory().toMutableList().apply { add(record) }
+        val trimmed = existing.sortedBy { it.scanDateMillis }.takeLast(12)
+        val array = JSONArray()
+        trimmed.forEach { item ->
+            array.put(JSONObject().apply {
+                put("scanDateMillis", item.scanDateMillis)
+                put("totalMediaSizeBytes", item.totalMediaSizeBytes)
+                put("imageSizeBytes", item.imageSizeBytes)
+                put("videoSizeBytes", item.videoSizeBytes)
+                put("duplicateSizeBytes", item.duplicateSizeBytes)
+            })
+        }
+        prefs.edit().putString(KEY_SCAN_HISTORY, array.toString()).apply()
+    }
+
+    fun getScanHistory(): List<ScanHistoryRecord> {
+        val raw = prefs.getString(KEY_SCAN_HISTORY, null) ?: return emptyList()
+        return runCatching {
+            val array = JSONArray(raw)
+            buildList {
+                for (i in 0 until array.length()) {
+                    val item = array.getJSONObject(i)
+                    add(
+                        ScanHistoryRecord(
+                            scanDateMillis = item.optLong("scanDateMillis", 0L),
+                            totalMediaSizeBytes = item.optLong("totalMediaSizeBytes", 0L),
+                            imageSizeBytes = item.optLong("imageSizeBytes", 0L),
+                            videoSizeBytes = item.optLong("videoSizeBytes", 0L),
+                            duplicateSizeBytes = item.optLong("duplicateSizeBytes", 0L)
+                        )
+                    )
+                }
+            }
+        }.getOrDefault(emptyList())
+    }
 }

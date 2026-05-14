@@ -1047,8 +1047,8 @@ fun PrivacyPolicyScreen(onBack: () -> Unit) {
             item {
                 SimpleActionCard(
                     icon = Icons.Default.Policy,
-                    title = "No personal data collection",
-                    subtitle = "This app does not collect personal information, contacts, or message contents.",
+                    title = "Local scan only",
+                    subtitle = "ChatSweep scans local media files on your device only.",
                     onClick = {},
                     showAction = false
                 )
@@ -1056,8 +1056,8 @@ fun PrivacyPolicyScreen(onBack: () -> Unit) {
             item {
                 SimpleActionCard(
                     icon = Icons.Default.Security,
-                    title = "Local processing only",
-                    subtitle = "Scanning and cleanup recommendations run on your device.",
+                    title = "No cloud upload",
+                    subtitle = "Your files are not uploaded to cloud services and no backend database is used.",
                     onClick = {},
                     showAction = false
                 )
@@ -1065,8 +1065,8 @@ fun PrivacyPolicyScreen(onBack: () -> Unit) {
             item {
                 SimpleActionCard(
                     icon = Icons.Default.FolderOpen,
-                    title = "Storage permission usage",
-                    subtitle = "Media permission is used only to read files for analysis and cleanup.",
+                    title = "Analytics & crash diagnostics",
+                    subtitle = "Firebase Analytics may collect basic usage events and Crashlytics may collect crash diagnostics.",
                     onClick = {},
                     showAction = false
                 )
@@ -1074,8 +1074,8 @@ fun PrivacyPolicyScreen(onBack: () -> Unit) {
             item {
                 SimpleActionCard(
                     icon = Icons.Default.CheckCircle,
-                    title = "No data sharing",
-                    subtitle = "Your media files are not uploaded, sold, or shared with third parties.",
+                    title = "Deletion confirmation",
+                    subtitle = "You manually review and confirm deletion actions.",
                     onClick = {},
                     showAction = false
                 )
@@ -1104,8 +1104,8 @@ fun TermsAndConditionsScreen(onBack: () -> Unit) {
             item {
                 SimpleActionCard(
                     icon = Icons.Default.Gavel,
-                    title = "Suggestions, not guarantees",
-                    subtitle = "The app provides cleanup suggestions to help you decide what to remove.",
+                    title = "Review before deleting",
+                    subtitle = "You are responsible for checking selected files before deletion.",
                     onClick = {},
                     showAction = false
                 )
@@ -1113,8 +1113,8 @@ fun TermsAndConditionsScreen(onBack: () -> Unit) {
             item {
                 SimpleActionCard(
                     icon = Icons.Default.DeleteSweep,
-                    title = "User responsibility",
-                    subtitle = "You are responsible for confirming deletions, and deleted files may not be recoverable.",
+                    title = "Deletion risk",
+                    subtitle = "Deleted files may not be recoverable.",
                     onClick = {},
                     showAction = false
                 )
@@ -1125,6 +1125,29 @@ fun TermsAndConditionsScreen(onBack: () -> Unit) {
                     title = "No affiliation",
                     subtitle = "ChatSweep is an independent utility and is not affiliated with WhatsApp LLC or Meta Platforms, Inc.",
                     onClick = {},
+                    showAction = false
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun AboutScreen(onBack: () -> Unit) {
+    FeatureScreenScaffold("About", "App details", onBack) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            item { SimpleActionCard(Icons.Default.Info, "ChatSweep", "Offline media cleaner", {}, showAction = false) }
+            item { SimpleActionCard(Icons.Default.CheckCircle, "Version", "See Settings for app version", {}, showAction = false) }
+            item {
+                SimpleActionCard(
+                    Icons.Default.Security,
+                    "Disclaimer",
+                    "This app is not affiliated with, endorsed by, or sponsored by WhatsApp LLC or Meta Platforms, Inc.",
+                    {},
                     showAction = false
                 )
             }
