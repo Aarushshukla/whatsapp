@@ -140,11 +140,24 @@ class MainActivity : ComponentActivity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             arrayOf(
                 Manifest.permission.READ_MEDIA_IMAGES,
-                Manifest.permission.READ_MEDIA_VIDEO
+                Manifest.permission.READ_MEDIA_VIDEO,
+                Manifest.permission.READ_MEDIA_AUDIO
             )
         } else {
             arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
         }
+
+    private fun openAppSettings() {
+        val intent = Intent(
+            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+            Uri.fromParts("package", packageName, null)
+        )
+        runCatching { startActivity(intent) }
+            .onFailure { error ->
+                Log.e(TAG, "Unable to open app settings.", error)
+                openSystemStorage()
+            }
+    }
 
     private fun syncPermissionState(): Boolean {
         val permissions = requiredPermissions()
@@ -433,6 +446,7 @@ class MainActivity : ComponentActivity() {
                     openSystemStorage()
                 },
                 onRequestPermission = ::requestStoragePermissions,
+                onOpenAppSettings = ::openAppSettings,
                 onSettingsOpened = viewModel::onSettingsOpened,
                 onThemeSelected = viewModel::setThemeMode,
                 onSmartAlertsToggle = viewModel::setSmartAlerts,
