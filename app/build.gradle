@@ -1,7 +1,6 @@
 plugins {
     id 'com.android.application'
     id 'org.jetbrains.kotlin.android'
-    id 'com.google.firebase.crashlytics'
 }
 
 android {
@@ -70,7 +69,6 @@ configurations.configureEach {
 
 
 dependencies {
-    implementation platform('com.google.firebase:firebase-bom:34.6.0')
     implementation platform('androidx.compose:compose-bom:2024.06.00')
 
     implementation 'androidx.core:core-ktx:1.13.1'
@@ -96,9 +94,6 @@ dependencies {
     implementation 'com.airbnb.android:lottie-compose:6.6.1'
 
     implementation 'com.android.billingclient:billing:8.3.0'
-    // Crash reporting only; no Auth/Firestore/Realtime DB/manual measurement dependencies.
-    implementation 'com.google.firebase:firebase-crashlytics-ktx'
-    implementation 'com.google.firebase:firebase-analytics'
     implementation 'org.tensorflow:tensorflow-lite:2.14.0'
     implementation 'com.google.android.gms:play-services-ads:23.5.0'
 
@@ -112,4 +107,3 @@ kotlin {
     jvmToolchain(17)
 }
 
-apply plugin: "com.google.gms.google-services"

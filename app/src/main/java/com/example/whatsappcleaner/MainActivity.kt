@@ -34,11 +34,6 @@ import com.example.whatsappcleaner.ui.home.DeleteExecution
 import com.example.whatsappcleaner.ui.home.HomeViewModel
 import com.example.whatsappcleaner.ui.settings.AppThemeMode
 import com.example.whatsappcleaner.ui.theme.WhatsCleanTheme
-import com.google.firebase.analytics.FirebaseAnalytics
-import com.google.firebase.analytics.ktx.analytics
-import com.google.firebase.FirebaseApp
-import com.google.firebase.crashlytics.FirebaseCrashlytics
-import com.google.firebase.ktx.Firebase
 
 class MainActivity : ComponentActivity() {
 
@@ -49,7 +44,6 @@ class MainActivity : ComponentActivity() {
     private val viewModel: HomeViewModel by viewModels()
     private val subscriptionRepository by lazy(LazyThreadSafetyMode.NONE) { SubscriptionRepository.get(this) }
     private val adManager by lazy(LazyThreadSafetyMode.NONE) { AdManager(this) }
-    private lateinit var firebaseAnalytics: FirebaseAnalytics
     private var hasShownExitAdThisSession = false
     private val deleteLauncher =
         registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
@@ -64,7 +58,6 @@ class MainActivity : ComponentActivity() {
                 }
             } catch (error: Exception) {
                 Log.e(TAG, "Failed while handling delete launcher result.", error)
-                FirebaseCrashlytics.getInstance().recordException(error)
                 viewModel.onMediaDeleteFailed()
                 showDeleteError("Unable to process delete result.")
             }
@@ -88,15 +81,6 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
-        FirebaseApp.initializeApp(this)
-        Log.d("TEST", "Firebase initialized")
-        val analytics = Firebase.analytics
-        val app = FirebaseApp.getInstance()
-        Log.d("TEST", "FirebaseApp: ${app.name}")
-        firebaseAnalytics = FirebaseAnalytics.getInstance(this)
-        Log.d("TEST", "APP STARTED")
-        Firebase.analytics.logEvent("test_event", null)
-        Log.d(TAG, "Firebase analytics ready: $analytics")
         Log.d(TAG, "onCreate called.")
         // TODO: RE-ENABLE SUBSCRIPTION LATER
         /*
@@ -252,7 +236,6 @@ class MainActivity : ComponentActivity() {
                 Log.d("DELETE_DEBUG", "deleteLauncher.launch() executed for MediaStore delete request")
             } catch (error: Exception) {
                 Log.e("DELETE_DEBUG", "Unable to launch MediaStore delete request", error)
-                FirebaseCrashlytics.getInstance().recordException(error)
                 viewModel.onMediaDeleteFailed()
                 showDeleteError("Unable to delete files right now.")
             }
@@ -273,7 +256,6 @@ class MainActivity : ComponentActivity() {
             }
         } catch (error: Exception) {
             Log.e("DELETE_DEBUG", "Unable to delete media via contentResolver.delete", error)
-            FirebaseCrashlytics.getInstance().recordException(error)
             viewModel.onMediaDeleteFailed()
             showDeleteError("Unable to delete files right now.")
         }

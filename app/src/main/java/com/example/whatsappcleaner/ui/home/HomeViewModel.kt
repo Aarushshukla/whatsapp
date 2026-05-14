@@ -39,7 +39,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.annotation.MainThread
 import kotlinx.coroutines.delay
-import com.google.firebase.crashlytics.FirebaseCrashlytics
 
 enum class PremiumFeature(val analyticsKey: String, val paywallSource: String) {
     SMART_CLEAN_ADVANCED("smart_clean_clicked", "smart_clean_advanced"),
@@ -317,7 +316,6 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 hasLoadedInitialCache = true
             } catch (error: SecurityException) {
                 Log.e(TAG, "Media scan failed due to permission issue.", error)
-                FirebaseCrashlytics.getInstance().recordException(error)
                 withContext(Dispatchers.Main) {
                     _uiState.update { currentState ->
                         currentState.copy(summaryInfo = "Scan failed: permission denied", isLoading = false)
@@ -327,7 +325,6 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 analytics.trackScanFailed("permission_denied")
             } catch (error: Exception) {
                 Log.e(TAG, "Media scan failed.", error)
-                FirebaseCrashlytics.getInstance().recordException(error)
                 withContext(Dispatchers.Main) {
                     _uiState.update { currentState ->
                         currentState.copy(summaryInfo = "Scan failed: ${error.message ?: "Unknown error"}", isLoading = false)
