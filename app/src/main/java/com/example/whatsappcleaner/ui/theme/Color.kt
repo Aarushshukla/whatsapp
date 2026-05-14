@@ -2,19 +2,32 @@ package com.example.whatsappcleaner.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-val PrimaryBackground = Color(0xFFF8FAFC)
-val SurfaceWhite = Color(0xFFFFFFFF)
-val SurfaceMuted = Color(0xFFF1F5F9)
+val PremiumBackground = Color(0xFF0B1117)
+val PremiumSurface = Color(0xFF17212B)
+val PremiumSurfaceVariant = Color(0xFF1E2A36)
 
-val BrandNavy = Color(0xFF0F172A)
-val BrandSecondary = Color(0xFF64748B)
+val PremiumPrimary = Color(0xFF16C784)
+val PremiumSecondary = Color(0xFF2F80ED)
+val PremiumAccent = Color(0xFF00C896)
+val PremiumWarning = Color(0xFFF59E0B)
+val PremiumDanger = Color(0xFFEF4444)
 
-val AccentBlue = Color(0xFF2563EB)
-val AccentPurple = Color(0xFF8B5CF6)
-val AccentGreen = Color(0xFF10B981)
-val AccentError = Color(0xFFEF4444)
-val AccentWarning = Color(0xFFF59E0B)
+val PremiumTextPrimary = Color(0xFFF8FAFC)
+val PremiumTextSecondary = Color(0xFF94A3B8)
 
-val TextMain = Color(0xFF0F172A)
-val TextSecondary = Color(0xFF64748B)
-val DividerColor = Color(0xFFE2E8F0)
+val PrimaryBackground = PremiumBackground
+val SurfaceWhite = PremiumSurface
+val SurfaceMuted = PremiumSurfaceVariant
+
+val BrandNavy = PremiumTextPrimary
+val BrandSecondary = PremiumTextSecondary
+
+val AccentBlue = PremiumSecondary
+val AccentPurple = Color(0xFF7C8CFF)
+val AccentGreen = PremiumPrimary
+val AccentError = PremiumDanger
+val AccentWarning = PremiumWarning
+
+val TextMain = PremiumTextPrimary
+val TextSecondary = PremiumTextSecondary
+val DividerColor = Color(0xFF2C3B4A)

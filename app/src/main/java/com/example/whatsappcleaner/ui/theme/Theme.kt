@@ -1,6 +1,7 @@
 package com.example.whatsappcleaner.ui.theme
 
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -8,61 +9,71 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 private val LightColorScheme = lightColorScheme(
-    primary = Color(0xFF4CAF50),
-    onPrimary = Color(0xFFFFFFFF),
-    primaryContainer = Color(0xFFE8F5E9),
-    onPrimaryContainer = Color(0xFF1B5E20),
-    secondary = AccentGreen,
-    onSecondary = Color(0xFFFFFFFF),
-    secondaryContainer = AccentGreen.copy(alpha = 0.16f),
-    onSecondaryContainer = BrandNavy,
-    tertiary = AccentPurple,
-    onTertiary = Color(0xFFFFFFFF),
-    tertiaryContainer = AccentPurple.copy(alpha = 0.14f),
-    onTertiaryContainer = BrandNavy,
-    error = AccentError,
-    onError = Color(0xFFFFFFFF),
-    background = Color(0xFFFFFFFF),
-    onBackground = Color(0xFF0F172A),
-    surface = Color(0xFFFFFFFF),
-    onSurface = Color(0xFF0F172A),
-    surfaceVariant = Color(0xFFE2E8F0),
-    onSurfaceVariant = Color(0xFF334155),
-    outline = Color(0xFFCBD5E1),
-    outlineVariant = Color(0xFFE2E8F0)
+    primary = PremiumPrimary,
+    onPrimary = PremiumBackground,
+    primaryContainer = PremiumPrimary.copy(alpha = 0.20f),
+    onPrimaryContainer = PremiumTextPrimary,
+    secondary = PremiumSecondary,
+    onSecondary = PremiumTextPrimary,
+    secondaryContainer = PremiumSecondary.copy(alpha = 0.20f),
+    onSecondaryContainer = PremiumTextPrimary,
+    tertiary = PremiumAccent,
+    onTertiary = PremiumBackground,
+    tertiaryContainer = PremiumAccent.copy(alpha = 0.20f),
+    onTertiaryContainer = PremiumTextPrimary,
+    error = PremiumDanger,
+    onError = PremiumTextPrimary,
+    background = PremiumBackground,
+    onBackground = PremiumTextPrimary,
+    surface = PremiumSurface,
+    onSurface = PremiumTextPrimary,
+    surfaceVariant = PremiumSurfaceVariant,
+    onSurfaceVariant = PremiumTextSecondary,
+    outline = DividerColor,
+    outlineVariant = DividerColor.copy(alpha = 0.75f)
 )
 
 private val DarkColorScheme = darkColorScheme(
-    primary = Color(0xFF7C8CFF),
-    onPrimary = Color(0xFF0D1233),
-    primaryContainer = Color(0xFF222C66),
-    onPrimaryContainer = Color(0xFFDEE1FF),
-    secondary = Color(0xFF7AE3C3),
-    onSecondary = Color(0xFF02291E),
-    secondaryContainer = Color(0xFF0D4E3B),
-    onSecondaryContainer = Color(0xFFB9F7E5),
-    tertiary = Color(0xFFC9A8FF),
-    onTertiary = Color(0xFF291244),
-    tertiaryContainer = Color(0xFF46306D),
-    onTertiaryContainer = Color(0xFFF0DEFF),
-    error = AccentError,
-    onError = Color(0xFF220404),
-    errorContainer = AccentError.copy(alpha = 0.18f),
-    onErrorContainer = Color(0xFFFFE7E7),
-    background = Color(0xFF090B14),
-    onBackground = Color(0xFFEAF0FF),
-    surface = Color(0xFF121727),
-    onSurface = Color(0xFFEAF0FF),
-    surfaceVariant = Color(0xFF1D2438),
-    onSurfaceVariant = Color(0xFFBBC5E0),
-    outline = Color(0xFF3A4663),
-    outlineVariant = Color(0xFF2B354D)
+    primary = PremiumPrimary,
+    onPrimary = PremiumBackground,
+    primaryContainer = PremiumPrimary.copy(alpha = 0.22f),
+    onPrimaryContainer = PremiumTextPrimary,
+    secondary = PremiumSecondary,
+    onSecondary = PremiumTextPrimary,
+    secondaryContainer = PremiumSecondary.copy(alpha = 0.22f),
+    onSecondaryContainer = PremiumTextPrimary,
+    tertiary = PremiumAccent,
+    onTertiary = PremiumBackground,
+    tertiaryContainer = PremiumAccent.copy(alpha = 0.24f),
+    onTertiaryContainer = PremiumTextPrimary,
+    error = PremiumDanger,
+    onError = PremiumTextPrimary,
+    errorContainer = PremiumDanger.copy(alpha = 0.24f),
+    onErrorContainer = PremiumTextPrimary,
+    background = PremiumBackground,
+    onBackground = PremiumTextPrimary,
+    surface = PremiumSurface,
+    onSurface = PremiumTextPrimary,
+    surfaceVariant = PremiumSurfaceVariant,
+    onSurfaceVariant = PremiumTextSecondary,
+    outline = DividerColor,
+    outlineVariant = DividerColor.copy(alpha = 0.75f)
+)
+
+val AppShapes = Shapes(
+    extraSmall = RoundedCornerShape(10.dp),
+    small = RoundedCornerShape(14.dp),
+    medium = RoundedCornerShape(18.dp),
+    large = RoundedCornerShape(22.dp),
+    extraLarge = RoundedCornerShape(28.dp)
 )
 
 val AppTypography = Typography(
@@ -137,5 +148,5 @@ fun WhatsCleanTheme(
             onError = LightColorScheme.onError
         )
     }
-    MaterialTheme(colorScheme = colorScheme, typography = AppTypography, content = content)
+    MaterialTheme(colorScheme = colorScheme, typography = AppTypography, shapes = AppShapes, content = content)
 }
