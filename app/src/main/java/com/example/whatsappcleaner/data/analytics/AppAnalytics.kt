@@ -48,6 +48,11 @@ class AppAnalytics private constructor(context: Context) {
     fun trackRestorePurchaseClicked(source: String) = logEvent("restore_purchase_clicked") { putString("source", source) }
     fun trackSmartCleanClicked() = logEvent("smart_clean_clicked")
     fun trackDeleteClicked(origin: String) = logEvent("delete_clicked") { putString("origin", origin) }
+    fun trackCleanupCompleted(deletedCount: Int, failedCount: Int, freedBytes: Long) = logEvent("cleanup_completed") {
+        putInt("deleted_count", deletedCount)
+        putInt("failed_count", failedCount)
+        putLong("freed_bytes", freedBytes)
+    }
     fun trackReviewClicked() = logEvent("review_clicked")
     fun trackStorageScreenOpened() = logEvent("storage_screen_opened")
     fun trackSettingsOpened() = logEvent("settings_opened")

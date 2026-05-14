@@ -310,7 +310,8 @@ fun PolishedSmartCleanScreen(
 
     val selectedUris = remember { mutableStateListOf<String>() }
     var previewItem by remember { mutableStateOf<FileItem?>(null) }
-    var showDeletePlaceholder by remember { mutableStateOf(false) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+    var friendlyMessage by remember { mutableStateOf<String?>(null) }
     val selectedSimpleItems = remember(selectedUris, mediaByUri) {
         selectedUris.mapNotNull { uri -> mediaByUri[uri] }
     }
@@ -497,7 +498,13 @@ fun PolishedSmartCleanScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text("${selectedSimpleItems.size} selected • ${formatSize(selectedSimpleItems.sumOf { it.size })}", modifier = Modifier.weight(1f))
-                        LegitButton(text = "Delete selected", onClick = { showDeletePlaceholder = true })
+                        LegitButton(text = "Delete selected", onClick = {
+                            if (selectedSimpleItems.isEmpty()) {
+                                friendlyMessage = "Select files first, then try deleting."
+                            } else {
+                                showDeleteConfirm = true
+                            }
+                        })
                     }
                 }
             }
@@ -508,10 +515,48 @@ fun PolishedSmartCleanScreen(
             if (selectedUris.contains(file.uri.toString())) selectedUris.remove(file.uri.toString()) else selectedUris.add(file.uri.toString())
         }, onBack = { previewItem = null })
     }
-    if (showDeletePlaceholder) {
-        AlertDialog(onDismissRequest = { showDeletePlaceholder = false }, title = { Text("Delete selected") }, text = { Text("Deletion is not implemented yet.") }, confirmButton = {
-            TextButton(onClick = { showDeletePlaceholder = false }) { Text("OK") }
-        })
+    if (showDeleteConfirm) {
+        val selectedBytes = selectedSimpleItems.sumOf { it.size }
+        val categoryNames = selectedSimpleItems
+            .mapNotNull { item ->
+                selectedCategory.items.firstOrNull { it.uri == item.uri }?.let { selectedCategory.title }
+            }
+            .toSet()
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("Delete selected files?") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("You will free ${formatSize(selectedBytes)}.")
+                    Text("Selected files will be removed from your device.")
+                    Text("This action cannot be undone.")
+                    Text("Nothing else will be deleted.")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel") }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDeleteConfirm = false
+                    onDeleteItemsRequested(selectedSimpleItems)
+                    onCleanupRecorded(selectedBytes)
+                    friendlyMessage = buildString {
+                        append("Your chat media is lighter now • ${selectedSimpleItems.size} files")
+                        if (categoryNames.isNotEmpty()) append(" • ${categoryNames.joinToString()}")
+                        append(" • ${DateFormat.format(\"MMM d, h:mm a\", System.currentTimeMillis())}")
+                    }
+                }) { Text("Delete Safely") }
+            }
+        )
+    }
+    friendlyMessage?.let { msg ->
+        AlertDialog(
+            onDismissRequest = { friendlyMessage = null },
+            title = { Text("Cleanup receipt") },
+            text = { Text(msg) },
+            confirmButton = { TextButton(onClick = { friendlyMessage = null }) { Text("OK") } }
+        )
     }
 }
 

@@ -976,7 +976,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 pendingDeleteIds = emptySet(),
                 pendingDeleteUris = emptyList(),
                 pendingDeleteItems = emptyList(),
-                isDeleteInProgress = false
+                isDeleteInProgress = false,
+                deleteSnackbarMessage = "Couldn’t delete selected files. Please try again."
             )
         }
     }
@@ -1043,12 +1044,19 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             val deletedBytes = currentState.allItems
                 .filter { item -> item.id in deletedIds }
                 .sumOf { mediaItem -> mediaItem.sizeKb.toLong() * 1024L }
+            val failedCount = (currentState.pendingDeleteIds - deletedIds).size.coerceAtLeast(0)
             val streak = prefs.recordCleanupDay()
             val deleteMessage = buildString {
                 append(if (deletedIds.size == 1) "1 item deleted" else "${deletedIds.size} items deleted")
                 if (deletedBytes > 0L) append(" • ${formatSize(deletedBytes)} freed")
+                if (failedCount > 0) append(" • $failedCount failed")
                 append(" • ${streak}-day streak")
             }
+            analytics.trackCleanupCompleted(
+                deletedCount = deletedIds.size,
+                failedCount = failedCount,
+                freedBytes = deletedBytes
+            )
             currentState.copy(
                 pendingDeleteIds = emptySet(),
                 pendingDeleteUris = emptyList(),
