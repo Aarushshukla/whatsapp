@@ -104,6 +104,7 @@ fun WhatsCleanAppRoot(
     onOpenInSystem: (SimpleMediaItem) -> Unit,
     onOpenSystemStorage: () -> Unit,
     onRequestPermission: () -> Unit,
+    onOpenAppSettings: () -> Unit,
     onSettingsOpened: () -> Unit,
     onThemeSelected: (AppThemeMode) -> Unit,
     onSmartAlertsToggle: (Boolean) -> Unit,
@@ -145,7 +146,11 @@ fun WhatsCleanAppRoot(
         return
     }
     if (!state.permissionGranted) {
-        PermissionGate(onRequestPermission = onRequestPermission, modifier = modifier)
+        PermissionGate(
+            onRequestPermission = onRequestPermission,
+            onOpenAppSettings = onOpenAppSettings,
+            modifier = modifier
+        )
         return
     }
     val navController = rememberNavController()
@@ -589,7 +594,11 @@ private fun NavHostController.navigateSingleTop(route: String) {
 }
 
 @Composable
-private fun PermissionGate(onRequestPermission: () -> Unit, modifier: Modifier = Modifier) {
+private fun PermissionGate(
+    onRequestPermission: () -> Unit,
+    onOpenAppSettings: () -> Unit,
+    modifier: Modifier = Modifier
+) {
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -600,14 +609,16 @@ private fun PermissionGate(onRequestPermission: () -> Unit, modifier: Modifier =
         FriendlyState(
             icon = Icons.Default.Lock,
             title = "Media permission required",
-            message = "Allow photo and video access so the dashboard can show WhatsApp images, videos, memes, and cleanup suggestions."
+            message = "ChatSweep needs media access to scan chat photos, videos, audio, and documents on your device. Files are scanned locally. Nothing is uploaded."
         )
         Text(
-            "If you previously denied access, grant it from the next system prompt and then tap refresh.",
+            "If access is denied, tap Retry. If Android stops showing the prompt, open Settings and allow media access.",
             modifier = Modifier.padding(vertical = 16.dp),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
         )
-        Button(onClick = onRequestPermission) { Text("Grant media access") }
+        Button(onClick = onRequestPermission) { Text("Retry") }
+        Spacer(modifier = Modifier.height(12.dp))
+        Button(onClick = onOpenAppSettings) { Text("Open Settings") }
     }
 }
