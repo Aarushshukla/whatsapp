@@ -101,7 +101,8 @@ data class HomeUiState(
     val shouldShowInterstitialForAiScan: Boolean = false,
     val deepCleanCredits: Int = 0,
     val shouldShowInterstitialForDelete: Boolean = false,
-    val categorySummaries: List<CategorySummaryUi> = emptyList()
+    val categorySummaries: List<CategorySummaryUi> = emptyList(),
+    val lastCleanupReceipt: CleanupReceipt? = null
 ) {
     // TODO: RE-ENABLE SUBSCRIPTION LATER
     /*
@@ -110,6 +111,15 @@ data class HomeUiState(
     val isProUser: Boolean get() = true
     val isDeleting: Boolean get() = isDeleteInProgress
 }
+
+data class CleanupReceipt(
+    val deletedFiles: Int,
+    val failedFiles: Int,
+    val storageFreedBytes: Long,
+    val categoriesCleaned: Int,
+    val timestampMillis: Long,
+    val message: String = "Your chat media is lighter now"
+)
 
 data class CategorySummaryUi(
     val title: String,
@@ -1040,14 +1050,29 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             val remainingScreenshotsToday = remainingItems.filter { mediaItem ->
                 mediaItem.addedMillis > today && mediaItem.name.startsWith("Screenshot", true)
             }
+            val requestedItems = currentState.pendingDeleteItems
+            val requestedIds = requestedItems.map { it.id }.toSet()
             val deletedBytes = currentState.allItems
                 .filter { item -> item.id in deletedIds }
                 .sumOf { mediaItem -> mediaItem.sizeKb.toLong() * 1024L }
+            val failedFiles = (requestedIds - deletedIds).size.coerceAtLeast(0)
             val streak = prefs.recordCleanupDay()
             val deleteMessage = buildString {
                 append(if (deletedIds.size == 1) "1 item deleted" else "${deletedIds.size} items deleted")
                 if (deletedBytes > 0L) append(" • ${formatSize(deletedBytes)} freed")
+                if (failedFiles > 0) append(" • $failedFiles failed")
                 append(" • ${streak}-day streak")
+            }
+            val categoriesCleaned = currentState.categorySummaries.count { summary ->
+                summary.items.any { it.id in deletedIds }
+            }
+            val refreshedCategorySummaries = currentState.categorySummaries.map { summary ->
+                val remainingCategoryItems = summary.items.filterNot { it.id in deletedIds }
+                summary.copy(
+                    count = remainingCategoryItems.size,
+                    sizeBytes = remainingCategoryItems.sumOf { it.size.toLong() * 1024L },
+                    items = remainingCategoryItems
+                )
             }
             currentState.copy(
                 pendingDeleteIds = emptySet(),
@@ -1087,7 +1112,15 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 ),
                 deleteSnackbarMessage = deleteMessage,
                 lastDeletedItems = emptyList(),
-                shouldShowInterstitialForDelete = true
+                shouldShowInterstitialForDelete = true,
+                categorySummaries = refreshedCategorySummaries,
+                lastCleanupReceipt = CleanupReceipt(
+                    deletedFiles = deletedIds.size,
+                    failedFiles = failedFiles,
+                    storageFreedBytes = deletedBytes,
+                    categoriesCleaned = categoriesCleaned,
+                    timestampMillis = System.currentTimeMillis()
+                )
             )
         }
         _uiState.value = updatedState
@@ -1097,6 +1130,10 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     fun onReviewClicked() {
         analytics.trackReviewClicked()
+    }
+
+    fun clearCleanupReceipt() {
+        _uiState.update { currentState -> currentState.copy(lastCleanupReceipt = null) }
     }
 
     fun onStorageScreenOpened() {

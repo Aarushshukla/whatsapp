@@ -66,6 +66,7 @@ import androidx.compose.material.ripple.rememberRipple
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
@@ -304,6 +305,7 @@ fun PolishedSmartCleanScreen(
     }
 
     val selectedUris = remember { mutableStateListOf<String>() }
+    var showConfirmDeleteSheet by remember { mutableStateOf(false) }
     val selectedSimpleItems = remember(selectedUris, mediaByUri) {
         selectedUris.mapNotNull { uri -> mediaByUri[uri] }
     }
@@ -452,15 +454,45 @@ fun PolishedSmartCleanScreen(
                         enabled = selectedSimpleItems.isNotEmpty(),
                         onClick = {
                             if (selectedSimpleItems.isEmpty()) return@LegitButton
-                            onCleanupRecorded(selectedSimpleItems.sumOf { it.size })
-                            onDeleteItemsRequested(selectedSimpleItems)
-                            selectedUris.clear()
+                            showConfirmDeleteSheet = true
                         },
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
             }
         }
+    }
+
+    if (showConfirmDeleteSheet) {
+        val selectedBytes = selectedSimpleItems.sumOf { it.size }
+        AlertDialog(
+            onDismissRequest = { showConfirmDeleteSheet = false },
+            title = { Text("Delete selected files?") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("You will free ${formatSize(selectedBytes)}.")
+                    Text("Selected files will be removed from your device.")
+                    Text("This action cannot be undone.")
+                    Text("Nothing else will be deleted.")
+                }
+            },
+            dismissButton = {
+                LegitButton(text = "Cancel", onClick = { showConfirmDeleteSheet = false })
+            },
+            confirmButton = {
+                LegitButton(
+                    text = "Delete Safely",
+                    onClick = {
+                        showConfirmDeleteSheet = false
+                        if (selectedSimpleItems.isNotEmpty()) {
+                            onCleanupRecorded(selectedBytes)
+                            onDeleteItemsRequested(selectedSimpleItems)
+                            selectedUris.clear()
+                        }
+                    }
+                )
+            }
+        )
     }
 }
 

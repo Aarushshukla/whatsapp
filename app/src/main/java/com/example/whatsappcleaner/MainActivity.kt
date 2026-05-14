@@ -22,6 +22,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -61,6 +64,7 @@ class MainActivity : ComponentActivity() {
                     viewModel.confirmDeleteSuccess()
                 } else {
                     Log.d("DELETE_FLOW", "Step 4.2: User cancelled delete request")
+                    viewModel.onMediaDeleteCancelled()
                 }
             } catch (error: Exception) {
                 Log.e(TAG, "Failed while handling delete launcher result.", error)
@@ -261,12 +265,17 @@ class MainActivity : ComponentActivity() {
 
         try {
             var deletedCount = 0
+            val deletedIds = mutableSetOf<Long>()
             validUris.forEach { uri ->
-                deletedCount += contentResolver.delete(uri, null, null)
+                val affected = contentResolver.delete(uri, null, null)
+                deletedCount += affected
+                if (affected > 0) {
+                    runCatching { android.content.ContentUris.parseId(uri) }.getOrNull()?.let { deletedIds.add(it) }
+                }
             }
             Log.d("DELETE_DEBUG", "contentResolver.delete flow completed. deletedCount=$deletedCount")
             if (deletedCount > 0) {
-                viewModel.confirmDeleteSuccess()
+                viewModel.onMediaDeleteSuccess(deletedIds)
             } else {
                 viewModel.onMediaDeleteCancelled()
                 showDeleteError("Some files cannot be deleted due to system restrictions")
@@ -538,6 +547,25 @@ class MainActivity : ComponentActivity() {
                 },
                 versionLabel = versionLabel
             )
+            state.lastCleanupReceipt?.let { receipt ->
+                AlertDialog(
+                    onDismissRequest = { viewModel.clearCleanupReceipt() },
+                    title = { Text("Cleanup receipt") },
+                    text = {
+                        Text(
+                            "Files deleted: ${receipt.deletedFiles}\n" +
+                                "Failed files: ${receipt.failedFiles}\n" +
+                                "Storage freed: ${com.example.whatsappcleaner.data.local.formatSize(receipt.storageFreedBytes)}\n" +
+                                "Categories cleaned: ${receipt.categoriesCleaned}\n" +
+                                "Date/time: ${java.text.DateFormat.getDateTimeInstance().format(java.util.Date(receipt.timestampMillis))}\n\n" +
+                                receipt.message
+                        )
+                    },
+                    confirmButton = {
+                        TextButton(onClick = { viewModel.clearCleanupReceipt() }) { Text("OK") }
+                    }
+                )
+            }
         }
     }
 }
