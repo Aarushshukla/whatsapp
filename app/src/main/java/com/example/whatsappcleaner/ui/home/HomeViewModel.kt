@@ -100,7 +100,8 @@ data class HomeUiState(
     val aiScanSummary: AiScanSummary = AiScanSummary(),
     val shouldShowInterstitialForAiScan: Boolean = false,
     val deepCleanCredits: Int = 0,
-    val shouldShowInterstitialForDelete: Boolean = false
+    val shouldShowInterstitialForDelete: Boolean = false,
+    val categorySummaries: List<CategorySummaryUi> = emptyList()
 ) {
     // TODO: RE-ENABLE SUBSCRIPTION LATER
     /*
@@ -109,6 +110,15 @@ data class HomeUiState(
     val isProUser: Boolean get() = true
     val isDeleting: Boolean get() = isDeleteInProgress
 }
+
+data class CategorySummaryUi(
+    val title: String,
+    val description: String,
+    val count: Int,
+    val sizeBytes: Long,
+    val safetyBadge: String,
+    val items: List<SimpleMediaItem>
+)
 
 data class SmartSuggestionSummary(
     val duplicateFiles: Int = 0,
@@ -198,6 +208,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         val duplicateGroups: List<List<SimpleMediaItem>>,
         val oldFileItems: List<SimpleMediaItem>,
         val whatsappJunkItems: List<SimpleMediaItem>
+        ,
+        val categorySummaries: List<CategorySummaryUi>
     )
 
     init {
@@ -343,6 +355,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             val totalSize = allItems.sumOf { mediaItem -> mediaItem.sizeKb.toLong() * 1024L }
             val now = System.currentTimeMillis()
             val oldFileCutoff = now - (OLD_FILE_AGE_DAYS * 24L * 60L * 60L * 1000L)
+            val oldStatusCutoff = now - (24L * 60L * 60L * 1000L)
             val duplicateGroups = allItems
                 .groupBy { mediaItem -> "${mediaItem.name.lowercase()}_${mediaItem.size}" }
                 .values
@@ -352,6 +365,44 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 .filter { mediaItem -> mediaItem.size > LARGE_FILE_THRESHOLD_BYTES }
                 .sortedByDescending { mediaItem -> mediaItem.size }
             val oldSuggestedItems = allItems.filter { mediaItem -> mediaItem.addedMillis < oldFileCutoff }
+            val statusItems = allItems.filter { item ->
+                val marker = "${item.name} ${item.path} ${item.bucketName.orEmpty()}".lowercase()
+                marker.contains(".statuses") || marker.contains("statuses") || marker.contains("status")
+            }
+            val memeStickerItems = allItems.filter { item ->
+                val marker = "${item.name} ${item.path} ${item.bucketName.orEmpty()}".lowercase()
+                val isAnimatedGif = item.mimeType?.contains("gif", ignoreCase = true) == true
+                listOf("sticker", "stickers", "meme", "funny", "gif", "animated", "forwarded", "status").any { marker.contains(it) } || isAnimatedGif
+            }
+            val lowQualityItems = allItems.filter { item ->
+                item.mimeType?.startsWith("image") == true &&
+                    ((item.width ?: Int.MAX_VALUE) < 720 || (item.height ?: Int.MAX_VALUE) < 720 || item.size < 80L * 1024L)
+            }
+            val duplicatesKeySet = duplicateGroups.flatten().map { "${it.name.lowercase()}_${it.size}" }.toSet()
+            val uniquePersonal = { item: SimpleMediaItem ->
+                !duplicatesKeySet.contains("${item.name.lowercase()}_${item.size}") &&
+                    !(item.name.lowercase().contains("status") || item.name.lowercase().contains("sticker") || item.name.lowercase().contains("meme"))
+            }
+            val largeFiles = allItems.filter { mediaItem -> mediaItem.size > LARGE_FILE_THRESHOLD_BYTES }
+                .sortedWith(compareByDescending<SimpleMediaItem> { it.mimeType?.startsWith("video") == true }.thenByDescending { it.size })
+
+            val categorySummaries = listOf(
+                CategorySummaryUi("Large Files", "Files larger than 10 MB. Videos prioritized.", largeFiles.size, largeFiles.sumOf { it.size }, "REVIEW_CAREFULLY", largeFiles),
+                CategorySummaryUi("Old Media", "Media modified more than 30 days ago.", oldSuggestedItems.size, oldSuggestedItems.sumOf { it.size }, "REVIEW_CAREFULLY", oldSuggestedItems),
+                CategorySummaryUi("Status Files", "Statuses folder/bucket files. Older than 24h is likely junk.", statusItems.size, statusItems.sumOf { it.size }, "PROBABLY_JUNK", statusItems),
+                CategorySummaryUi("Memes & Stickers", "Sticker/meme/funny/gif/forwarded/status-like media.", memeStickerItems.size, memeStickerItems.sumOf { it.size }, "PROBABLY_JUNK", memeStickerItems),
+                CategorySummaryUi("Blurry / Low-quality Images", "Image width/height under 720 or size under 80 KB.", lowQualityItems.size, lowQualityItems.sumOf { it.size }, "REVIEW_CAREFULLY", lowQualityItems)
+            ).map { category ->
+                val risk = when {
+                    category.title == "Status Files" && category.items.any { it.modifiedMillis < oldStatusCutoff } -> "PROBABLY_JUNK"
+                    category.title == "Memes & Stickers" && category.items.any { it.modifiedMillis < oldStatusCutoff } -> "PROBABLY_JUNK"
+                    category.title == "Blurry / Low-quality Images" && category.items.any(uniquePersonal) -> "REVIEW_CAREFULLY"
+                    category.items.any { it.mimeType?.startsWith("image") == true || it.mimeType?.startsWith("video") == true } && category.items.any(uniquePersonal) -> "REVIEW_CAREFULLY"
+                    category.items.any { duplicatesKeySet.contains("${it.name.lowercase()}_${it.size}") } -> "SAFE_TO_DELETE"
+                    else -> category.safetyBadge
+                }
+                category.copy(safetyBadge = risk)
+            }
             val whatsappJunkItems = allItems.filter { mediaItem ->
                 mediaItem.mimeType?.startsWith("image") == true &&
                     mediaItem.size < 200L * 1024L &&
@@ -422,6 +473,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 duplicateGroups = duplicateGroups,
                 oldFileItems = oldSuggestedItems.sortedBy { mediaItem -> mediaItem.addedMillis },
                 whatsappJunkItems = whatsappJunkItems
+                ,
+                categorySummaries = categorySummaries
             )
         }
 
@@ -459,6 +512,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     duplicateGroups = computed.duplicateGroups,
                     oldFileItems = computed.oldFileItems,
                     whatsappJunkItems = computed.whatsappJunkItems
+                    ,
+                    categorySummaries = computed.categorySummaries
                 )
             }
             _items.value = computed.allItems

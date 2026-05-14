@@ -16,7 +16,11 @@ data class SimpleMediaItem(
     val size: Long,
     val addedMillis: Long,
     val mimeType: String?,
-    val mediaType: String
+    val mediaType: String,
+    val width: Int? = null,
+    val height: Int? = null,
+    val bucketName: String? = null,
+    val modifiedMillis: Long = addedMillis
 ) {
     val sizeKb: Int
         get() = (size / 1024L).toInt()
@@ -68,7 +72,11 @@ class MediaLoader(private val context: Context) {
             MediaStore.MediaColumns.DISPLAY_NAME,
             MediaStore.MediaColumns.SIZE,
             MediaStore.MediaColumns.DATE_ADDED,
-            MediaStore.MediaColumns.MIME_TYPE
+            MediaStore.MediaColumns.DATE_MODIFIED,
+            MediaStore.MediaColumns.MIME_TYPE,
+            MediaStore.MediaColumns.WIDTH,
+            MediaStore.MediaColumns.HEIGHT,
+            MediaStore.MediaColumns.BUCKET_DISPLAY_NAME
         )
 
         val selection = "${MediaStore.MediaColumns.SIZE} > 0 AND ${MediaStore.MediaColumns.DATE_ADDED} BETWEEN ? AND ?"
@@ -90,6 +98,10 @@ class MediaLoader(private val context: Context) {
                 val sizeCol = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.SIZE)
                 val dateCol = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.DATE_ADDED)
                 val mimeCol = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.MIME_TYPE)
+                val modifiedCol = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.DATE_MODIFIED)
+                val widthCol = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.WIDTH)
+                val heightCol = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.HEIGHT)
+                val bucketCol = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.BUCKET_DISPLAY_NAME)
 
                 while (cursor.moveToNext()) {
                     val id = cursor.getLong(idCol)
@@ -101,6 +113,10 @@ class MediaLoader(private val context: Context) {
                     val sizeBytes = cursor.getLong(sizeCol)
                     val dateAddedSec = cursor.getLong(dateCol)
                     val mimeType = cursor.getString(mimeCol)
+                    val modifiedSec = cursor.getLong(modifiedCol)
+                    val width = cursor.getInt(widthCol).takeIf { it > 0 }
+                    val height = cursor.getInt(heightCol).takeIf { it > 0 }
+                    val bucketName = cursor.getString(bucketCol)
                     val uri = ContentUris.withAppendedId(collectionUri, id)
                     if (!uri.toString().startsWith("content://media/")) {
                         Log.w(TAG, "Skipping non-MediaStore URI built from _ID=$id: $uri")
@@ -115,7 +131,11 @@ class MediaLoader(private val context: Context) {
                             size = sizeBytes,
                             addedMillis = dateAddedSec * 1000,
                             mimeType = mimeType,
-                            mediaType = mediaType
+                            mediaType = mediaType,
+                            width = width,
+                            height = height,
+                            bucketName = bucketName,
+                            modifiedMillis = modifiedSec * 1000
                         )
                     )
                 }
