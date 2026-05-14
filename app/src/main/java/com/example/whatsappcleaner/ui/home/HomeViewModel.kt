@@ -127,6 +127,14 @@ data class AiScanSummary(
     val junkCount: Int = 0
 )
 
+sealed class ScanUiState {
+    data object Idle : ScanUiState()
+    data class Loading(val stage: String, val progress: Float) : ScanUiState()
+    data class Success(val result: String) : ScanUiState()
+    data object Empty : ScanUiState()
+    data class Error(val message: String) : ScanUiState()
+}
+
 sealed class DeleteExecution {
     data class NeedsUserApproval(val uris: List<Uri>) : DeleteExecution()
     data class StartedInBackground(val uris: List<Uri>) : DeleteExecution()
@@ -159,6 +167,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
     private val _items = MutableStateFlow<List<SimpleMediaItem>>(emptyList())
     val items: StateFlow<List<SimpleMediaItem>> = _items.asStateFlow()
+    private val _scanUiState = MutableStateFlow<ScanUiState>(ScanUiState.Idle)
+    val scanUiState: StateFlow<ScanUiState> = _scanUiState.asStateFlow()
     private var hasLoadedInitialCache = false
     private var refreshInProgress = false
 
@@ -240,9 +250,11 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                         )
                     }
                 }
+                _scanUiState.value = ScanUiState.Success("Using cached scan results")
                 return@launch
             }
             refreshInProgress = true
+            _scanUiState.value = ScanUiState.Loading("Reading chat media folders", 0.1f)
             Log.d(TAG, "Refreshing media library.")
             val loadStartedAt = System.currentTimeMillis()
             if (showLoading) {
@@ -254,6 +266,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 val images = mediaLoader.loadAllDeviceMedia("image", limit = INITIAL_LOAD_LIMIT)
                 val videos = mediaLoader.loadAllDeviceMedia("video", limit = INITIAL_LOAD_LIMIT)
                 val initialItems = (images + videos).sortedByDescending { mediaItem -> mediaItem.addedMillis }
+                _scanUiState.value = ScanUiState.Loading("Finding duplicate files", 0.3f)
                 if (showLoading) {
                     ensureMinimumLoadingDuration(loadStartedAt)
                 }
@@ -262,12 +275,19 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
                 val fullImages = mediaLoader.loadAllDeviceMedia("image")
                 val fullVideos = mediaLoader.loadAllDeviceMedia("video")
+                _scanUiState.value = ScanUiState.Loading("Checking large videos", 0.5f)
                 val allItems = (fullImages + fullVideos).sortedByDescending { mediaItem -> mediaItem.addedMillis }
                 Log.d("FILES", "Files found: ${allItems.size}")
+                _scanUiState.value = ScanUiState.Loading("Detecting old media", 0.7f)
 
                 if (allItems.size != initialItems.size) {
                     applyLoadedMediaState(allItems)
                 }
+                _scanUiState.value = ScanUiState.Loading("Finding statuses and stickers", 0.85f)
+                _scanUiState.value = ScanUiState.Loading("Preparing safe cleanup", 0.97f)
+                _scanUiState.value = if (allItems.isEmpty()) ScanUiState.Empty else ScanUiState.Success(
+                    "Found ${allItems.size} files (${formatSize(allItems.sumOf { it.sizeKb.toLong() * 1024L })})"
+                )
                 hasLoadedInitialCache = true
             } catch (error: SecurityException) {
                 Log.e(TAG, "Media scan failed due to permission issue.", error)
@@ -277,6 +297,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                         currentState.copy(summaryInfo = "Scan failed: permission denied", isLoading = false)
                     }
                 }
+                _scanUiState.value = ScanUiState.Error("Permission denied")
             } catch (error: Exception) {
                 Log.e(TAG, "Media scan failed.", error)
                 FirebaseCrashlytics.getInstance().recordException(error)
@@ -285,6 +306,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                         currentState.copy(summaryInfo = "Scan failed: ${error.message ?: "Unknown error"}", isLoading = false)
                     }
                 }
+                _scanUiState.value = ScanUiState.Error(error.message ?: "Unknown error")
             } finally {
                 refreshInProgress = false
             }
