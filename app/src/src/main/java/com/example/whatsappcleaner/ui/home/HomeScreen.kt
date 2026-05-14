@@ -77,8 +77,13 @@ fun SimpleHomeScreen(
             .padding(16.dp)
     ) {
         Text(
-            text = "WhatsApp Cleaner",
+            text = "ChatSweep",
             style = MaterialTheme.typography.headlineSmall
+        )
+        Text(
+            text = "Independent cleaner for chat media files. Not affiliated with WhatsApp.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         if (summaryInfo.isNotEmpty()) {
             Spacer(modifier = Modifier.height(4.dp))
