@@ -50,7 +50,7 @@ import com.example.whatsappcleaner.ui.home.HomeUiState
 import com.example.whatsappcleaner.ui.home.JunkFilesScreen
 import com.example.whatsappcleaner.ui.home.MediaFilter
 import com.example.whatsappcleaner.ui.home.MediaViewerScreen
-import com.example.whatsappcleaner.ui.home.PolishedMemeScreen
+import com.example.whatsappcleaner.ui.home.MemeAnalyzerScreen
 import com.example.whatsappcleaner.ui.home.PolishedPhoneRealityScreen
 import com.example.whatsappcleaner.ui.home.PolishedSmartCleanScreen
 import com.example.whatsappcleaner.ui.home.PrivacyPolicyScreen
@@ -331,10 +331,10 @@ fun WhatsCleanAppRoot(
         }
 
         composable(Routes.MemeScreen) {
-            PolishedMemeScreen(
+            MemeAnalyzerScreen(
                 memes = state.memeItems,
                 onOpenInSystem = onOpenInSystem,
-                onBack = { navController.popBackStack() }
+                onNext = { navController.popBackStack() }
             )
         }
 
