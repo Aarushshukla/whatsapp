@@ -376,6 +376,7 @@ class MainActivity : ComponentActivity() {
     @Composable
     private fun MainActivityContent(versionLabel: String) {
         val state by viewModel.uiState.collectAsStateWithLifecycle()
+        val scanUiState by viewModel.scanUiState.collectAsStateWithLifecycle()
         val mediaItems by viewModel.items.collectAsStateWithLifecycle()
         val darkTheme = when (state.settings.themeMode) {
             AppThemeMode.DARK -> true
@@ -412,6 +413,7 @@ class MainActivity : ComponentActivity() {
         WhatsCleanTheme(darkTheme = darkTheme) {
             WhatsCleanAppRoot(
                 state = state,
+                scanUiState = scanUiState,
                 onRefreshClick = {
                     AnalyticsHelper.logScanStarted()
                     trackEvent(this@MainActivity, "scan_started")

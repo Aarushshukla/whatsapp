@@ -55,6 +55,7 @@ import com.example.whatsappcleaner.ui.home.PolishedPhoneRealityScreen
 import com.example.whatsappcleaner.ui.home.PolishedSmartCleanScreen
 import com.example.whatsappcleaner.ui.home.PrivacyPolicyScreen
 import com.example.whatsappcleaner.ui.home.PremiumFeature
+import com.example.whatsappcleaner.ui.home.ScanUiState
 import com.example.whatsappcleaner.ui.home.SimpleHomeScreen
 import com.example.whatsappcleaner.ui.home.SpamMediaScreen
 import com.example.whatsappcleaner.ui.home.SuggestionType
@@ -94,6 +95,7 @@ private object Routes {
 @Composable
 fun WhatsCleanAppRoot(
     state: HomeUiState,
+    scanUiState: ScanUiState,
     onRefreshClick: () -> Unit,
     onAiScanClick: () -> Unit,
     onFilterChange: (MediaFilter) -> Unit,
@@ -243,6 +245,7 @@ fun WhatsCleanAppRoot(
                 smartSuggestionSummary = state.smartSuggestionSummary,
                 smartSuggestedItems = state.smartSuggestedItems,
                 suggestionReasonsByUri = state.suggestionReasonsByUri,
+                scanUiState = scanUiState,
                 onNavigateToFeatures = { navController.navigateSingleTop(Routes.Features) },
                 onAiFeatureClick = { feature ->
                     if (true) {
