@@ -1,5 +1,11 @@
 package com.example.whatsappcleaner.ui.home
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -16,6 +22,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -37,8 +44,8 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -49,16 +56,15 @@ import com.example.whatsappcleaner.data.ReminderFreq
 import com.example.whatsappcleaner.data.ReminderTime
 import com.example.whatsappcleaner.data.local.SimpleMediaItem
 import com.example.whatsappcleaner.data.local.formatSize
-import kotlinx.coroutines.launch
 
 private data class CategoryCardModel(
     val icon: ImageVector,
     val title: String,
-    val benefit: String,
+    val description: String,
     val fileCount: Int,
     val storageBytes: Long,
     val safety: String,
-    val onClick: (() -> Unit)?
+    val onClick: () -> Unit
 )
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -119,7 +125,6 @@ fun SimpleHomeScreen(
     onAiFeatureClick: (AiFeature) -> Unit
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
-    val scope = rememberCoroutineScope()
     LaunchedEffect(deleteSnackbarMessage) {
         deleteSnackbarMessage?.let {
             snackbarHostState.showSnackbar(it)
@@ -137,25 +142,34 @@ fun SimpleHomeScreen(
     }
 
     val categoryCards = listOf(
-        CategoryCardModel(Icons.Default.ContentCopy, "Duplicates", "Remove repeated media quickly", duplicateCount, smartSuggestionSummary.totalSpaceToFree, "Safe review", onNavigateToDuplicates),
-        CategoryCardModel(Icons.Default.SdStorage, "Large Files", "Find biggest space hogs", largeTodayCount, smartSuggestionSummary.totalSpaceToFree, "Manual select", onNavigateToSmartClean),
-        CategoryCardModel(Icons.Default.Schedule, "Old Media", "Clear forgotten files", oldFilesCount, totalSize / 5, "Age-based", onNavigateToSmartClean),
-        CategoryCardModel(Icons.Default.ViewAgenda, "Statuses", "Trim expired status media", 0, 0, "Read-only scan", null),
-        CategoryCardModel(Icons.Default.Collections, "Memes & Stickers", "Clean low-value forwards", memeCount, totalSize / 8, "Review first", onNavigateToMemeAnalyzer),
-        CategoryCardModel(Icons.Default.ImageSearch, "Blurry Images", "Spot low-quality shots", 0, 0, "AI assist", null)
+        CategoryCardModel(Icons.Default.AutoAwesome, "Smart Recommendation", "Best first cleanup suggestions", smartSuggestedItems.size, smartSuggestionSummary.totalSpaceToFree, "Safest first", onNavigateToSmartClean),
+        CategoryCardModel(Icons.Default.ContentCopy, "Duplicate Media", "Repeated photos and videos", duplicateCount, smartSuggestionSummary.totalSpaceToFree, "Safe review", onNavigateToDuplicates),
+        CategoryCardModel(Icons.Default.SdStorage, "Large Videos", "Big files with high impact", largeTodayCount, smartSuggestionSummary.totalSpaceToFree, "Manual select", onNavigateToMediaViewer),
+        CategoryCardModel(Icons.Default.Schedule, "Old Media", "Media that has not been opened in a while", oldFilesCount, totalSize / 5, "Age-based", onNavigateToSmartClean),
+        CategoryCardModel(Icons.Default.ViewAgenda, "Status Files", "Temporary status media to review", 0, 0, "Review", onNavigateToMediaViewer),
+        CategoryCardModel(Icons.Default.Collections, "Memes & Stickers", "Low-value shareables", memeCount, totalSize / 8, "Review first", onNavigateToMemeAnalyzer),
+        CategoryCardModel(Icons.Default.ImageSearch, "Blurry Images", "Likely low-quality photos", 0, 0, "AI assist", onNavigateToSmartClean),
+        CategoryCardModel(Icons.Default.ContentCopy, "Forwarded Duplicates", "Repeated forwarded content", spamCount, totalSize / 10, "Review", onNavigateToSpam),
+        CategoryCardModel(Icons.Default.Storage, "Review Carefully", "Potentially important files", junkCount, totalSize / 12, "Needs attention", onNavigateToJunk)
+    )
+
+    val visibleCards = categoryCards.filter { it.fileCount > 0 || it.storageBytes > 0L }
+    val animatedBytes by animateFloatAsState(
+        targetValue = smartSuggestionSummary.totalSpaceToFree.toFloat(),
+        animationSpec = tween(durationMillis = 900, easing = FastOutSlowInEasing),
+        label = "space_countup"
     )
 
     LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFFF4F7FB)),
+        modifier = Modifier.fillMaxSize().background(Color(0xFFF4F7FB)),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         item {
-            Text("ChatSweep", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-            Text("Private offline media cleaner", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("You can free up ${formatSize(animatedBytes.toLong())}", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            Text("Review files before deleting. Nothing is deleted automatically.", color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
+
         item {
             Card(shape = RoundedCornerShape(24.dp), elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)) {
                 Column(Modifier.fillMaxWidth().padding(18.dp), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -175,12 +189,8 @@ fun SimpleHomeScreen(
                     Spacer(Modifier.height(10.dp))
                     Text(scanStageText)
                     Spacer(Modifier.height(12.dp))
-                    Button(
-                        onClick = onRefreshClick,
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = scanUiState !is ScanUiState.Loading
-                    ) {
-                        Text(if (isLoading) "Scanning..." else "Scan Chat Media")
+                    Button(onClick = onRefreshClick, modifier = Modifier.fillMaxWidth(), enabled = scanUiState !is ScanUiState.Loading) {
+                        Text(if (isLoading) "Scanning..." else "Clean Safely")
                     }
                     Spacer(Modifier.height(8.dp))
                     Text("No auto-delete • Review before deleting • Offline scan", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -197,30 +207,41 @@ fun SimpleHomeScreen(
             }
         }
 
-        item { Text("Categories", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) }
+        item { Text("Scan Results", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) }
 
-        items(categoryCards.size) { index ->
-            val card = categoryCards[index]
-            Card(
-                shape = RoundedCornerShape(18.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable {
-                        if (card.onClick != null) card.onClick.invoke()
-                        else scope.launch { snackbarHostState.showSnackbar("${card.title} is coming soon.") }
-                    }
+        if (visibleCards.isEmpty()) {
+            item {
+                Card(shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = Color.White), modifier = Modifier.fillMaxWidth()) {
+                    Text("Everything looks clean for now. Run another scan anytime.", modifier = Modifier.padding(16.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+
+        itemsIndexed(visibleCards) { index, card ->
+            AnimatedVisibility(
+                visible = true,
+                enter = fadeIn(animationSpec = tween(320, delayMillis = index * 50)) +
+                    slideInVertically(initialOffsetY = { it / 4 }, animationSpec = tween(320, delayMillis = index * 50))
             ) {
-                Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.size(42.dp).background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f), CircleShape), contentAlignment = Alignment.Center) {
-                        Icon(card.icon, null, tint = MaterialTheme.colorScheme.primary)
+                Card(
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    modifier = Modifier.fillMaxWidth().clickable { card.onClick.invoke() }
+                ) {
+                    Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            Modifier.size(42.dp).background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(card.icon, null, tint = MaterialTheme.colorScheme.primary)
+                        }
+                        Column(Modifier.weight(1f).padding(start = 12.dp)) {
+                            Text(card.title, fontWeight = FontWeight.SemiBold)
+                            Text(card.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("${card.fileCount} files • ${formatSize(card.storageBytes)}", style = MaterialTheme.typography.labelMedium)
+                        }
+                        Text(card.safety, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                     }
-                    Column(Modifier.weight(1f).padding(start = 12.dp)) {
-                        Text(card.title, fontWeight = FontWeight.SemiBold)
-                        Text(card.benefit, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text("${card.fileCount} files • ${formatSize(card.storageBytes)}", style = MaterialTheme.typography.labelMedium)
-                    }
-                    Text(card.safety, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                 }
             }
         }
