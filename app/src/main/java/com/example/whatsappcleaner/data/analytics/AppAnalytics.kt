@@ -3,36 +3,16 @@ package com.example.whatsappcleaner.data.analytics
 import android.content.Context
 import android.os.Bundle
 import android.util.Log
-import com.example.whatsappcleaner.BuildConfig
-import com.google.firebase.FirebaseApp
-import com.google.firebase.analytics.FirebaseAnalytics
 
 private const val TAG = "AppAnalytics"
 
 class AppAnalytics private constructor(context: Context) {
     private val appContext = context.applicationContext
-    private val firebaseAnalytics: FirebaseAnalytics? = initializeAnalytics()
-
-    private fun initializeAnalytics(): FirebaseAnalytics? {
-        if (!BuildConfig.HAS_GOOGLE_SERVICES) {
-            Log.w(TAG, "google-services.json is missing; Firebase Analytics is disabled and events will be logged locally only.")
-            return null
-        }
-        return runCatching {
-            FirebaseApp.initializeApp(appContext) ?: FirebaseApp.getInstance()
-            FirebaseAnalytics.getInstance(appContext)
-        }.onSuccess {
-            Log.d(TAG, "Firebase Analytics initialized successfully.")
-        }.onFailure { error ->
-            Log.e(TAG, "Firebase Analytics initialization failed. Falling back to local logs.", error)
-        }.getOrNull()
-    }
 
     fun logEvent(name: String, paramsBuilder: Bundle.() -> Unit = {}) {
         val bundle = Bundle().apply(paramsBuilder)
         Log.d(TAG, "logEvent(name=$name, params=$bundle)")
-        runCatching { firebaseAnalytics?.logEvent(name, bundle) }
-            .onFailure { error -> Log.e(TAG, "Failed to send Firebase event: $name", error) }
+        // Privacy-first offline app: analytics events are only logged locally.
     }
 
     fun trackPaywallViewed(source: String) = logEvent("paywall_viewed") { putString("source", source) }
