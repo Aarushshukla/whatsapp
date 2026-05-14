@@ -12,7 +12,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
 import androidx.compose.ui.platform.LocalContext
 import com.example.whatsappcleaner.data.MediaLoader
 import com.example.whatsappcleaner.data.SimpleMediaItem
@@ -56,10 +58,11 @@ fun WhatsCleanAppRoot() {
     }
 
     var selectedFrequency by remember { mutableStateOf(frequencyOptions.first()) }
+    val scope = rememberCoroutineScope()
     var reminderHour by remember { mutableStateOf(22) }
     var reminderMinute by remember { mutableStateOf(0) }
 
-    fun reload() {
+    suspend fun reload() {
         if (!hasPermission) return
         val loader = MediaLoader(context)
 
@@ -194,7 +197,7 @@ fun WhatsCleanAppRoot() {
         onRefreshClick = {
             val prefs = UserPrefs.get(context)
             streak = prefs.recordCleanup()
-            reload()
+            scope.launch { reload() }
         },
         permissionInfo = permissionInfo,
         summaryInfo = summaryInfo,
