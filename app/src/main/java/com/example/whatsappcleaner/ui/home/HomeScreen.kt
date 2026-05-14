@@ -295,7 +295,7 @@ fun SimpleHomeScreen(
                     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         Text("ChatSweep", color = MaterialTheme.colorScheme.onBackground, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                         Text(
-                            text = "Premium private cleanup dashboard",
+                            text = "Private offline media cleaner",
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.labelMedium,
                             maxLines = 1,
