@@ -468,7 +468,6 @@ class MainActivity : ComponentActivity() {
                 },
                 onSmartCleanClicked = {
                     Log.d("TEST", "SMART CLEAN CLICKED")
-                    Firebase.analytics.logEvent("smart_clean_clicked", null)
                     AnalyticsHelper.logSmartClean()
                     trackEvent(this@MainActivity, "smart_clean_clicked")
                 },
