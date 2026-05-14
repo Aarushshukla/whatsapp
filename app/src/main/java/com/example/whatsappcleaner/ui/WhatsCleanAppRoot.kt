@@ -54,6 +54,7 @@ import com.example.whatsappcleaner.ui.home.PolishedMemeScreen
 import com.example.whatsappcleaner.ui.home.PolishedPhoneRealityScreen
 import com.example.whatsappcleaner.ui.home.PolishedSmartCleanScreen
 import com.example.whatsappcleaner.ui.home.PrivacyPolicyScreen
+import com.example.whatsappcleaner.ui.home.AboutScreen
 import com.example.whatsappcleaner.ui.home.PremiumFeature
 import com.example.whatsappcleaner.ui.home.ScanUiState
 import com.example.whatsappcleaner.ui.home.SimpleHomeScreen
@@ -81,6 +82,7 @@ private object Routes {
     const val Settings = "settings"
     const val PrivacyPolicy = "privacy_policy"
     const val Terms = "terms"
+    const val About = "about"
     const val AiSmartSuggestions = "ai_smart_suggestions"
     const val AiDuplicateDetector = "ai_duplicate_detector"
     const val AiLargeFilesFinder = "ai_large_files_finder"
@@ -527,6 +529,9 @@ fun WhatsCleanAppRoot(
 
         composable(Routes.Terms) {
             TermsAndConditionsScreen(onBack = { navController.popBackStack() })
+        }
+        composable(Routes.About) {
+            AboutScreen(onBack = { navController.popBackStack() })
         }
     }
 }
