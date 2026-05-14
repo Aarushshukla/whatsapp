@@ -7,6 +7,7 @@ package com.example.whatsappcleaner.ui.home
 
 import android.os.Environment
 import android.os.StatFs
+import android.text.format.DateFormat
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateContentSize
@@ -61,6 +62,7 @@ import androidx.compose.material.icons.filled.Gavel
 import androidx.compose.material.icons.filled.Policy
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.material.ripple.rememberRipple
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -72,11 +74,13 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -90,6 +94,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -304,6 +309,8 @@ fun PolishedSmartCleanScreen(
     }
 
     val selectedUris = remember { mutableStateListOf<String>() }
+    var previewItem by remember { mutableStateOf<FileItem?>(null) }
+    var showDeletePlaceholder by remember { mutableStateOf(false) }
     val selectedSimpleItems = remember(selectedUris, mediaByUri) {
         selectedUris.mapNotNull { uri -> mediaByUri[uri] }
     }
@@ -371,10 +378,11 @@ fun PolishedSmartCleanScreen(
             return@Scaffold
         }
 
+        Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues),
+                .padding(bottom = 86.dp),
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
@@ -428,13 +436,41 @@ fun PolishedSmartCleanScreen(
             }
 
             if (selectedCategory.items.isNotEmpty()) {
-                itemsIndexed(selectedCategory.items, key = { _, item -> item.uri.toString() }) { _, item ->
+                item {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        LegitButton(
+                            text = "Select safe files",
+                            onClick = {
+                                val safe = selectedCategory.items.filter {
+                                    if (activeCategory == "Duplicates") it.isDuplicate && !it.isBestDuplicateCopy
+                                    else it.selectionHint().safety == AutoSelectionSafety.SAFE_TO_DELETE
+                                }.map { it.uri.toString() }
+                                selectedUris.clear()
+                                selectedUris.addAll(safe)
+                            },
+                            modifier = Modifier.weight(1f)
+                        )
+                        LegitButton(
+                            text = "Deselect all",
+                            onClick = { selectedUris.clear() },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+                item {
+                    LazyVerticalGrid(
+                        columns = GridCells.Adaptive(120.dp),
+                        modifier = Modifier.fillMaxWidth().height(500.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        items(selectedCategory.items, key = { it.uri.toString() }) { item ->
                     val isSelected = selectedUris.contains(item.uri.toString())
                     SmartCleanFileCard(
                         file = item,
                         isSelected = isSelected,
                         onOpenPreview = {
-                            mediaByUri[item.uri.toString()]?.let(onOpenInSystem)
+                            previewItem = item
                         },
                         onToggleSelection = {
                             if (isSelected) {
@@ -445,22 +481,37 @@ fun PolishedSmartCleanScreen(
                         }
                     )
                 }
+                    }
+                }
 
-                item {
-                    LegitButton(
-                        text = "Delete selected (${selectedSimpleItems.size})",
-                        enabled = selectedSimpleItems.isNotEmpty(),
-                        onClick = {
-                            if (selectedSimpleItems.isEmpty()) return@LegitButton
-                            onCleanupRecorded(selectedSimpleItems.sumOf { it.size })
-                            onDeleteItemsRequested(selectedSimpleItems)
-                            selectedUris.clear()
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    )
+            }
+        }
+            AnimatedVisibility(
+                visible = selectedSimpleItems.isNotEmpty(),
+                modifier = Modifier.align(Alignment.BottomCenter)
+            ) {
+                Surface(shadowElevation = 8.dp) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("${selectedSimpleItems.size} selected • ${formatSize(selectedSimpleItems.sumOf { it.size })}", modifier = Modifier.weight(1f))
+                        LegitButton(text = "Delete selected", onClick = { showDeletePlaceholder = true })
+                    }
                 }
             }
         }
+    }
+    previewItem?.let { file ->
+        PreviewDialog(file = file, isSelected = selectedUris.contains(file.uri.toString()), onToggleSelection = {
+            if (selectedUris.contains(file.uri.toString())) selectedUris.remove(file.uri.toString()) else selectedUris.add(file.uri.toString())
+        }, onBack = { previewItem = null })
+    }
+    if (showDeletePlaceholder) {
+        AlertDialog(onDismissRequest = { showDeletePlaceholder = false }, title = { Text("Delete selected") }, text = { Text("Deletion is not implemented yet.") }, confirmButton = {
+            TextButton(onClick = { showDeletePlaceholder = false }) { Text("OK") }
+        })
     }
 }
 
@@ -546,7 +597,7 @@ private fun SmartCleanFileCard(
     onOpenPreview: () -> Unit,
     onToggleSelection: () -> Unit
 ) {
-    val score = remember(file) { calculateScore(file) }
+    var imageFailed by remember(file.uri.toString()) { mutableStateOf(false) }
     val reasonText = remember(file) { junkReasons(file).firstOrNull().orEmpty() }
     val hint = remember(file) { file.selectionHint() }
     val statusText = when {
@@ -556,36 +607,46 @@ private fun SmartCleanFileCard(
 
     Card(
         modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onToggleSelection() },
+            .fillMaxWidth().combinedClickable(onClick = onOpenPreview, onLongClick = onToggleSelection),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 5.dp else 2.dp)
     ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            AsyncImage(
-                model = file.uri,
-                contentDescription = file.name,
-                modifier = Modifier
-                    .size(56.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .clickable(onClick = onOpenPreview)
-            )
-            Column(modifier = Modifier.weight(1f)) {
-                Text(file.name, maxLines = 1, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurface)
-                Text(formatSize(file.size), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                if (reasonText.isNotBlank()) {
-                    Text(reasonText, style = MaterialTheme.typography.bodySmall, color = AccentBlue)
-                }
-                Text(statusText, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+        Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Box(contentAlignment = Alignment.TopEnd) {
+                AsyncImage(
+                    model = file.uri,
+                    contentDescription = file.name,
+                    contentScale = ContentScale.Crop,
+                    onError = { imageFailed = true },
+                    modifier = Modifier.size(110.dp).clip(RoundedCornerShape(12.dp))
+                )
+                Checkbox(checked = isSelected, onCheckedChange = { onToggleSelection() })
+                if (imageFailed) Text("No preview", modifier = Modifier.align(Alignment.Center))
             }
-            Checkbox(checked = isSelected, onCheckedChange = { onToggleSelection() })
+            Text(formatSize(file.size), style = MaterialTheme.typography.labelSmall)
+            if (file.mimeType.startsWith("video")) Text("Video", style = MaterialTheme.typography.labelSmall)
+            Text(file.name, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelSmall)
+            Text(if (hint.safety == AutoSelectionSafety.SAFE_TO_DELETE) "Safe" else "Risk", style = MaterialTheme.typography.labelSmall, color = AccentBlue)
+            if (file.isBestDuplicateCopy) Text("Best copy", style = MaterialTheme.typography.labelSmall, color = AccentGreen)
+            if (hint.safety == AutoSelectionSafety.PROTECTED) Text("Protected", style = MaterialTheme.typography.labelSmall)
         }
     }
+}
+
+@Composable
+private fun PreviewDialog(file: FileItem, isSelected: Boolean, onToggleSelection: () -> Unit, onBack: () -> Unit) {
+    AlertDialog(onDismissRequest = onBack, title = { Text("Preview") }, text = {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            AsyncImage(model = file.uri, contentDescription = file.name, modifier = Modifier.fillMaxWidth().height(220.dp), contentScale = ContentScale.Fit)
+            Text("File: ${file.name}")
+            Text("Size: ${formatSize(file.size)}")
+            Text("Date: ${DateFormat.format("yyyy-MM-dd HH:mm", file.lastModified)}")
+            Text("Folder: ${file.path.substringBeforeLast("/", "")}")
+            Text("Category: ${if (file.isDuplicate) "Duplicates" else if (file.mimeType.startsWith("video")) "Videos" else "General"}")
+            Text("Risk: ${file.selectionHint().label}")
+        }
+    }, confirmButton = { TextButton(onClick = onToggleSelection) { Text(if (isSelected) "Unselect" else "Select") } }, dismissButton = { TextButton(onClick = onBack) { Text("Back") } })
 }
 
 private data class SmartCleanCategoryUiModel(
