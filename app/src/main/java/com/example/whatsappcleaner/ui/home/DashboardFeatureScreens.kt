@@ -256,7 +256,14 @@ fun PolishedSmartCleanScreen(
     }
 
     val fileItems = remember(allItems, duplicateKeys) {
+        val groups = allItems.groupBy { mediaItem -> "${mediaItem.name.lowercase()}_${mediaItem.size}" }
+        val bestByKey = groups.mapValues { (_, items) ->
+            items.maxWithOrNull(compareBy<SimpleMediaItem> { it.addedMillis }.thenBy { it.size })?.uri?.toString()
+        }
+
         allItems.map { mediaItem ->
+            val duplicateKey = "${mediaItem.name.lowercase()}_${mediaItem.size}"
+            val isDup = duplicateKeys.contains(duplicateKey)
             FileItem(
                 uri = mediaItem.uri,
                 name = mediaItem.name,
@@ -264,9 +271,11 @@ fun PolishedSmartCleanScreen(
                 lastModified = mediaItem.addedMillis,
                 path = mediaItem.path,
                 mimeType = mediaItem.mimeType.orEmpty(),
-                isDuplicate = duplicateKeys.contains("${mediaItem.name.lowercase()}_${mediaItem.size}"),
+                isDuplicate = isDup,
                 isScreenshot = mediaItem.name.contains("screenshot", ignoreCase = true) || mediaItem.path.contains("screenshot", ignoreCase = true),
-                isWhatsapp = mediaItem.path.contains("whatsapp", ignoreCase = true) || mediaItem.uri.toString().contains("whatsapp", ignoreCase = true)
+                isWhatsapp = mediaItem.path.contains("whatsapp", ignoreCase = true) || mediaItem.uri.toString().contains("whatsapp", ignoreCase = true),
+                duplicateGroupKey = if (isDup) duplicateKey else null,
+                isBestDuplicateCopy = isDup && bestByKey[duplicateKey] == mediaItem.uri.toString()
             )
         }
     }
@@ -297,6 +306,18 @@ fun PolishedSmartCleanScreen(
     val selectedUris = remember { mutableStateListOf<String>() }
     val selectedSimpleItems = remember(selectedUris, mediaByUri) {
         selectedUris.mapNotNull { uri -> mediaByUri[uri] }
+    }
+
+    LaunchedEffect(selectedCategory.items, activeCategory) {
+        selectedUris.clear()
+        val autoSelectedUris = if (activeCategory == "Duplicates") {
+            selectedCategory.items.filter { it.isDuplicate && !it.isBestDuplicateCopy }
+        } else {
+            selectedCategory.items.filter { it.selectionHint().safety == AutoSelectionSafety.SAFE_TO_DELETE }
+        }
+            .map { it.uri.toString() }
+            .distinct()
+        selectedUris.addAll(autoSelectedUris)
     }
 
     val statFs = remember { runCatching { StatFs(Environment.getDataDirectory().path) }.getOrNull() }
@@ -454,8 +475,47 @@ data class FileItem(
     val isScreenshot: Boolean = false,
     val isWhatsapp: Boolean = false,
     val path: String = "",
-    val mimeType: String = ""
+    val mimeType: String = "",
+    val duplicateGroupKey: String? = null,
+    val isBestDuplicateCopy: Boolean = false
 )
+
+
+private enum class AutoSelectionSafety {
+    SAFE_TO_DELETE,
+    REVIEW_CAREFULLY,
+    PROTECTED
+}
+
+private data class SelectionHint(
+    val safety: AutoSelectionSafety,
+    val label: String
+)
+
+private fun FileItem.selectionHint(nowMillis: Long = System.currentTimeMillis()): SelectionHint {
+    val ageDays = (nowMillis - lastModified).coerceAtLeast(0L) / (1000L * 60L * 60L * 24L)
+    val isVeryRecent = ageDays <= 3
+    val isVideo = mimeType.startsWith("video", ignoreCase = true)
+    val isUniqueLargeVideo = isVideo && size > LARGE_FILE_BYTES && !isDuplicate
+    val isSentFolderMedia = path.contains("/sent", ignoreCase = true) || path.contains(" sent", ignoreCase = true)
+    val personalPhotoLike = mimeType.startsWith("image", ignoreCase = true) && !isDuplicate &&
+        !path.contains("status", ignoreCase = true) &&
+        !path.contains("sticker", ignoreCase = true) &&
+        !name.contains("meme", ignoreCase = true) && !path.contains("meme", ignoreCase = true)
+
+    val shouldProtect = isVeryRecent || isUniqueLargeVideo || isSentFolderMedia || personalPhotoLike ||
+        (!isDuplicate &&
+            !path.contains("status", ignoreCase = true) &&
+            !path.contains("sticker", ignoreCase = true) &&
+            !name.contains("meme", ignoreCase = true) && !path.contains("meme", ignoreCase = true))
+
+    return when {
+        shouldProtect && (isVeryRecent || isUniqueLargeVideo || isSentFolderMedia) -> SelectionHint(AutoSelectionSafety.PROTECTED, "Protected from auto-selection")
+        shouldProtect -> SelectionHint(AutoSelectionSafety.REVIEW_CAREFULLY, "Review carefully")
+        else -> SelectionHint(AutoSelectionSafety.SAFE_TO_DELETE, "Safe to delete")
+    }
+}
+
 
 private fun calculateScore(file: FileItem): Int {
     var score = 0
@@ -488,10 +548,10 @@ private fun SmartCleanFileCard(
 ) {
     val score = remember(file) { calculateScore(file) }
     val reasonText = remember(file) { junkReasons(file).firstOrNull().orEmpty() }
+    val hint = remember(file) { file.selectionHint() }
     val statusText = when {
-        score > 60 -> "Safe to delete"
-        score >= 30 -> "Review"
-        else -> "Keep"
+        file.isDuplicate -> if (file.isBestDuplicateCopy) "Best copy kept" else "Duplicates selected"
+        else -> hint.label
     }
 
     Card(
