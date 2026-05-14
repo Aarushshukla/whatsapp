@@ -43,10 +43,10 @@ class ReminderNotificationHelper(
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle("Quick cleanup reminder")
-            .setContentText("Take 60 seconds to review today's WhatsApp media.")
+            .setContentText("Take 60 seconds to review today's chat media.")
             .setStyle(
                 NotificationCompat.BigTextStyle().bigText(
-                    "Quick cleanup reminder\nTake 60 seconds to review today's WhatsApp media and keep storage under control."
+                    "Quick cleanup reminder\nTake 60 seconds to review today's chat media and keep storage under control."
                 )
             )
             .setContentIntent(pendingIntent)

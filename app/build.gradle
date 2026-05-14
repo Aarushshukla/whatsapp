@@ -96,8 +96,7 @@ dependencies {
     implementation 'com.airbnb.android:lottie-compose:6.6.1'
 
     implementation 'com.android.billingclient:billing:8.3.0'
-    // Keep only Firebase Analytics + Crashlytics (no Auth/Firestore/Realtime DB/manual measurement deps).
-    implementation 'com.google.firebase:firebase-analytics-ktx'
+    // Crash reporting only; no Auth/Firestore/Realtime DB/manual measurement dependencies.
     implementation 'com.google.firebase:firebase-crashlytics-ktx'
     implementation 'org.tensorflow:tensorflow-lite:2.14.0'
     implementation 'com.google.android.gms:play-services-ads:23.5.0'
