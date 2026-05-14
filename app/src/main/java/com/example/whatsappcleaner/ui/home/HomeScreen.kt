@@ -295,7 +295,7 @@ fun SimpleHomeScreen(
                     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         Text("ChatSweep", color = MaterialTheme.colorScheme.onBackground, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                         Text(
-                            text = "Private offline media cleaner",
+                            text = "Premium private cleanup dashboard",
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.labelMedium,
                             maxLines = 1,
@@ -342,7 +342,7 @@ fun SimpleHomeScreen(
                 ) {
                     PremiumHeader(
                         title = "ChatSweep",
-                        subtitle = "Private offline media cleaner",
+                        subtitle = "Premium private cleanup dashboard",
                         remindersEnabled = remindersEnabled,
                         onRemindersToggle = onRemindersToggle
                     )
@@ -582,7 +582,7 @@ private fun PremiumHeader(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Daily reminders", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
+                Text("Daily smart reminders", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
                 Switch(checked = remindersEnabled, onCheckedChange = onRemindersToggle)
             }
         }
@@ -715,7 +715,7 @@ private fun DashboardHeader(
                 }
                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text("ChatSweep", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurface)
-                    Text("Clean chat media storage", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Premium home dashboard", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
 
