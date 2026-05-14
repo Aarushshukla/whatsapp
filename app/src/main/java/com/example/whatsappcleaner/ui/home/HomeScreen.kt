@@ -16,6 +16,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.animateIntAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -114,6 +119,8 @@ fun SimpleHomeScreen(
     smartSuggestionSummary: SmartSuggestionSummary,
     smartSuggestedItems: List<SimpleMediaItem>,
     suggestionReasonsByUri: Map<String, List<String>>,
+    storageHeatmapByMonth: List<Pair<String, Long>>,
+    monthlyGrowthForecast: String?,
     scanUiState: ScanUiState,
     onNavigateToFeatures: () -> Unit,
     onAiFeatureClick: (AiFeature) -> Unit
@@ -128,6 +135,8 @@ fun SimpleHomeScreen(
     }
 
     val scanProgress = (scanUiState as? ScanUiState.Loading)?.progress ?: if (totalSize > 0L) 0.72f else 0f
+    val animatedProgress = animateFloatAsState(targetValue = scanProgress, label = "scanProgress")
+    val animatedSizeNumber = animateIntAsState(targetValue = (totalSize / (1024 * 1024)).toInt(), label = "sizeCountUp")
     val scanStageText = when (scanUiState) {
         is ScanUiState.Loading -> scanUiState.stage
         is ScanUiState.Success -> scanUiState.result
@@ -161,7 +170,7 @@ fun SimpleHomeScreen(
                 Column(Modifier.fillMaxWidth().padding(18.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     Box(Modifier.size(136.dp), contentAlignment = Alignment.Center) {
                         androidx.compose.material3.CircularProgressIndicator(
-                            progress = { scanProgress },
+                            progress = { animatedProgress.value },
                             strokeWidth = 12.dp,
                             modifier = Modifier.fillMaxSize(),
                             color = MaterialTheme.colorScheme.primary,
@@ -169,11 +178,14 @@ fun SimpleHomeScreen(
                         )
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Icon(Icons.Default.Storage, null)
-                            Text(if (totalSize > 0L) formatSize(totalSize) else "Ready to scan", fontWeight = FontWeight.SemiBold)
+                            Text(if (totalSize > 0L) "${animatedSizeNumber.value} MB" else "Ready to scan", fontWeight = FontWeight.SemiBold)
                         }
                     }
                     Spacer(Modifier.height(10.dp))
                     Text(scanStageText)
+                    if (scanUiState is ScanUiState.Success) {
+                        Text("✓", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                    }
                     Spacer(Modifier.height(12.dp))
                     Button(
                         onClick = onRefreshClick,
@@ -196,11 +208,46 @@ fun SimpleHomeScreen(
                 StatChip("Files found", totalFiles.toString())
             }
         }
+        if (items.isNotEmpty()) {
+            item {
+                Text("Storage Heatmap", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                storageHeatmapByMonth.take(2).forEach { row ->
+                    Card(shape = RoundedCornerShape(14.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
+                        Text(row.first, modifier = Modifier.padding(12.dp))
+                    }
+                }
+                monthlyGrowthForecast?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            }
+        }
+
+        if (scanUiState == ScanUiState.Empty) {
+            item {
+                Card(shape = RoundedCornerShape(16.dp)) {
+                    Column(Modifier.padding(16.dp)) {
+                        Text("No files found", fontWeight = FontWeight.SemiBold)
+                        Text("Your chat media looks clean.")
+                        Button(onClick = onRefreshClick) { Text("Scan again") }
+                    }
+                }
+            }
+        }
+        if (scanUiState is ScanUiState.Error) {
+            item {
+                Card(shape = RoundedCornerShape(16.dp)) {
+                    Column(Modifier.padding(16.dp)) {
+                        Text("Scan failed", fontWeight = FontWeight.SemiBold)
+                        Text(scanUiState.message)
+                        Button(onClick = onRefreshClick) { Text("Try again") }
+                    }
+                }
+            }
+        }
 
         item { Text("Categories", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) }
 
         items(categoryCards.size) { index ->
             val card = categoryCards[index]
+            AnimatedVisibility(visible = true, enter = fadeIn() + slideInVertically(initialOffsetY = { it / 2 })) {
             Card(
                 shape = RoundedCornerShape(18.dp),
                 colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -222,7 +269,7 @@ fun SimpleHomeScreen(
                     }
                     Text(card.safety, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                 }
-            }
+            )}
         }
 
         item { SnackbarHost(snackbarHostState) }

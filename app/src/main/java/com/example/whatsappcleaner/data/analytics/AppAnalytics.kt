@@ -51,6 +51,15 @@ class AppAnalytics private constructor(context: Context) {
     fun trackReviewClicked() = logEvent("review_clicked")
     fun trackStorageScreenOpened() = logEvent("storage_screen_opened")
     fun trackSettingsOpened() = logEvent("settings_opened")
+    fun trackHomeOpened() = logEvent("home_opened")
+    fun trackScanClicked() = logEvent("scan_clicked")
+    fun trackScanStarted() = logEvent("scan_started")
+    fun trackScanCompleted() = logEvent("scan_completed")
+    fun trackScanFailed(reason: String) = logEvent("scan_failed") { putString("reason", reason.take(80)) }
+    fun trackCategoryOpened(name: String) = logEvent("category_opened") { putString("name", name.take(40)) }
+    fun trackFilePreviewOpened() = logEvent("file_preview_opened")
+    fun trackCleanupCompleted() = logEvent("cleanup_completed")
+    fun trackPrivacyOpened() = logEvent("privacy_opened")
     fun trackShareResultClicked(source: String) = logEvent("share_result_clicked") { putString("source", source) }
 
     companion object {

@@ -941,8 +941,8 @@ fun PrivacyPolicyScreen(onBack: () -> Unit) {
             item {
                 SimpleActionCard(
                     icon = Icons.Default.Policy,
-                    title = "No personal data collection",
-                    subtitle = "This app does not collect personal information, contacts, or message contents.",
+                    title = "Local-only scanning",
+                    subtitle = "Scans run on your device only. No cloud upload and no backend database is used for media scanning.",
                     onClick = {},
                     showAction = false
                 )
@@ -950,8 +950,8 @@ fun PrivacyPolicyScreen(onBack: () -> Unit) {
             item {
                 SimpleActionCard(
                     icon = Icons.Default.Security,
-                    title = "Local processing only",
-                    subtitle = "Scanning and cleanup recommendations run on your device.",
+                    title = "Diagnostics and analytics",
+                    subtitle = "Firebase Analytics collects basic app usage data and Firebase Crashlytics collects crash diagnostics.",
                     onClick = {},
                     showAction = false
                 )
@@ -960,7 +960,7 @@ fun PrivacyPolicyScreen(onBack: () -> Unit) {
                 SimpleActionCard(
                     icon = Icons.Default.FolderOpen,
                     title = "Storage permission usage",
-                    subtitle = "Media permission is used only to read files for analysis and cleanup.",
+                    subtitle = "Media permission is used only to read files for analysis and cleanup. Manual deletion always requires your confirmation.",
                     onClick = {},
                     showAction = false
                 )
@@ -998,8 +998,8 @@ fun TermsAndConditionsScreen(onBack: () -> Unit) {
             item {
                 SimpleActionCard(
                     icon = Icons.Default.Gavel,
-                    title = "Suggestions, not guarantees",
-                    subtitle = "The app provides cleanup suggestions to help you decide what to remove.",
+                    title = "Review before deletion",
+                    subtitle = "You review files before deletion. Deleted files may not be recoverable.",
                     onClick = {},
                     showAction = false
                 )
@@ -1007,8 +1007,8 @@ fun TermsAndConditionsScreen(onBack: () -> Unit) {
             item {
                 SimpleActionCard(
                     icon = Icons.Default.DeleteSweep,
-                    title = "User responsibility",
-                    subtitle = "You are responsible for confirming deletions, and deleted files may not be recoverable.",
+                    title = "Utility tool notice",
+                    subtitle = "This app is a utility tool and cleanup assistant. You remain responsible for your decisions.",
                     onClick = {},
                     showAction = false
                 )
@@ -1022,6 +1022,18 @@ fun TermsAndConditionsScreen(onBack: () -> Unit) {
                     showAction = false
                 )
             }
+        }
+    }
+}
+
+@Composable
+fun AboutScreen(onBack: () -> Unit, version: String) {
+    FeatureScreenScaffold("About", "Product details", onBack) {
+        LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            item { statBox("ChatSweep", "App name") }
+            item { statBox(version, "Version") }
+            item { statBox("Offline media cleaner", "Purpose") }
+            item { statBox("Not affiliated with WhatsApp LLC or Meta Platforms, Inc.", "Disclaimer") }
         }
     }
 }

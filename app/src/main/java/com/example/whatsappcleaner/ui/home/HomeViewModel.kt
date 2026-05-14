@@ -39,6 +39,10 @@ import kotlinx.coroutines.withContext
 import androidx.annotation.MainThread
 import kotlinx.coroutines.delay
 import com.google.firebase.crashlytics.FirebaseCrashlytics
+import java.time.Instant
+import java.time.YearMonth
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 enum class PremiumFeature(val analyticsKey: String, val paywallSource: String) {
     SMART_CLEAN_ADVANCED("smart_clean_clicked", "smart_clean_advanced"),
@@ -101,7 +105,9 @@ data class HomeUiState(
     val shouldShowInterstitialForAiScan: Boolean = false,
     val deepCleanCredits: Int = 0,
     val shouldShowInterstitialForDelete: Boolean = false,
-    val categorySummaries: List<CategorySummaryUi> = emptyList()
+    val categorySummaries: List<CategorySummaryUi> = emptyList(),
+    val storageHeatmapByMonth: List<Pair<String, Long>> = emptyList(),
+    val monthlyGrowthForecast: String? = null
 ) {
     // TODO: RE-ENABLE SUBSCRIPTION LATER
     /*
@@ -244,8 +250,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     fun refreshMedia(forceRefresh: Boolean = false, showLoading: Boolean = true) {
         if (!_uiState.value.permissionGranted) return
-        Log.d("SCAN", "Scan started")
-        trackEvent(appContext, "scan_started")
+        analytics.trackScanStarted()
         viewModelScope.launch(Dispatchers.IO) {
             if (refreshInProgress) {
                 Log.d(TAG, "Skipping refresh request because a scan is already in progress.")
@@ -300,6 +305,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 _scanUiState.value = if (allItems.isEmpty()) ScanUiState.Empty else ScanUiState.Success(
                     "Found ${allItems.size} files (${formatSize(allItems.sumOf { it.sizeKb.toLong() * 1024L })})"
                 )
+                persistScanHistory(allItems)
+                analytics.trackScanCompleted()
                 hasLoadedInitialCache = true
             } catch (error: SecurityException) {
                 Log.e(TAG, "Media scan failed due to permission issue.", error)
@@ -310,6 +317,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 }
                 _scanUiState.value = ScanUiState.Error("Permission denied")
+                analytics.trackScanFailed("permission_denied")
             } catch (error: Exception) {
                 Log.e(TAG, "Media scan failed.", error)
                 FirebaseCrashlytics.getInstance().recordException(error)
@@ -318,6 +326,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                         currentState.copy(summaryInfo = "Scan failed: ${error.message ?: "Unknown error"}", isLoading = false)
                     }
                 }
+                analytics.trackScanFailed(error.message ?: "unknown")
                 _scanUiState.value = ScanUiState.Error(error.message ?: "Unknown error")
             } finally {
                 refreshInProgress = false
@@ -513,11 +522,50 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     oldFileItems = computed.oldFileItems,
                     whatsappJunkItems = computed.whatsappJunkItems
                     ,
-                    categorySummaries = computed.categorySummaries
+                    categorySummaries = computed.categorySummaries,
+                    storageHeatmapByMonth = buildStorageHeatmap(computed.allItems),
+                    monthlyGrowthForecast = buildGrowthForecast()
                 )
             }
             _items.value = computed.allItems
         }
+    }
+
+    private fun persistScanHistory(items: List<SimpleMediaItem>) {
+        val total = items.sumOf { it.size }
+        val imageBytes = items.filter { it.mimeType?.startsWith("image") == true }.sumOf { it.size }
+        val videoBytes = items.filter { it.mimeType?.startsWith("video") == true }.sumOf { it.size }
+        prefs.saveScanSnapshot(
+            UserPrefs.ScanSnapshot(
+                scanDateMillis = System.currentTimeMillis(),
+                totalSizeBytes = total,
+                imageBytes = imageBytes,
+                videoBytes = videoBytes
+            )
+        )
+    }
+
+    private fun buildGrowthForecast(): String? {
+        val history = prefs.getScanHistory()
+        if (history.size < 2) return null
+        val first = history.first()
+        val last = history.last()
+        val days = ((last.scanDateMillis - first.scanDateMillis) / 86_400_000.0).coerceAtLeast(1.0)
+        val perDay = (last.totalSizeBytes - first.totalSizeBytes) / days
+        val monthly = (perDay * 30.0).toLong()
+        if (monthly <= 0L) return null
+        return "At this rate, chat media may grow by ${formatSize(monthly)} this month."
+    }
+
+    private fun buildStorageHeatmap(items: List<SimpleMediaItem>): List<Pair<String, Long>> {
+        val formatter = DateTimeFormatter.ofPattern("MMMM yyyy")
+        return items.groupBy {
+            YearMonth.from(Instant.ofEpochMilli(it.modifiedMillis).atZone(ZoneId.systemDefault()))
+        }.mapValues { entry -> entry.value.sumOf { it.size } }
+            .toList()
+            .sortedByDescending { it.first }
+            .take(6)
+            .map { "${it.first.format(formatter)} — ${formatSize(it.second)}" to it.second }
     }
 
     private suspend fun isMeme(item: SimpleMediaItem, classifier: MemeClassifier): Boolean {

@@ -27,7 +27,14 @@ class UserPrefs private constructor(context: Context) {
         private const val KEY_INCLUDE_MEMES = "include_memes"
         private const val KEY_INCLUDE_DUPLICATES = "include_duplicates"
         private const val KEY_FREE_PREMIUM_ATTEMPTS = "free_premium_attempts"
+        private const val KEY_SCAN_HISTORY = "scan_history_v1"
     }
+    data class ScanSnapshot(
+        val scanDateMillis: Long,
+        val totalSizeBytes: Long,
+        val imageBytes: Long,
+        val videoBytes: Long
+    )
 
     fun hasSeenOnboarding(): Boolean = prefs.getBoolean(KEY_SEEN_ONBOARDING, false)
     fun setOnboardingSeen() = prefs.edit().putBoolean(KEY_SEEN_ONBOARDING, true).apply()
@@ -106,4 +113,29 @@ class UserPrefs private constructor(context: Context) {
     }
 
     fun resetFreePremiumAttempts() = prefs.edit().putInt(KEY_FREE_PREMIUM_ATTEMPTS, 0).apply()
+
+    fun saveScanSnapshot(snapshot: ScanSnapshot) {
+        val existing = getScanHistory().toMutableList()
+        existing += snapshot
+        val capped = existing.takeLast(20)
+        val encoded = capped.joinToString("|") {
+            listOf(it.scanDateMillis, it.totalSizeBytes, it.imageBytes, it.videoBytes).joinToString(",")
+        }
+        prefs.edit().putString(KEY_SCAN_HISTORY, encoded).apply()
+    }
+
+    fun getScanHistory(): List<ScanSnapshot> {
+        val raw = prefs.getString(KEY_SCAN_HISTORY, null).orEmpty()
+        if (raw.isBlank()) return emptyList()
+        return raw.split("|").mapNotNull { row ->
+            val parts = row.split(",")
+            if (parts.size < 4) return@mapNotNull null
+            ScanSnapshot(
+                scanDateMillis = parts[0].toLongOrNull() ?: return@mapNotNull null,
+                totalSizeBytes = parts[1].toLongOrNull() ?: return@mapNotNull null,
+                imageBytes = parts[2].toLongOrNull() ?: 0L,
+                videoBytes = parts[3].toLongOrNull() ?: 0L
+            )
+        }
+    }
 }

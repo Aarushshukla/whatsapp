@@ -250,6 +250,8 @@ fun WhatsCleanAppRoot(
                 smartSuggestionSummary = state.smartSuggestionSummary,
                 smartSuggestedItems = state.smartSuggestedItems,
                 suggestionReasonsByUri = state.suggestionReasonsByUri,
+                storageHeatmapByMonth = state.storageHeatmapByMonth,
+                monthlyGrowthForecast = state.monthlyGrowthForecast,
                 scanUiState = scanUiState,
                 onNavigateToFeatures = { navController.navigateSingleTop(Routes.Features) },
                 onAiFeatureClick = { feature ->
