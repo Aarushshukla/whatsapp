@@ -245,7 +245,6 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     fun refreshMedia(forceRefresh: Boolean = false, showLoading: Boolean = true) {
         if (!_uiState.value.permissionGranted) return
         Log.d("SCAN", "Scan started")
-        analytics.trackScanStarted()
         viewModelScope.launch(Dispatchers.IO) {
             if (refreshInProgress) {
                 Log.d(TAG, "Skipping refresh request because a scan is already in progress.")
@@ -311,7 +310,6 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                             duplicateSizeBytes = 0L
                         )
                     )
-                    analytics.trackScanCompleted(allItems.size, totalSizeBytes)
                 }
                 hasLoadedInitialCache = true
             } catch (error: SecurityException) {
@@ -322,7 +320,6 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 }
                 _scanUiState.value = ScanUiState.Error("Permission denied")
-                analytics.trackScanFailed("permission_denied")
             } catch (error: Exception) {
                 Log.e(TAG, "Media scan failed.", error)
                 withContext(Dispatchers.Main) {
@@ -331,7 +328,6 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 }
                 _scanUiState.value = ScanUiState.Error(error.message ?: "Unknown error")
-                analytics.trackScanFailed(error.message ?: "unknown")
             } finally {
                 refreshInProgress = false
             }
