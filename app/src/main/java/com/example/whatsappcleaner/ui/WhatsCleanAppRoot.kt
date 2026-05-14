@@ -57,7 +57,6 @@ import com.example.whatsappcleaner.ui.home.ScanUiState
 import com.example.whatsappcleaner.ui.home.SimpleHomeScreen
 import com.example.whatsappcleaner.ui.home.SpamMediaScreen
 import com.example.whatsappcleaner.ui.home.SuggestionType
-import com.example.whatsappcleaner.ui.home.TermsAndConditionsScreen
 import com.example.whatsappcleaner.ui.paywall.PaywallScreen
 import com.example.whatsappcleaner.ui.settings.AppThemeMode
 import com.example.whatsappcleaner.ui.settings.ReminderFrequencyOption
