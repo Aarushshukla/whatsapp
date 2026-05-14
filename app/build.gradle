@@ -15,7 +15,7 @@ android {
         versionCode 1
         versionName '1.0'
 
-        buildConfigField 'boolean', 'HAS_GOOGLE_SERVICES', 'true'
+        buildConfigField 'boolean', 'HAS_GOOGLE_SERVICES', project.hasProperty('HAS_GOOGLE_SERVICES') ? project.property('HAS_GOOGLE_SERVICES') : (file('google-services.json').exists() ? 'true' : 'false')
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
     }
 
