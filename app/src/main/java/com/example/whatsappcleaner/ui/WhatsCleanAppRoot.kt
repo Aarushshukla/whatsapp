@@ -52,7 +52,6 @@ import com.example.whatsappcleaner.ui.home.MediaFilter
 import com.example.whatsappcleaner.ui.home.MediaViewerScreen
 import com.example.whatsappcleaner.ui.home.MemeAnalyzerScreen
 import com.example.whatsappcleaner.ui.home.PolishedSmartCleanScreen
-import com.example.whatsappcleaner.ui.home.PrivacyPolicyScreen
 import com.example.whatsappcleaner.ui.home.AboutScreen
 import com.example.whatsappcleaner.ui.home.PremiumFeature
 import com.example.whatsappcleaner.ui.home.ScanUiState
