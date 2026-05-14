@@ -51,7 +51,6 @@ import com.example.whatsappcleaner.ui.home.JunkFilesScreen
 import com.example.whatsappcleaner.ui.home.MediaFilter
 import com.example.whatsappcleaner.ui.home.MediaViewerScreen
 import com.example.whatsappcleaner.ui.home.MemeAnalyzerScreen
-import com.example.whatsappcleaner.ui.home.PolishedPhoneRealityScreen
 import com.example.whatsappcleaner.ui.home.PolishedSmartCleanScreen
 import com.example.whatsappcleaner.ui.home.PrivacyPolicyScreen
 import com.example.whatsappcleaner.ui.home.AboutScreen
@@ -322,10 +321,13 @@ fun WhatsCleanAppRoot(
         }
 
         composable(Routes.PhoneReality) {
-            PolishedPhoneRealityScreen(
+            AnalyticsScreen(
                 report = state.report,
                 imageCount = state.allItems.count { mediaItem -> mediaItem.mimeType?.startsWith("image") == true },
                 videoCount = state.allItems.count { mediaItem -> mediaItem.mimeType?.startsWith("video") == true },
+                memeCount = state.memeCount,
+                duplicateCount = state.duplicateCount,
+                spamCount = state.spamCount,
                 onBack = { navController.popBackStack() }
             )
         }
