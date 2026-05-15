@@ -56,7 +56,7 @@ private val PrimaryBlue = Color(0xFF2F6FED)
 private val Border = Color(0xFFE5E7EB)
 
 @Composable
-fun SimpleHomeScreen(items: List<SimpleMediaItem>, onRefreshClick: () -> Unit, summaryInfo: String, isLoading: Boolean, currentFilter: MediaFilter, onFilterChange: (MediaFilter) -> Unit, remindersEnabled: Boolean, onRemindersToggle: (Boolean) -> Unit, memeCount: Int, spamCount: Int, junkCount: Int, duplicateCount: Int, isProUser: Boolean, onNavigateToSmartClean: () -> Unit, onNavigateToPhoneReality: () -> Unit, onNavigateToMemeAnalyzer: () -> Unit, onNavigateToMediaViewer: () -> Unit, onNavigateToJunk: () -> Unit, onNavigateToAnalytics: () -> Unit, onNavigateToSpam: () -> Unit, onNavigateToSettings: () -> Unit, onNavigateToDuplicates: () -> Unit, onBulkDeleteClick: () -> Unit, onUpgradeToPro: () -> Unit, onDeleteConfirmed: () -> Unit, onDeleteItemsRequested: (List<SimpleMediaItem>) -> Unit, onOpenInSystem: (SimpleMediaItem) -> Unit, onOpenSystemStorage: () -> Unit, pendingDeleteUris: Set<String>, isDeleteInProgress: Boolean, deleteSnackbarMessage: String?, onUndoDelete: () -> Unit, onDeleteSnackbarConsumed: () -> Unit, selectedFrequency: ReminderFreq, onFrequencyChange: (ReminderFreq) -> Unit, selectedTime: ReminderTime, allTimeOptions: List<ReminderTime>, onTimeChange: (ReminderTime) -> Unit, largeTodayCount: Int, largeTodaySizeText: String, screenshotTodayCount: Int, screenshotTodaySizeText: String, activeSuggestion: SuggestionType, onSuggestionChange: (SuggestionType) -> Unit, totalFiles: Int, totalSize: Long, oldFilesCount: Int, smartSuggestionSummary: SmartSuggestionSummary, smartSuggestedItems: List<SimpleMediaItem>, suggestionReasonsByUri: Map<String, List<String>>, scanUiState: ScanUiState, onNavigateToFeatures: () -> Unit, onAiFeatureClick: (AiFeature) -> Unit, onNavigateToPrivacyPolicy: () -> Unit, onNavigateToTerms: () -> Unit, onNavigateToAbout: () -> Unit, onNavigateToHelpFeedback: () -> Unit, onNavigateToScanHistory: () -> Unit, onNavigateToCleanupReceipt: () -> Unit, onNavigateToStorageOverview: () -> Unit) {
+fun SimpleHomeScreen(items: List<SimpleMediaItem>, onRefreshClick: () -> Unit, summaryInfo: String, isLoading: Boolean, currentFilter: MediaFilter, onFilterChange: (MediaFilter) -> Unit, remindersEnabled: Boolean, onRemindersToggle: (Boolean) -> Unit, memeCount: Int, spamCount: Int, junkCount: Int, duplicateCount: Int, isProUser: Boolean, onNavigateToSmartClean: () -> Unit, onNavigateToPhoneReality: () -> Unit, onNavigateToMemeAnalyzer: () -> Unit, onNavigateToMediaViewer: () -> Unit, onNavigateToJunk: () -> Unit, onNavigateToAnalytics: () -> Unit, onNavigateToSpam: () -> Unit, onNavigateToSettings: () -> Unit, onNavigateToDuplicates: () -> Unit, onBulkDeleteClick: () -> Unit, onUpgradeToPro: () -> Unit, onDeleteConfirmed: () -> Unit, onDeleteItemsRequested: (List<SimpleMediaItem>) -> Unit, onOpenInSystem: (SimpleMediaItem) -> Unit, onOpenSystemStorage: () -> Unit, pendingDeleteUris: Set<String>, isDeleteInProgress: Boolean, deleteSnackbarMessage: String?, onUndoDelete: () -> Unit, onDeleteSnackbarConsumed: () -> Unit, selectedFrequency: ReminderFreq, onFrequencyChange: (ReminderFreq) -> Unit, selectedTime: ReminderTime, allTimeOptions: List<ReminderTime>, onTimeChange: (ReminderTime) -> Unit, largeTodayCount: Int, largeTodaySizeText: String, screenshotTodayCount: Int, screenshotTodaySizeText: String, activeSuggestion: SuggestionType, onSuggestionChange: (SuggestionType) -> Unit, totalFiles: Int, totalSize: Long, oldFilesCount: Int, smartSuggestionSummary: SmartSuggestionSummary, smartSuggestedItems: List<SimpleMediaItem>, suggestionReasonsByUri: Map<String, List<String>>, scanUiState: ScanUiState, onNavigateToFeatures: () -> Unit, onAiFeatureClick: (AiFeature) -> Unit, onNavigateToPrivacyPolicy: () -> Unit, onNavigateToTerms: () -> Unit, onNavigateToAbout: () -> Unit, onNavigateToHelpFeedback: () -> Unit, onNavigateToScanHistory: () -> Unit, onNavigateToCleanupReceipt: () -> Unit, onNavigateToStorageOverview: () -> Unit, onNavigateToSmartReview: () -> Unit, onNavigateToMediaOverview: () -> Unit, onNavigateToDuplicateFinder: () -> Unit, onNavigateToLargeFiles: () -> Unit, onNavigateToOldMedia: () -> Unit, onNavigateToStatusCleaner: () -> Unit, onNavigateToMemesStickers: () -> Unit, onNavigateToBlurryImages: () -> Unit) {
     val drawerState = androidx.compose.material3.rememberDrawerState(androidx.compose.material3.DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     val hasScanSummary = totalFiles > 0 || totalSize > 0L
@@ -69,16 +69,18 @@ fun SimpleHomeScreen(items: List<SimpleMediaItem>, onRefreshClick: () -> Unit, s
                 scope.launch { drawerState.close() }
                 when (route) {
                     "home" -> Unit
-                    "smart_review" -> onNavigateToSmartClean()
+                    "smart_review" -> onNavigateToSmartReview()
                     "scan_again" -> onRefreshClick()
-                    "duplicate_finder" -> onNavigateToDuplicates()
-                    "large_files" -> onNavigateToJunk()
+                    "duplicate_finder" -> onNavigateToDuplicateFinder()
+                    "large_files" -> onNavigateToLargeFiles()
                     "old_media" -> onNavigateToSmartClean()
-                    "blurry_images" -> onNavigateToFeatures()
+                    "blurry_images" -> onNavigateToBlurryImages()
                     "scan_history" -> onNavigateToScanHistory()
                     "cleanup_receipt" -> onNavigateToCleanupReceipt()
                     "storage_overview" -> onNavigateToStorageOverview()
-                    "media_overview", "photos", "videos", "audio", "documents", "statuses", "stickers", "categories" -> onNavigateToMediaViewer()
+                    "media_overview", "photos", "videos", "audio", "documents", "statuses", "stickers", "categories" -> onNavigateToMediaOverview();
+                    "status_cleaner" -> onNavigateToStatusCleaner();
+                    "memes_stickers" -> onNavigateToMemesStickers()
                     "help_feedback" -> onNavigateToHelpFeedback()
                     "settings" -> onNavigateToSettings()
                     "privacy_policy" -> onNavigateToPrivacyPolicy()
@@ -155,13 +157,13 @@ fun SimpleHomeScreen(items: List<SimpleMediaItem>, onRefreshClick: () -> Unit, s
                 totalFiles = totalFiles,
                 totalSize = totalSize,
                 memeCount = memeCount,
-                onSmartReview = onNavigateToSmartClean,
-                onMedia = onNavigateToMediaViewer,
-                onDuplicates = onNavigateToDuplicates,
-                onLargeVideos = onNavigateToJunk,
-                onStatuses = onNavigateToMediaViewer,
-                onMemes = onNavigateToMemeAnalyzer,
-                onBlurry = onNavigateToFeatures,
+                onSmartReview = onNavigateToSmartReview,
+                onMedia = onNavigateToMediaOverview,
+                onDuplicates = onNavigateToDuplicateFinder,
+                onLargeVideos = onNavigateToLargeFiles,
+                onStatuses = onNavigateToStatusCleaner,
+                onMemes = onNavigateToMemesStickers,
+                onBlurry = onNavigateToBlurryImages,
                 onScanHistory = onNavigateToScanHistory
             )
         }
