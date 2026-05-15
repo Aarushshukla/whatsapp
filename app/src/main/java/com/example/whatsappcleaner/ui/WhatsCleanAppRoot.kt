@@ -67,6 +67,10 @@ import com.example.whatsappcleaner.ui.home.PolishedSmartCleanScreen
 import com.example.whatsappcleaner.ui.home.PremiumFeature
 import com.example.whatsappcleaner.ui.home.ScanUiState
 import com.example.whatsappcleaner.ui.home.SimpleHomeScreen
+import com.example.whatsappcleaner.ui.home.MediaOverviewScreen
+import com.example.whatsappcleaner.ui.home.DashboardMediaBucket
+import com.example.whatsappcleaner.ui.home.DashboardSubScreen
+import com.example.whatsappcleaner.ui.home.SimpleStatRow
 import com.example.whatsappcleaner.ui.home.PermissionIntroScreen
 import com.example.whatsappcleaner.ui.home.CheckSuccessScreen
 import com.example.whatsappcleaner.ui.home.ScanIntroScreen
@@ -117,6 +121,18 @@ private object Routes {
     const val AiBlurryPhotos = "ai_blurry_photos"
     const val AiScreenshotsCleaner = "ai_screenshots_cleaner"
     const val AiSpamDetector = "ai_spam_detector"
+    const val SmartReview = "smart_review"
+    const val MediaOverview = "media_overview"
+    const val DuplicateFinder = "duplicate_finder"
+    const val LargeFiles = "large_files"
+    const val OldMedia = "old_media"
+    const val StatusCleaner = "status_cleaner"
+    const val MemesStickers = "memes_stickers"
+    const val BlurryImages = "blurry_images"
+    const val ScanHistory = "scan_history"
+    const val CleanupReceipt = "cleanup_receipt"
+    const val StorageOverview = "storage_overview"
+    const val HelpFeedback = "help_feedback"
 }
 
 @Composable
@@ -391,7 +407,19 @@ fun WhatsCleanAppRoot(
                 },
                 onNavigateToPrivacyPolicy = { navController.navigateSingleTop(Routes.PrivacyPolicy) },
                 onNavigateToTerms = { navController.navigateSingleTop(Routes.Terms) },
-                onNavigateToAbout = { navController.navigateSingleTop(Routes.About) }
+                onNavigateToAbout = { navController.navigateSingleTop(Routes.About) },
+                onNavigateToHelpFeedback = { navController.navigateSingleTop(Routes.HelpFeedback) },
+                onNavigateToScanHistory = { navController.navigateSingleTop(Routes.ScanHistory) },
+                onNavigateToCleanupReceipt = { navController.navigateSingleTop(Routes.CleanupReceipt) },
+                onNavigateToStorageOverview = { navController.navigateSingleTop(Routes.StorageOverview) },
+                onNavigateToSmartReview = { navController.navigateSingleTop(Routes.SmartReview) },
+                onNavigateToMediaOverview = { navController.navigateSingleTop(Routes.MediaOverview) },
+                onNavigateToDuplicateFinder = { navController.navigateSingleTop(Routes.DuplicateFinder) },
+                onNavigateToLargeFiles = { navController.navigateSingleTop(Routes.LargeFiles) },
+                onNavigateToOldMedia = { navController.navigateSingleTop(Routes.OldMedia) },
+                onNavigateToStatusCleaner = { navController.navigateSingleTop(Routes.StatusCleaner) },
+                onNavigateToMemesStickers = { navController.navigateSingleTop(Routes.MemesStickers) },
+                onNavigateToBlurryImages = { navController.navigateSingleTop(Routes.BlurryImages) }
             )
         }
 
@@ -584,6 +612,41 @@ fun WhatsCleanAppRoot(
                 onBack = { navController.popBackStack() }
             )
         }
+
+        composable(Routes.SmartReview) {
+            DashboardSubScreen("Smart Review", "Best first cleanup suggestions", onBack = { navController.popBackStack() }) {
+                SimpleStatRow("Suggested cleanup", com.example.whatsappcleaner.data.local.formatSize(state.smartSuggestionSummary.totalSpaceToFree))
+                SimpleStatRow("Suggested files", state.smartSuggestionSummary.totalSuggestedFiles.toString())
+                Spacer(Modifier.height(8.dp))
+                Button(onClick = { navController.navigateSingleTop(Routes.SmartClean) }, modifier = Modifier.fillMaxWidth()) { Text("Review suggested files") }
+            }
+        }
+
+        composable(Routes.MediaOverview) {
+            val total = state.totalSize.coerceAtLeast(1L)
+            val buckets = listOf(
+                DashboardMediaBucket("Photos", state.allItems.count{it.mimeType?.startsWith("image")==true}, state.allItems.filter{it.mimeType?.startsWith("image")==true}.sumOf{it.size}, ((state.allItems.filter{it.mimeType?.startsWith("image")==true}.sumOf{it.size}*100)/total).toInt()),
+                DashboardMediaBucket("Videos", state.allItems.count{it.mimeType?.startsWith("video")==true}, state.allItems.filter{it.mimeType?.startsWith("video")==true}.sumOf{it.size}, ((state.allItems.filter{it.mimeType?.startsWith("video")==true}.sumOf{it.size}*100)/total).toInt()),
+                DashboardMediaBucket("Audio", state.allItems.count{it.mimeType?.startsWith("audio")==true}, state.allItems.filter{it.mimeType?.startsWith("audio")==true}.sumOf{it.size}, ((state.allItems.filter{it.mimeType?.startsWith("audio")==true}.sumOf{it.size}*100)/total).toInt()),
+                DashboardMediaBucket("Documents", state.allItems.count{it.mimeType?.contains("pdf")==true || it.mimeType?.contains("text")==true}, state.allItems.filter{it.mimeType?.contains("pdf")==true || it.mimeType?.contains("text")==true}.sumOf{it.size}, 0),
+                DashboardMediaBucket("Statuses", state.sentFileItems.size, state.sentFileItems.sumOf{it.size}, 0),
+                DashboardMediaBucket("Stickers", state.memeItems.size, state.memeItems.sumOf{it.size}, 0),
+                DashboardMediaBucket("Other", state.allItems.size, state.totalSize, 100)
+            )
+            MediaOverviewScreen(items = buckets, onBack = { navController.popBackStack() }, onOpen = { navController.navigateSingleTop(Routes.MediaViewer) })
+        }
+
+        composable(Routes.DuplicateFinder) { DashboardSubScreen("Duplicate Finder","Repeated photos and videos",{navController.popBackStack()}) { SimpleStatRow("Duplicates", state.duplicateItems.size.toString()); SimpleStatRow("Cleanup potential", com.example.whatsappcleaner.data.local.formatSize(state.duplicateItems.sumOf{it.size})); Text("Best copy is kept by recency and quality.", color = MaterialTheme.colorScheme.onSurfaceVariant); Button(onClick={navController.navigateSingleTop(Routes.SmartClean)}, modifier=Modifier.fillMaxWidth()){Text("Review duplicates")} } }
+        composable(Routes.LargeFiles) { DashboardSubScreen("Large Files", "Big files with high impact", { navController.popBackStack() }) { SimpleStatRow("Large files", state.largeFileItems.size.toString()); SimpleStatRow("Total size", com.example.whatsappcleaner.data.local.formatSize(state.largeFileItems.sumOf{it.size})); Button(onClick={navController.navigateSingleTop(Routes.AiLargeFilesFinder)}, modifier=Modifier.fillMaxWidth()){Text("Review large files")} } }
+        composable(Routes.OldMedia) { DashboardSubScreen("Old Media", "Review older media by age", { navController.popBackStack() }) { SimpleStatRow("Old media", state.oldFileItems.size.toString()); SimpleStatRow("Total size", com.example.whatsappcleaner.data.local.formatSize(state.oldFileItems.sumOf{it.size})); Button(onClick={navController.navigateSingleTop(Routes.AiOldMediaCleaner)}, modifier=Modifier.fillMaxWidth()){Text("Review old media")} } }
+        composable(Routes.StatusCleaner) { DashboardSubScreen("Status Cleaner", "Old temporary status files", { navController.popBackStack() }) { SimpleStatRow("Statuses", state.sentFileItems.size.toString()); SimpleStatRow("Size", com.example.whatsappcleaner.data.local.formatSize(state.sentFileItems.sumOf{it.size})); Text("Review before deleting", color = MaterialTheme.colorScheme.onSurfaceVariant); Button(onClick={navController.navigateSingleTop(Routes.MediaViewer)}, modifier=Modifier.fillMaxWidth()){Text("Review statuses")} } }
+        composable(Routes.MemesStickers) { DashboardSubScreen("Memes & Stickers", "Forwarded and low-value media", { navController.popBackStack() }) { SimpleStatRow("Items", state.memeItems.size.toString()); SimpleStatRow("Size", com.example.whatsappcleaner.data.local.formatSize(state.memeItems.sumOf{it.size})); Button(onClick={navController.navigateSingleTop(Routes.AiMemeCleaner)}, modifier=Modifier.fillMaxWidth()){Text("Review memes & stickers")} } }
+        composable(Routes.BlurryImages) { DashboardSubScreen("Blurry Images", "Low-quality images to review", { navController.popBackStack() }) { SimpleStatRow("Blurry images", state.blurryImageItems.size.toString()); SimpleStatRow("Estimated size", com.example.whatsappcleaner.data.local.formatSize(state.blurryImageItems.sumOf{it.size})); Button(onClick={navController.navigateSingleTop(Routes.AiBlurryPhotos)}, modifier=Modifier.fillMaxWidth()){Text("Review blurry images")} } }
+        composable(Routes.ScanHistory) { DashboardSubScreen("Scan History", "Previous scans and trends", { navController.popBackStack() }) { if (state.totalSize>0L){ SimpleStatRow("Last scan", state.summaryInfo); SimpleStatRow("Scanned size", com.example.whatsappcleaner.data.local.formatSize(state.totalSize)); SimpleStatRow("Potential cleanup", com.example.whatsappcleaner.data.local.formatSize(state.smartSuggestionSummary.totalSpaceToFree)); } else { Text("No scan history yet"); Text("Run your first scan to see storage trends.", color = MaterialTheme.colorScheme.onSurfaceVariant) } } }
+        composable(Routes.CleanupReceipt) { DashboardSubScreen("Last Cleanup Receipt", "Recent cleanup summary", { navController.popBackStack() }) { SimpleStatRow("Cleaned amount", com.example.whatsappcleaner.data.local.formatSize(state.lastCleanupBytes)); SimpleStatRow("Deleted files", "See delete confirmations"); if(state.lastCleanupBytes==0L) Text("No cleanup yet
+Review and delete files to see your cleanup receipt here.", color = MaterialTheme.colorScheme.onSurfaceVariant) } }
+        composable(Routes.StorageOverview) { DashboardSubScreen("Storage Overview", "Chat media footprint", { navController.popBackStack() }) { SimpleStatRow("Total chat media", com.example.whatsappcleaner.data.local.formatSize(state.totalSize)); SimpleStatRow("Potential cleanup", com.example.whatsappcleaner.data.local.formatSize(state.smartSuggestionSummary.totalSpaceToFree)); SimpleStatRow("File count", state.totalFiles.toString()) } }
+        composable(Routes.HelpFeedback) { DashboardSubScreen("Help & Feedback", "Quick answers", { navController.popBackStack() }) { listOf("How does scanning work?","Why is media access needed?","Does ChatSweep upload files?","How does deletion work?").forEach{ Text("• $it", color = MaterialTheme.colorScheme.onSurface) } } }
 
         composable(Routes.Paywall) {
             // TODO: RE-ENABLE SUBSCRIPTION LATER
