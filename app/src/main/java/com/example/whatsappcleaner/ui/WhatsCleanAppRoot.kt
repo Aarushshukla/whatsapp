@@ -66,6 +66,7 @@ import com.example.whatsappcleaner.ui.home.MemeAnalyzerScreen
 import com.example.whatsappcleaner.ui.home.PolishedSmartCleanScreen
 import com.example.whatsappcleaner.ui.home.PremiumFeature
 import com.example.whatsappcleaner.ui.home.ScanUiState
+import com.example.whatsappcleaner.ui.home.ScanHistoryPlaceholderScreen
 import com.example.whatsappcleaner.ui.home.SimpleHomeScreen
 import com.example.whatsappcleaner.ui.home.PermissionIntroScreen
 import com.example.whatsappcleaner.ui.home.CheckSuccessScreen
@@ -101,6 +102,7 @@ private object Routes {
     const val Spam = "spam_screen"
     const val MediaViewer = "media_viewer"
     const val Features = "features"
+    const val ScanHistory = "scan_history"
     const val WhatsAppCleaner = "whatsapp_cleaner"
     const val ScreenshotsCleaner = "screenshots_cleaner"
     const val Paywall = "paywall"
@@ -369,6 +371,7 @@ fun WhatsCleanAppRoot(
                 suggestionReasonsByUri = state.suggestionReasonsByUri,
                 scanUiState = scanUiState,
                 onNavigateToFeatures = { navController.navigateSingleTop(Routes.Features) },
+                onNavigateToScanHistory = { navController.navigateSingleTop(Routes.ScanHistory) },
                 onAiFeatureClick = { feature ->
                     if (true) {
                         onAiToolOpened(feature)
@@ -393,6 +396,11 @@ fun WhatsCleanAppRoot(
                 onNavigateToTerms = { navController.navigateSingleTop(Routes.Terms) },
                 onNavigateToAbout = { navController.navigateSingleTop(Routes.About) }
             )
+        }
+
+
+        composable(Routes.ScanHistory) {
+            ScanHistoryPlaceholderScreen(onBack = { navController.popBackStack() })
         }
 
         composable(Routes.Features) {
