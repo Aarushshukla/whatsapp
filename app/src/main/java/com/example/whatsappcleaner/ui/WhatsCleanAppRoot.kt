@@ -329,7 +329,10 @@ if (state.isLoading && state.filteredItems.isEmpty() && state.permissionGranted)
                     } else {
                         navController.navigateSingleTop(Routes.Paywall)
                     }
-                }
+                },
+                onNavigateToPrivacyPolicy = { navController.navigateSingleTop(Routes.PrivacyPolicy) },
+                onNavigateToTerms = { navController.navigateSingleTop(Routes.Terms) },
+                onNavigateToAbout = { navController.navigateSingleTop(Routes.About) }
             )
         }
 
