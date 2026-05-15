@@ -14,67 +14,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
 @Composable
-fun AboutScreen(
-    modifier: Modifier = Modifier,
-    onBack: () -> Unit = {}
-) {
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(20.dp)
-    ) {
-        TextButton(onClick = onBack) {
-            Text(text = "Back")
-        }
-
-        Text(
-            text = "About WhatsApp Cleaner",
-            style = MaterialTheme.typography.headlineSmall,
-            modifier = Modifier.padding(top = 8.dp, bottom = 12.dp)
-        )
-
-        Text(
-            text = "WhatsApp Cleaner helps you quickly find bulky, duplicate, and low-value media so you can free storage without losing important memories.",
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.padding(bottom = 16.dp)
-        )
-
-        SectionTitle("Privacy-first")
-        Text(
-            text = "Your media scan runs locally on your device. The app is designed so you can review results before deleting anything.",
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.padding(bottom = 12.dp)
-        )
-
-        SectionTitle("Safe deletion")
-        Text(
-            text = "You stay in control of cleanup decisions. Files are selected by you, and destructive actions are always explicit.",
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.padding(bottom = 12.dp)
-        )
-
-        SectionTitle("Purpose")
-        Text(
-            text = "The goal is simple: reduce storage stress, speed up your gallery experience, and keep chat media organized with minimal effort.",
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.padding(bottom = 12.dp)
-        )
-
-        SectionTitle("Developer & contact")
-        Text(
-            text = "Built for users who want cleaner chat storage habits. For support or feedback, use the Contact Support option from Settings.",
-            style = MaterialTheme.typography.bodyMedium
-        )
+fun AboutScreen(modifier: Modifier = Modifier,onBack: () -> Unit = {}, versionLabel: String = "") {
+    Column(modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp)) {
+        TextButton(onClick = onBack) { Text("Back") }
+        Text("About ChatSweep", style = MaterialTheme.typography.headlineSmall)
+        Text("Private offline media cleaner")
+        if (versionLabel.isNotBlank()) Text("Version: $versionLabel")
+        Text("This app is not affiliated with, endorsed by, or sponsored by WhatsApp LLC or Meta Platforms, Inc.", fontWeight = FontWeight.SemiBold)
     }
-}
-
-@Composable
-private fun SectionTitle(text: String) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.titleMedium,
-        fontWeight = FontWeight.SemiBold,
-        modifier = Modifier.padding(bottom = 6.dp)
-    )
 }
