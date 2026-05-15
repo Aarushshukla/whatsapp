@@ -19,6 +19,7 @@ data class SimpleMediaItem(
     val mediaType: String,
     val width: Int? = null,
     val height: Int? = null,
+    val durationMillis: Long? = null,
     val bucketName: String? = null,
     val modifiedMillis: Long = addedMillis
 ) {
@@ -76,7 +77,8 @@ class MediaLoader(private val context: Context) {
             MediaStore.MediaColumns.MIME_TYPE,
             MediaStore.MediaColumns.WIDTH,
             MediaStore.MediaColumns.HEIGHT,
-            MediaStore.MediaColumns.BUCKET_DISPLAY_NAME
+            MediaStore.MediaColumns.BUCKET_DISPLAY_NAME,
+            MediaStore.Video.VideoColumns.DURATION
         )
 
         val selection = "${MediaStore.MediaColumns.SIZE} > 0 AND ${MediaStore.MediaColumns.DATE_ADDED} BETWEEN ? AND ?"
@@ -102,6 +104,7 @@ class MediaLoader(private val context: Context) {
                 val widthCol = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.WIDTH)
                 val heightCol = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.HEIGHT)
                 val bucketCol = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.BUCKET_DISPLAY_NAME)
+                val durationCol = cursor.getColumnIndex(MediaStore.Video.VideoColumns.DURATION)
 
                 while (cursor.moveToNext()) {
                     val id = cursor.getLong(idCol)
@@ -117,6 +120,7 @@ class MediaLoader(private val context: Context) {
                     val width = cursor.getInt(widthCol).takeIf { it > 0 }
                     val height = cursor.getInt(heightCol).takeIf { it > 0 }
                     val bucketName = cursor.getString(bucketCol)
+                    val durationMillis = if (durationCol >= 0) cursor.getLong(durationCol).takeIf { it > 0L } else null
                     val uri = ContentUris.withAppendedId(collectionUri, id)
                     if (!uri.toString().startsWith("content://media/")) {
                         Log.w(TAG, "Skipping non-MediaStore URI built from _ID=$id: $uri")
@@ -134,6 +138,7 @@ class MediaLoader(private val context: Context) {
                             mediaType = mediaType,
                             width = width,
                             height = height,
+                            durationMillis = durationMillis,
                             bucketName = bucketName,
                             modifiedMillis = modifiedSec * 1000
                         )

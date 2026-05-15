@@ -162,8 +162,8 @@ fun WhatsCleanAppRoot(
     var permissionJustGranted by rememberSaveable { mutableStateOf(false) }
     var previousPermissionGranted by rememberSaveable { mutableStateOf(state.permissionGranted) }
     var hasSeenPermissionSuccess by rememberSaveable { mutableStateOf(prefs.hasSeenPermissionSuccess()) }
-    val hasCompletedFirstScan = remember { prefs.isFirstScanCompleted() }
-    val hasCompletedOnboarding = remember { prefs.hasCompletedOnboarding() }
+    var hasCompletedFirstScan by rememberSaveable { mutableStateOf(prefs.isFirstScanCompleted()) }
+    var hasCompletedOnboarding by rememberSaveable { mutableStateOf(prefs.hasCompletedOnboarding()) }
 
     LaunchedEffect(state.permissionGranted) {
         permissionJustGranted = !previousPermissionGranted && state.permissionGranted && !hasSeenPermissionSuccess
@@ -206,6 +206,8 @@ fun WhatsCleanAppRoot(
         CheckSuccessScreen("Your scan is finished!", msg, "CONTINUE") {
             prefs.setFirstScanCompleted(true)
             prefs.setCompletedOnboarding(true)
+            hasCompletedFirstScan = true
+            hasCompletedOnboarding = true
             firstScanFinishedShown = true
         }
         return

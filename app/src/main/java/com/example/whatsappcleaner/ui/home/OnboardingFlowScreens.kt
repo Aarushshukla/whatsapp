@@ -135,7 +135,10 @@ fun ScanProgressScreen(scanUiState: ScanUiState) {
         if (!isLoading) {
             visualProgress = 1f
         } else {
-            visualProgress = maxOf(realProgress, (visualProgress + 0.06f).coerceAtMost(0.9f))
+            while (isLoading) {
+                visualProgress = maxOf(realProgress, (visualProgress + 0.02f).coerceAtMost(0.9f))
+                kotlinx.coroutines.delay(120)
+            }
         }
     }
     val animatedProgress by animateFloatAsState(

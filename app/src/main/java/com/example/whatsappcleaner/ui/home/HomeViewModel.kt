@@ -30,6 +30,7 @@ import com.example.whatsappcleaner.ui.settings.AppThemeMode
 import com.example.whatsappcleaner.ui.settings.ReminderFrequencyOption
 import com.example.whatsappcleaner.ui.settings.SettingsUiState
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -181,6 +182,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     val scanUiState: StateFlow<ScanUiState> = _scanUiState.asStateFlow()
     private var hasLoadedInitialCache = false
     private var refreshInProgress = false
+    private var scanJob: Job? = null
 
     private data class MediaComputation(
         val allItems: List<SimpleMediaItem>,
@@ -256,12 +258,12 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     fun refreshMedia(forceRefresh: Boolean = false, showLoading: Boolean = true) {
         if (!_uiState.value.permissionGranted) return
+        if (scanJob?.isActive == true || refreshInProgress) {
+            Log.d(TAG, "Skipping refresh request because a scan is already in progress.")
+            return
+        }
         Log.d("SCAN", "Scan started")
-        viewModelScope.launch(Dispatchers.IO) {
-            if (refreshInProgress) {
-                Log.d(TAG, "Skipping refresh request because a scan is already in progress.")
-                return@launch
-            }
+        scanJob = viewModelScope.launch(Dispatchers.IO) {
             if (hasLoadedInitialCache && !forceRefresh && _uiState.value.allItems.isNotEmpty()) {
                 Log.d(TAG, "Using cached media list; skipping full rescan.")
                 withContext(Dispatchers.Main) {
@@ -287,33 +289,26 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             }
             try {
                 val allItems = runCatching {
-                    val images = mediaLoader.loadAllDeviceMedia("image", limit = INITIAL_LOAD_LIMIT)
-                    val videos = mediaLoader.loadAllDeviceMedia("video", limit = INITIAL_LOAD_LIMIT)
-                    val initialItems = (images + videos).sortedByDescending { mediaItem -> mediaItem.addedMillis }
+                    val images = mediaLoader.loadAllDeviceMedia("image")
+                    val videos = mediaLoader.loadAllDeviceMedia("video")
                     _scanUiState.value = ScanUiState.Loading("Finding duplicates", 0.3f)
-                    if (showLoading) {
-                        ensureMinimumLoadingDuration(loadStartedAt)
-                    }
-                    applyLoadedMediaState(initialItems)
-                    hasLoadedInitialCache = true
-
-                    val fullImages = mediaLoader.loadAllDeviceMedia("image")
-                    val fullVideos = mediaLoader.loadAllDeviceMedia("video")
+                    val loadedItems = (images + videos).sortedByDescending { mediaItem -> mediaItem.addedMillis }
+                    if (showLoading) ensureMinimumLoadingDuration(loadStartedAt)
                     _scanUiState.value = ScanUiState.Loading("Checking large videos", 0.5f)
-                    val loadedItems = (fullImages + fullVideos).sortedByDescending { mediaItem -> mediaItem.addedMillis }
-                    Log.d("FILES", "Files found: ${loadedItems.size}")
+                    applyLoadedMediaState(loadedItems)
                     _scanUiState.value = ScanUiState.Loading("Detecting old media", 0.7f)
-
-                    if (loadedItems.size != initialItems.size) {
-                        applyLoadedMediaState(loadedItems)
-                    }
                     _scanUiState.value = ScanUiState.Loading("Finding statuses and stickers", 0.85f)
                     _scanUiState.value = ScanUiState.Loading("Preparing results", 0.97f)
                     loadedItems
-                }.getOrElse { initialItemsOrEmpty ->
-                    Log.w(TAG, "Large scan paused. Showing results found so far.", initialItemsOrEmpty)
-                    _scanUiState.value = ScanUiState.Loading("Still scanning large media folders…", 0.9f)
-                    _uiState.value.allItems.ifEmpty { emptyList() }
+                }.getOrElse { scanError ->
+                    Log.w(TAG, "Large scan paused. Showing results found so far.", scanError)
+                    val partial = _uiState.value.allItems
+                    if (partial.isNotEmpty()) {
+                        _scanUiState.value = ScanUiState.Loading("Still scanning large media folders…", 0.9f)
+                        partial
+                    } else {
+                        throw scanError
+                    }
                 }
                 _scanUiState.value = if (allItems.isEmpty()) ScanUiState.Empty else ScanUiState.Success(
                     "Found ${allItems.size} files (${formatSize(allItems.sumOf { it.sizeKb.toLong() * 1024L })})"
@@ -359,9 +354,25 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                         currentState.copy(summaryInfo = "Scan failed: ${error.message ?: "Unknown error"}", isLoading = false)
                     }
                 }
-                _scanUiState.value = ScanUiState.Error(error.message ?: "Unknown error")
+                val partial = _uiState.value.allItems
+                if (partial.isNotEmpty()) {
+                    _scanUiState.value = ScanUiState.Success(
+                        "Found ${partial.size} files (${formatSize(partial.sumOf { it.sizeKb.toLong() * 1024L })})"
+                    )
+                } else {
+                    _scanUiState.value = ScanUiState.Error(error.message ?: "Large scan paused. Please try again.")
+                }
             } finally {
                 refreshInProgress = false
+                if (_scanUiState.value is ScanUiState.Loading) {
+                    _scanUiState.value = if (_uiState.value.allItems.isEmpty()) {
+                        ScanUiState.Empty
+                    } else {
+                        ScanUiState.Success(
+                            "Found ${_uiState.value.allItems.size} files (${formatSize(_uiState.value.allItems.sumOf { it.sizeKb.toLong() * 1024L })})"
+                        )
+                    }
+                }
             }
         }
     }
