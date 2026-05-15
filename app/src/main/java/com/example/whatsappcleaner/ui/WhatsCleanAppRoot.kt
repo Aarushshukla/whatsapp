@@ -21,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -76,6 +77,19 @@ import com.example.whatsappcleaner.ui.paywall.PaywallScreen
 import com.example.whatsappcleaner.ui.settings.AppThemeMode
 import com.example.whatsappcleaner.ui.settings.ReminderFrequencyOption
 import com.example.whatsappcleaner.ui.settings.SettingsScreen
+
+
+private enum class OnboardingRoute {
+    Resolving,
+    PermissionRequired,
+    PermissionGrantedSuccess,
+    FirstScanIntro,
+    Scanning,
+    ScanFinished,
+    Dashboard,
+    Empty,
+    Error
+}
 
 private object Routes {
     const val Home = "home"
@@ -162,53 +176,99 @@ fun WhatsCleanAppRoot(
     var permissionJustGranted by rememberSaveable { mutableStateOf(false) }
     var previousPermissionGranted by rememberSaveable { mutableStateOf(state.permissionGranted) }
     var hasSeenPermissionSuccess by rememberSaveable { mutableStateOf(prefs.hasSeenPermissionSuccess()) }
-    val hasCompletedFirstScan = remember { prefs.isFirstScanCompleted() }
-    val hasCompletedOnboarding = remember { prefs.hasCompletedOnboarding() }
+    var hasCompletedFirstScan by rememberSaveable { mutableStateOf(prefs.isFirstScanCompleted()) }
+    var hasCompletedOnboarding by rememberSaveable { mutableStateOf(prefs.hasCompletedOnboarding()) }
+    var onboardingRoute by rememberSaveable { mutableStateOf(OnboardingRoute.Resolving) }
+    var scanLaunchInFlight by rememberSaveable { mutableStateOf(false) }
+
+    LaunchedEffect(state.permissionGranted, permissionJustGranted, hasSeenPermissionSuccess, hasCompletedFirstScan, hasCompletedOnboarding, scanUiState, firstScanFinishedShown) {
+        onboardingRoute = when {
+            !state.permissionGranted -> OnboardingRoute.PermissionRequired
+            permissionJustGranted -> OnboardingRoute.PermissionGrantedSuccess
+            scanUiState is ScanUiState.Loading -> OnboardingRoute.Scanning
+            scanUiState is ScanUiState.Success && !hasCompletedFirstScan && !hasCompletedOnboarding && !firstScanFinishedShown -> OnboardingRoute.ScanFinished
+            !hasCompletedFirstScan && !hasCompletedOnboarding -> OnboardingRoute.FirstScanIntro
+            scanUiState is ScanUiState.Error -> OnboardingRoute.Error
+            state.filteredItems.isEmpty() -> OnboardingRoute.Empty
+            else -> OnboardingRoute.Dashboard
+        }
+    }
 
     LaunchedEffect(state.permissionGranted) {
-        permissionJustGranted = !previousPermissionGranted && state.permissionGranted && !hasSeenPermissionSuccess
-        previousPermissionGranted = state.permissionGranted
+        val nowGranted = state.permissionGranted
+        if (!previousPermissionGranted && nowGranted && !hasSeenPermissionSuccess) {
+            permissionJustGranted = true
+        }
+        if (!nowGranted) {
+            permissionJustGranted = false
+        }
+        previousPermissionGranted = nowGranted
     }
 
-    if (!state.permissionGranted) {
-        permissionJustGranted = false
-        PermissionIntroScreen(
-            onAllow = onRequestPermission,
-            onTryAgain = onRequestPermission,
-            onOpenSettings = onOpenAppSettings,
-            message = if (scanUiState is ScanUiState.Error) "Storage access is needed to scan chat media." else null
-        )
-        return
-    }
-    if (permissionJustGranted) {
-        AnimatedContent(targetState = "great", transitionSpec = {
-            (slideInHorizontally(animationSpec = tween(300)) + fadeIn(animationSpec = tween(280))) togetherWith
-                (slideOutHorizontally(animationSpec = tween(300)) + fadeOut(animationSpec = tween(220)))
-        }, label = "permission_great_transition") {
-            CheckSuccessScreen("Great", "Storage access is ready.", "CONTINUE") {
-                permissionJustGranted = false
-                prefs.setSeenPermissionSuccess(true)
-                hasSeenPermissionSuccess = true
+    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+        when (onboardingRoute) {
+            OnboardingRoute.Resolving -> {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+                return@Surface
             }
+            OnboardingRoute.PermissionRequired -> {
+                PermissionIntroScreen(
+                    onAllow = onRequestPermission,
+                    onTryAgain = onRequestPermission,
+                    onOpenSettings = onOpenAppSettings,
+                    message = if (scanUiState is ScanUiState.Error) "Storage access is needed to scan chat media." else null
+                )
+                return@Surface
+            }
+            OnboardingRoute.PermissionGrantedSuccess -> {
+                AnimatedContent(targetState = "great", transitionSpec = {
+                    (slideInHorizontally(animationSpec = tween(300)) + fadeIn(animationSpec = tween(280))) togetherWith
+                        (slideOutHorizontally(animationSpec = tween(300)) + fadeOut(animationSpec = tween(220)))
+                }, label = "permission_great_transition") {
+                    CheckSuccessScreen("Great", "Storage access is ready.", "CONTINUE") {
+                        permissionJustGranted = false
+                        prefs.setSeenPermissionSuccess(true)
+                        hasSeenPermissionSuccess = true
+                        hasCompletedFirstScan = prefs.isFirstScanCompleted()
+                        hasCompletedOnboarding = prefs.hasCompletedOnboarding()
+                    }
+                }
+                return@Surface
+            }
+            OnboardingRoute.FirstScanIntro -> {
+                ScanIntroScreen(
+                    onScan = {
+                        if (!(scanLaunchInFlight || scanUiState is ScanUiState.Loading)) {
+                            scanLaunchInFlight = true
+                            onboardingRoute = OnboardingRoute.Scanning
+                            onAiScanClick()
+                        }
+                    },
+                    scanning = scanUiState is ScanUiState.Loading || scanLaunchInFlight
+                )
+                return@Surface
+            }
+            OnboardingRoute.Scanning -> {
+                scanLaunchInFlight = false
+                ScanProgressScreen(scanUiState)
+                return@Surface
+            }
+            OnboardingRoute.ScanFinished -> {
+                scanLaunchInFlight = false
+                val msg = if (state.totalSize > 0L) "You can review ${com.example.whatsappcleaner.data.local.formatSize(state.totalSize)}" else "Your results are ready"
+                CheckSuccessScreen("Your scan is finished!", msg, "CONTINUE") {
+                    prefs.setFirstScanCompleted(true)
+                    prefs.setCompletedOnboarding(true)
+                    hasCompletedFirstScan = true
+                    hasCompletedOnboarding = true
+                    firstScanFinishedShown = true
+                }
+                return@Surface
+            }
+            OnboardingRoute.Empty, OnboardingRoute.Error, OnboardingRoute.Dashboard -> Unit
         }
-        return
-    }
-    if (hasSeenPermissionSuccess && !hasCompletedFirstScan && !hasCompletedOnboarding && scanUiState !is ScanUiState.Loading && scanUiState !is ScanUiState.Success) {
-        ScanIntroScreen(onScan = onAiScanClick, scanning = scanUiState is ScanUiState.Loading)
-        return
-    }
-    if (scanUiState is ScanUiState.Loading) {
-        ScanProgressScreen(scanUiState)
-        return
-    }
-    if (scanUiState is ScanUiState.Success && !hasCompletedFirstScan && !hasCompletedOnboarding && !firstScanFinishedShown) {
-        val msg = if (state.totalSize > 0L) "You can review ${com.example.whatsappcleaner.data.local.formatSize(state.totalSize)}" else "Your results are ready"
-        CheckSuccessScreen("Your scan is finished!", msg, "CONTINUE") {
-            prefs.setFirstScanCompleted(true)
-            prefs.setCompletedOnboarding(true)
-            firstScanFinishedShown = true
-        }
-        return
     }
 if (state.isLoading && state.filteredItems.isEmpty() && state.permissionGranted) {
         LoadingScreen(modifier = modifier)
