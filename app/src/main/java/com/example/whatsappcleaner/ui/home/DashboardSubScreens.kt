@@ -8,6 +8,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material3.Icon
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -37,7 +38,38 @@ fun DashboardSubScreen(title:String, subtitle:String, onBack:()->Unit, content:@
 fun SimpleStatRow(label:String, value:String){ Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween){ Text(label,color=SecondaryText); Text(value,color=MainText,fontWeight=FontWeight.Medium) } }
 
 @Composable
-fun ListNavRow(label:String, meta:String, onClick:()->Unit){ Card(onClick=onClick, colors=CardDefaults.cardColors(containerColor=CardBg)){ Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween){ Column(Modifier.weight(1f)){ Text(label,color=MainText,fontWeight=FontWeight.SemiBold); Text(meta,color=SecondaryText, style=MaterialTheme.typography.bodySmall)} Icon(Icons.Default.ChevronRight,null,tint=PrimaryBlue)}} }
+fun ListNavRow(label:String, meta:String, onClick:()->Unit){
+    Card(
+        onClick = onClick,
+        colors = CardDefaults.cardColors(containerColor = CardBg)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = label,
+                    color = MainText,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = meta,
+                    color = SecondaryText,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+            Icon(
+                imageVector = Icons.Default.ChevronRight,
+                contentDescription = null,
+                tint = PrimaryBlue
+            )
+        }
+    }
+}
 
 @Composable
 fun MediaOverviewScreen(items: List<DashboardMediaBucket>, onBack:()->Unit, onOpen:(String)->Unit){
