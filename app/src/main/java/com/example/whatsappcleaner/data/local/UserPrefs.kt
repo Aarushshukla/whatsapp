@@ -179,7 +179,8 @@ class UserPrefs private constructor(context: Context) {
     data class CachedCategorySummary(
         val title: String,
         val count: Int,
-        val sizeBytes: Long
+        val sizeBytes: Long,
+        val percent: Float = 0f
     )
 
     fun setLastScanCompletedAt(timestamp: Long) = prefs.edit().putLong(KEY_LAST_SCAN_COMPLETED_AT, timestamp).apply()
@@ -197,6 +198,7 @@ class UserPrefs private constructor(context: Context) {
                         put("title", category.title)
                         put("count", category.count)
                         put("sizeBytes", category.sizeBytes)
+                        put("percent", category.percent)
                     })
                 }
             })
@@ -216,7 +218,8 @@ class UserPrefs private constructor(context: Context) {
                         CachedCategorySummary(
                             title = item.optString("title"),
                             count = item.optInt("count"),
-                            sizeBytes = item.optLong("sizeBytes")
+                            sizeBytes = item.optLong("sizeBytes"),
+                            percent = item.optDouble("percent", 0.0).toFloat()
                         )
                     )
                 }

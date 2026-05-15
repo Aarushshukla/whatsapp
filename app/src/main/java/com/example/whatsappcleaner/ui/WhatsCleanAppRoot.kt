@@ -243,7 +243,7 @@ fun WhatsCleanAppRoot(
                         if (!(scanLaunchInFlight || scanUiState is ScanUiState.Loading)) {
                             scanLaunchInFlight = true
                             onboardingRoute = OnboardingRoute.Scanning
-                            onAiScanClick()
+                            onRefreshClick()
                         }
                     },
                     scanning = scanUiState is ScanUiState.Loading || scanLaunchInFlight

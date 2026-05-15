@@ -13,44 +13,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
 @Composable
-fun PrivacyPolicyScreen(
-    modifier: Modifier = Modifier,
-    onBack: () -> Unit = {}
-) {
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(20.dp)
-    ) {
-        TextButton(onClick = onBack) {
-            Text(text = "Back")
-        }
-
-        Text(
-            text = "Privacy Policy",
-            style = MaterialTheme.typography.headlineSmall,
-            modifier = Modifier.padding(top = 8.dp, bottom = 12.dp)
-        )
-
-        Text(
-            text = "WhatsCleaner processes files locally on your device to help you review media, duplicates, and large files.",
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.padding(bottom = 8.dp)
-        )
-        Text(
-            text = "We do not upload your personal media for core cleanup features. Some optional services may require network access (for example, billing or analytics) and follow their own policies.",
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.padding(bottom = 8.dp)
-        )
-        Text(
-            text = "You control what is deleted. Deletion actions are initiated by you and can include undo support where available.",
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.padding(bottom = 8.dp)
-        )
-        Text(
-            text = "If you have questions, contact support from Settings.",
-            style = MaterialTheme.typography.bodyMedium
-        )
+fun PrivacyPolicyScreen(modifier: Modifier = Modifier,onBack: () -> Unit = {}) {
+    Column(modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp)) {
+        TextButton(onClick = onBack) { Text("Back") }
+        Text("Privacy Policy", style = MaterialTheme.typography.headlineSmall)
+        Text("ChatSweep scans chat media locally on your device only.")
+        Text("No cloud upload is required for cleanup suggestions.")
+        Text("ChatSweep does not run a backend database for your personal media files.")
+        Text("If configured, Firebase Analytics may collect basic app usage events.")
+        Text("If configured, Firebase Crashlytics may collect crash diagnostics.")
+        Text("You manually review and confirm every deletion.")
+        Text("ChatSweep is not affiliated with WhatsApp LLC or Meta Platforms, Inc.")
     }
 }

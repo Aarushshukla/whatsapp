@@ -127,15 +127,17 @@ fun ScanProgressScreen(scanUiState: ScanUiState) {
         "Finding statuses and stickers",
         "Preparing results"
     )
-    val realProgress = (scanUiState as? ScanUiState.Loading)?.progress?.coerceIn(0f, 1f) ?: 0f
-    val isLoading = scanUiState is ScanUiState.Loading
+    val loadingState = scanUiState as? ScanUiState.Loading
+    val realProgress = loadingState?.progress?.coerceIn(0f, 1f) ?: 0f
+    val currentStage = loadingState?.stage
+    val isLoading = loadingState != null
     var visualProgress by remember { mutableStateOf(0f) }
 
     androidx.compose.runtime.LaunchedEffect(isLoading, realProgress) {
         if (!isLoading) {
             visualProgress = 1f
         } else {
-            visualProgress = maxOf(realProgress, (visualProgress + 0.06f).coerceAtMost(0.9f))
+            visualProgress = maxOf(realProgress, (visualProgress + 0.04f).coerceAtMost(0.9f))
         }
     }
     val animatedProgress by animateFloatAsState(
@@ -144,8 +146,9 @@ fun ScanProgressScreen(scanUiState: ScanUiState) {
         label = "smooth_scan_progress"
     )
 
-    val stageIndex = remember(realProgress) {
-        ((realProgress.coerceAtMost(0.999f)) * stages.size).toInt().coerceIn(0, stages.lastIndex)
+    val stageIndex = remember(currentStage, realProgress) {
+        val byStage = stages.indexOf(currentStage)
+        if (byStage >= 0) byStage else ((realProgress.coerceAtMost(0.999f)) * stages.size).toInt().coerceIn(0, stages.lastIndex)
     }
     val pulse = rememberInfiniteTransition(label = "stage_pulse").animateFloat(
         initialValue = 0.55f,

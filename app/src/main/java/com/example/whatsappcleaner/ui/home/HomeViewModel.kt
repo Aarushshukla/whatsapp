@@ -180,7 +180,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private val _scanUiState = MutableStateFlow<ScanUiState>(ScanUiState.Idle)
     val scanUiState: StateFlow<ScanUiState> = _scanUiState.asStateFlow()
     private var hasLoadedInitialCache = false
-    private var refreshInProgress = false
+    @Volatile private var scanRunning = false
 
     private data class MediaComputation(
         val allItems: List<SimpleMediaItem>,
@@ -258,7 +258,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         if (!_uiState.value.permissionGranted) return
         Log.d("SCAN", "Scan started")
         viewModelScope.launch(Dispatchers.IO) {
-            if (refreshInProgress) {
+            if (scanRunning) {
                 Log.d(TAG, "Skipping refresh request because a scan is already in progress.")
                 return@launch
             }
@@ -276,7 +276,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 _scanUiState.value = ScanUiState.Success("Using cached scan results")
                 return@launch
             }
-            refreshInProgress = true
+            scanRunning = true
             _scanUiState.value = ScanUiState.Loading("Reading chat folders", 0.05f)
             Log.d(TAG, "Refreshing media library.")
             val loadStartedAt = System.currentTimeMillis()
@@ -310,10 +310,12 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     _scanUiState.value = ScanUiState.Loading("Finding statuses and stickers", 0.85f)
                     _scanUiState.value = ScanUiState.Loading("Preparing results", 0.97f)
                     loadedItems
-                }.getOrElse { initialItemsOrEmpty ->
-                    Log.w(TAG, "Large scan paused. Showing results found so far.", initialItemsOrEmpty)
+                }.getOrElse { error ->
+                    Log.w(TAG, "Large scan paused. Showing results found so far.", error)
                     _scanUiState.value = ScanUiState.Loading("Still scanning large media folders…", 0.9f)
-                    _uiState.value.allItems.ifEmpty { emptyList() }
+                    val partial = _uiState.value.allItems
+                    if (partial.isEmpty()) throw error
+                    partial
                 }
                 _scanUiState.value = if (allItems.isEmpty()) ScanUiState.Empty else ScanUiState.Success(
                     "Found ${allItems.size} files (${formatSize(allItems.sumOf { it.sizeKb.toLong() * 1024L })})"
@@ -329,7 +331,12 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                             fileCount = allItems.size,
                             lastScanCompletedAt = now,
                             categories = _uiState.value.categorySummaries.map {
-                                UserPrefs.CachedCategorySummary(it.title, it.count, it.sizeBytes)
+                                UserPrefs.CachedCategorySummary(
+                                    title = it.title,
+                                    count = it.count,
+                                    sizeBytes = it.sizeBytes,
+                                    percent = if (totalSizeBytes > 0L) ((it.sizeBytes * 100.0) / totalSizeBytes).toFloat() else 0f
+                                )
                             }
                         )
                     )
@@ -361,7 +368,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 _scanUiState.value = ScanUiState.Error(error.message ?: "Unknown error")
             } finally {
-                refreshInProgress = false
+                scanRunning = false
             }
         }
     }
@@ -376,7 +383,14 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 isLoading = false,
                 smartSuggestionSummary = it.smartSuggestionSummary.copy(totalSpaceToFree = cached.potentialCleanupBytes),
                 categorySummaries = cached.categories.map { category ->
-                    CategorySummaryUi(category.title, "Cached summary", category.count, category.sizeBytes, "REVIEW_CAREFULLY", emptyList())
+                    CategorySummaryUi(
+                        category.title,
+                        "Cached summary • ${"%.1f".format(category.percent)}%",
+                        category.count,
+                        category.sizeBytes,
+                        "REVIEW_CAREFULLY",
+                        emptyList()
+                    )
                 }
             )
         }
