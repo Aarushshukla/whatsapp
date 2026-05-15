@@ -108,6 +108,11 @@ private object Routes {
     const val PrivacyPolicy = "privacy_policy"
     const val Terms = "terms"
     const val About = "about"
+    const val ScanHistory = "scan_history"
+    const val CleanupReceipt = "cleanup_receipt"
+    const val StorageOverview = "storage_overview"
+    const val HelpFeedback = "help_feedback"
+    const val StatusCleaner = "status_cleaner"
     const val AiSmartSuggestions = "ai_smart_suggestions"
     const val AiDuplicateDetector = "ai_duplicate_detector"
     const val AiLargeFilesFinder = "ai_large_files_finder"
@@ -392,6 +397,12 @@ fun WhatsCleanAppRoot(
                 onNavigateToPrivacyPolicy = { navController.navigateSingleTop(Routes.PrivacyPolicy) },
                 onNavigateToTerms = { navController.navigateSingleTop(Routes.Terms) },
                 onNavigateToAbout = { navController.navigateSingleTop(Routes.About) }
+                ,
+                onNavigateToHelpFeedback = { navController.navigateSingleTop(Routes.HelpFeedback) },
+                onNavigateToScanHistory = { navController.navigateSingleTop(Routes.ScanHistory) },
+                onNavigateToCleanupReceipt = { navController.navigateSingleTop(Routes.CleanupReceipt) },
+                onNavigateToStorageOverview = { navController.navigateSingleTop(Routes.StorageOverview) },
+                onNavigateToStatusCleaner = { navController.navigateSingleTop(Routes.StatusCleaner) }
             )
         }
 
@@ -653,6 +664,21 @@ fun WhatsCleanAppRoot(
         }
         composable(Routes.About) {
             AboutScreen(onBack = { navController.popBackStack() })
+        }
+        composable(Routes.ScanHistory) {
+            DrawerDetailScreen("Scan History", "Previous scans and trends", if (state.totalFiles == 0) emptyList() else listOf("Last indexed files" to "${state.totalFiles} files", "Current indexed size" to com.example.whatsappcleaner.data.local.formatSize(state.totalSize)), onBack = { navController.popBackStack() })
+        }
+        composable(Routes.CleanupReceipt) {
+            DrawerDetailScreen("Last Cleanup Receipt", "Most recent cleanup summary", if (state.lastCleanupBytes <= 0L) emptyList() else listOf("Freed space" to com.example.whatsappcleaner.data.local.formatSize(state.lastCleanupBytes), "Current streak" to "${state.streakDays} day(s)"), onBack = { navController.popBackStack() })
+        }
+        composable(Routes.StorageOverview) {
+            DrawerDetailScreen("Storage Overview", "How your space is distributed", if (state.totalFiles == 0) emptyList() else listOf("Total media size" to com.example.whatsappcleaner.data.local.formatSize(state.totalSize), "Large files" to "${state.largeFileItems.size}", "Old media" to "${state.oldFileItems.size}"), onBack = { navController.popBackStack() })
+        }
+        composable(Routes.HelpFeedback) {
+            DrawerDetailScreen("Help & Feedback", "Support and troubleshooting", listOf("FAQ" to "Open the FAQ from settings support section.", "Contact support" to "Use settings to email support.", "Report an issue" to "Submit diagnostics from settings."), onBack = { navController.popBackStack() })
+        }
+        composable(Routes.StatusCleaner) {
+            DrawerDetailScreen("Status Cleaner", "Review status-like media", if (state.oldFileItems.isEmpty()) emptyList() else listOf("Status candidates" to "${state.oldFileItems.size}", "Estimated size" to com.example.whatsappcleaner.data.local.formatSize(state.oldFileItems.sumOf { it.sizeKb.toLong() * 1024L })), onBack = { navController.popBackStack() })
         }
     }
 }

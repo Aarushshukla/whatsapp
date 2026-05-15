@@ -1159,3 +1159,33 @@ fun AboutScreen(onBack: () -> Unit) {
         }
     }
 }
+
+@Composable
+fun DrawerDetailScreen(
+    title: String,
+    subtitle: String,
+    highlights: List<Pair<String, String>>,
+    onBack: () -> Unit
+) {
+    FeatureScreenScaffold(title, subtitle, onBack) {
+        if (highlights.isEmpty()) {
+            FriendlyState(Icons.Default.Info, "Nothing to show yet", "Run a scan to populate this section.")
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                items(highlights) { item ->
+                    SimpleActionCard(
+                        icon = Icons.Default.Analytics,
+                        title = item.first,
+                        subtitle = item.second,
+                        onClick = {},
+                        showAction = false
+                    )
+                }
+            }
+        }
+    }
+}
