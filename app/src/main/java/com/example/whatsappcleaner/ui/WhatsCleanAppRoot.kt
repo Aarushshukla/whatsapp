@@ -79,16 +79,16 @@ import com.example.whatsappcleaner.ui.settings.ReminderFrequencyOption
 import com.example.whatsappcleaner.ui.settings.SettingsScreen
 
 
-private enum class OnboardingRoute {
-    Resolving,
-    PermissionRequired,
-    PermissionGrantedSuccess,
-    FirstScanIntro,
-    Scanning,
-    ScanFinished,
-    Dashboard,
-    Empty,
-    Error
+private sealed interface AppScreenState {
+    data object Resolving : AppScreenState
+    data object PermissionIntro : AppScreenState
+    data object PermissionGreat : AppScreenState
+    data object FirstScanIntro : AppScreenState
+    data object ScanProgress : AppScreenState
+    data object ScanFinished : AppScreenState
+    data object Dashboard : AppScreenState
+    data object Empty : AppScreenState
+    data object Error : AppScreenState
 }
 
 private object Routes {
@@ -178,19 +178,20 @@ fun WhatsCleanAppRoot(
     var hasSeenPermissionSuccess by rememberSaveable { mutableStateOf(prefs.hasSeenPermissionSuccess()) }
     var hasCompletedFirstScan by rememberSaveable { mutableStateOf(prefs.isFirstScanCompleted()) }
     var hasCompletedOnboarding by rememberSaveable { mutableStateOf(prefs.hasCompletedOnboarding()) }
-    var onboardingRoute by rememberSaveable { mutableStateOf(OnboardingRoute.Resolving) }
+    var appScreenState by rememberSaveable { mutableStateOf<AppScreenState>(AppScreenState.Resolving) }
     var scanLaunchInFlight by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(state.permissionGranted, permissionJustGranted, hasSeenPermissionSuccess, hasCompletedFirstScan, hasCompletedOnboarding, scanUiState, firstScanFinishedShown) {
-        onboardingRoute = when {
-            !state.permissionGranted -> OnboardingRoute.PermissionRequired
-            permissionJustGranted -> OnboardingRoute.PermissionGrantedSuccess
-            scanUiState is ScanUiState.Loading -> OnboardingRoute.Scanning
-            scanUiState is ScanUiState.Success && !hasCompletedFirstScan && !hasCompletedOnboarding && !firstScanFinishedShown -> OnboardingRoute.ScanFinished
-            !hasCompletedFirstScan && !hasCompletedOnboarding -> OnboardingRoute.FirstScanIntro
-            scanUiState is ScanUiState.Error -> OnboardingRoute.Error
-            state.filteredItems.isEmpty() -> OnboardingRoute.Empty
-            else -> OnboardingRoute.Dashboard
+        appScreenState = when {
+            !state.permissionGranted -> AppScreenState.PermissionIntro
+            permissionJustGranted -> AppScreenState.PermissionGreat
+            scanLaunchInFlight || scanUiState is ScanUiState.Loading -> AppScreenState.ScanProgress
+            scanUiState is ScanUiState.Error -> AppScreenState.Error
+            scanUiState is ScanUiState.Empty && !hasCompletedOnboarding -> AppScreenState.Empty
+            scanUiState is ScanUiState.Success && !hasCompletedFirstScan && !hasCompletedOnboarding && !firstScanFinishedShown -> AppScreenState.ScanFinished
+            !hasCompletedFirstScan && !hasCompletedOnboarding -> AppScreenState.FirstScanIntro
+            state.filteredItems.isEmpty() -> AppScreenState.Empty
+            else -> AppScreenState.Dashboard
         }
     }
 
@@ -206,14 +207,14 @@ fun WhatsCleanAppRoot(
     }
 
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        when (onboardingRoute) {
-            OnboardingRoute.Resolving -> {
+        when (appScreenState) {
+            AppScreenState.Resolving -> {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
                 }
                 return@Surface
             }
-            OnboardingRoute.PermissionRequired -> {
+            AppScreenState.PermissionIntro -> {
                 PermissionIntroScreen(
                     onAllow = onRequestPermission,
                     onTryAgain = onRequestPermission,
@@ -222,7 +223,7 @@ fun WhatsCleanAppRoot(
                 )
                 return@Surface
             }
-            OnboardingRoute.PermissionGrantedSuccess -> {
+            AppScreenState.PermissionGreat -> {
                 AnimatedContent(targetState = "great", transitionSpec = {
                     (slideInHorizontally(animationSpec = tween(300)) + fadeIn(animationSpec = tween(280))) togetherWith
                         (slideOutHorizontally(animationSpec = tween(300)) + fadeOut(animationSpec = tween(220)))
@@ -237,12 +238,12 @@ fun WhatsCleanAppRoot(
                 }
                 return@Surface
             }
-            OnboardingRoute.FirstScanIntro -> {
+            AppScreenState.FirstScanIntro -> {
                 ScanIntroScreen(
                     onScan = {
                         if (!(scanLaunchInFlight || scanUiState is ScanUiState.Loading)) {
                             scanLaunchInFlight = true
-                            onboardingRoute = OnboardingRoute.Scanning
+                            appScreenState = AppScreenState.ScanProgress
                             onRefreshClick()
                         }
                     },
@@ -250,12 +251,12 @@ fun WhatsCleanAppRoot(
                 )
                 return@Surface
             }
-            OnboardingRoute.Scanning -> {
+            AppScreenState.ScanProgress -> {
                 scanLaunchInFlight = false
                 ScanProgressScreen(scanUiState)
                 return@Surface
             }
-            OnboardingRoute.ScanFinished -> {
+            AppScreenState.ScanFinished -> {
                 scanLaunchInFlight = false
                 val msg = if (state.totalSize > 0L) "You can review ${com.example.whatsappcleaner.data.local.formatSize(state.totalSize)}" else "Your results are ready"
                 CheckSuccessScreen("Your scan is finished!", msg, "CONTINUE") {
@@ -267,13 +268,10 @@ fun WhatsCleanAppRoot(
                 }
                 return@Surface
             }
-            OnboardingRoute.Empty, OnboardingRoute.Error, OnboardingRoute.Dashboard -> Unit
+            AppScreenState.Empty, AppScreenState.Error, AppScreenState.Dashboard -> Unit
         }
     }
-if (state.isLoading && state.filteredItems.isEmpty() && state.permissionGranted) {
-        LoadingScreen(modifier = modifier)
-        return
-    }
+    if (appScreenState != AppScreenState.Dashboard && appScreenState != AppScreenState.Empty && appScreenState != AppScreenState.Error) return
     val navController = rememberNavController()
     val navBackStackEntry = navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry.value?.destination?.route
@@ -696,26 +694,6 @@ private fun AnimatedNavHost(
         },
         builder = builder
     )
-}
-
-@Composable
-private fun LoadingScreen(modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            CircularProgressIndicator()
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = "Preparing cleaner...",
-                style = MaterialTheme.typography.bodyLarge,
-                color = Color(0xFF1F2937)
-            )
-        }
-    }
 }
 
 private fun NavHostController.navigateSingleTop(route: String) {
