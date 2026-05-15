@@ -73,7 +73,36 @@ fun SimpleHomeScreen(items: List<SimpleMediaItem>, onRefreshClick: () -> Unit, s
         DashboardFeature("Blurry Images","Low-quality images to review",Icons.Default.BlurOn,0,0,onNavigateToSmartClean),
         DashboardFeature("Scan History","Previous scans and trends",Icons.Default.History,0,0,onNavigateToFeatures)
     )
-    ModalNavigationDrawer(drawerState = drawerState, drawerContent = { AppDrawer { route -> scope.launch { drawerState.close() }; when(route){"home"->Unit;"smart_review"->onNavigateToSmartClean();"scan_again"->onRefreshClick();"categories"->onNavigateToFeatures();"media_overview"->onNavigateToPhoneReality();"duplicate_finder"->onNavigateToDuplicates();"large_files"->onNavigateToMediaViewer();"old_media"->onNavigateToJunk();"blurry_images"->onNavigateToSmartClean();"scan_history"->onNavigateToFeatures();"cleanup_receipt"->onNavigateToFeatures();"storage_overview"->onNavigateToAnalytics();"privacy_policy"->onNavigateToPrivacyPolicy();"terms"->onNavigateToTerms();"about"->onNavigateToAbout();"settings"->onNavigateToSettings();"help_feedback"->onNavigateToSettings(); else -> onNavigateToPhoneReality() } } }) {
+    val visibleDrawerRoutes = setOf(
+        "home", "smart_review", "scan_again", "categories",
+        "media_overview",
+        "duplicate_finder", "large_files", "old_media", "blurry_images", "scan_history", "storage_overview",
+        "privacy_policy", "terms", "about",
+        "settings", "help_feedback"
+    )
+
+    ModalNavigationDrawer(drawerState = drawerState, drawerContent = {
+        AppDrawer(visibleRoutes = visibleDrawerRoutes) { route ->
+            scope.launch { drawerState.close() }
+            when (route) {
+                "home" -> Unit
+                "smart_review" -> onNavigateToSmartClean()
+                "scan_again" -> onRefreshClick()
+                "categories" -> onNavigateToFeatures()
+                "media_overview" -> onNavigateToPhoneReality()
+                "duplicate_finder" -> onNavigateToDuplicates()
+                "large_files" -> onNavigateToMediaViewer()
+                "old_media" -> onNavigateToJunk()
+                "blurry_images" -> onNavigateToSmartClean()
+                "scan_history" -> onNavigateToFeatures()
+                "storage_overview" -> onNavigateToAnalytics()
+                "privacy_policy" -> onNavigateToPrivacyPolicy()
+                "terms" -> onNavigateToTerms()
+                "about" -> onNavigateToAbout()
+                "settings", "help_feedback" -> onNavigateToSettings()
+            }
+        }
+    }) {
         Column(Modifier.fillMaxSize().background(AppBg).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Row(verticalAlignment = Alignment.CenterVertically){IconButton(onClick={scope.launch{drawerState.open()}}){Icon(Icons.Default.Menu,null)}; Column{Text("ChatSweep", fontWeight = FontWeight.Bold, color=MainText); Text("Private offline cleaner", color=SecondaryText, style=MaterialTheme.typography.labelSmall)}}; IconButton(onClick=onRefreshClick){Icon(Icons.Default.Refresh,null,tint=PrimaryBlue)} }
             Card(colors = CardDefaults.cardColors(containerColor = CardBg), border = BorderStroke(1.dp, Border), shape = RoundedCornerShape(16.dp)) { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { Text("Chat media", color=MainText, fontWeight=FontWeight.SemiBold); Text(formatSize(totalSize), style = MaterialTheme.typography.headlineMedium, color=MainText); Text("Review up to ${formatSize(reviewBytes)}", color=SecondaryText); Text("Total files found: $totalFiles", color=SecondaryText); SegmentedBar(listOf(reviewBytes/4,reviewBytes/4,totalSize/8,totalSize/10,totalSize/12,0,reviewBytes/6), totalSize); Button(onClick = if (hasScan) onNavigateToSmartClean else onRefreshClick, modifier=Modifier.fillMaxWidth()){Text(if(hasScan)"SMART REVIEW" else "START SMART SCAN")}; Text("SCAN AGAIN", color=PrimaryBlue, modifier=Modifier.clickable{onRefreshClick()}); Text("No cloud upload. Nothing is deleted automatically.", color=SecondaryText, style=MaterialTheme.typography.labelMedium) } }
