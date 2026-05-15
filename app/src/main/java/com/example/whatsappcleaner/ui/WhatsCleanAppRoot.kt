@@ -19,6 +19,12 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
@@ -55,6 +61,10 @@ import com.example.whatsappcleaner.ui.home.PolishedSmartCleanScreen
 import com.example.whatsappcleaner.ui.home.PremiumFeature
 import com.example.whatsappcleaner.ui.home.ScanUiState
 import com.example.whatsappcleaner.ui.home.SimpleHomeScreen
+import com.example.whatsappcleaner.ui.home.PermissionIntroScreen
+import com.example.whatsappcleaner.ui.home.CheckSuccessScreen
+import com.example.whatsappcleaner.ui.home.ScanIntroScreen
+import com.example.whatsappcleaner.ui.home.ScanProgressScreen
 import com.example.whatsappcleaner.ui.home.SpamMediaScreen
 import com.example.whatsappcleaner.ui.home.SuggestionType
 import com.example.whatsappcleaner.ui.paywall.PaywallScreen
@@ -141,16 +151,36 @@ fun WhatsCleanAppRoot(
     versionLabel: String,
     modifier: Modifier = Modifier
 ) {
-    if (state.isLoading && state.filteredItems.isEmpty() && state.permissionGranted) {
-        LoadingScreen(modifier = modifier)
+        val context = LocalContext.current
+    val prefs = remember { com.example.whatsappcleaner.data.local.UserPrefs.get(context) }
+    var permissionSuccessShown by remember { mutableStateOf(false) }
+    var firstScanFinishedShown by remember { mutableStateOf(false) }
+    val firstScanCompleted = remember(state.permissionGranted, state.totalFiles) { prefs.isFirstScanCompleted() || state.totalFiles > 0 }
+
+    if (!state.permissionGranted) {
+        PermissionIntroScreen(onAllow = onRequestPermission, message = if (scanUiState is ScanUiState.Error) "Storage access is needed to scan chat media." else null)
         return
     }
-    if (!state.permissionGranted) {
-        PermissionGate(
-            onRequestPermission = onRequestPermission,
-            onOpenAppSettings = onOpenAppSettings,
-            modifier = modifier
-        )
+    if (!permissionSuccessShown) {
+        LaunchedEffect(Unit) { kotlinx.coroutines.delay(900); permissionSuccessShown = true }
+        CheckSuccessScreen("Great", "Storage access is ready.", "Continue") { permissionSuccessShown = true }
+        return
+    }
+    if (!firstScanCompleted && scanUiState !is ScanUiState.Loading && scanUiState !is ScanUiState.Success) {
+        ScanIntroScreen(onScan = { onAiScanClick() }, scanning = scanUiState is ScanUiState.Loading)
+        return
+    }
+    if (scanUiState is ScanUiState.Loading) {
+        ScanProgressScreen(scanUiState)
+        return
+    }
+    if (scanUiState is ScanUiState.Success && !firstScanCompleted && !firstScanFinishedShown) {
+        val msg = if (state.totalSize > 0L) "You can review ${com.example.whatsappcleaner.data.local.formatSize(state.totalSize)}" else "Your results are ready"
+        CheckSuccessScreen("Your scan is finished!", msg, "CONTINUE") { prefs.setFirstScanCompleted(true); firstScanFinishedShown = true }
+        return
+    }
+if (state.isLoading && state.filteredItems.isEmpty() && state.permissionGranted) {
+        LoadingScreen(modifier = modifier)
         return
     }
     val navController = rememberNavController()
