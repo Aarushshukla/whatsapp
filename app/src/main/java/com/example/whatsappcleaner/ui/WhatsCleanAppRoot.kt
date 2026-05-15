@@ -158,14 +158,15 @@ fun WhatsCleanAppRoot(
 ) {
         val context = LocalContext.current
     val prefs = remember { com.example.whatsappcleaner.data.local.UserPrefs.get(context) }
-    var permissionGreatAcknowledged by rememberSaveable { mutableStateOf(prefs.hasSeenPermissionSuccess()) }
     var firstScanFinishedShown by rememberSaveable { mutableStateOf(false) }
     var permissionJustGranted by rememberSaveable { mutableStateOf(false) }
     var previousPermissionGranted by rememberSaveable { mutableStateOf(state.permissionGranted) }
-    val firstScanCompleted = remember(state.totalFiles) { prefs.isFirstScanCompleted() || prefs.hasCompletedOnboarding() || state.totalFiles > 0 }
+    var hasSeenPermissionSuccess by rememberSaveable { mutableStateOf(prefs.hasSeenPermissionSuccess()) }
+    val hasCompletedFirstScan = remember { prefs.isFirstScanCompleted() }
+    val hasCompletedOnboarding = remember { prefs.hasCompletedOnboarding() }
 
     LaunchedEffect(state.permissionGranted) {
-        permissionJustGranted = !previousPermissionGranted && state.permissionGranted && !prefs.hasSeenPermissionSuccess()
+        permissionJustGranted = !previousPermissionGranted && state.permissionGranted && !hasSeenPermissionSuccess
         previousPermissionGranted = state.permissionGranted
     }
 
@@ -179,20 +180,20 @@ fun WhatsCleanAppRoot(
         )
         return
     }
-    if (permissionJustGranted && !permissionGreatAcknowledged) {
+    if (permissionJustGranted) {
         AnimatedContent(targetState = "great", transitionSpec = {
             (slideInHorizontally(animationSpec = tween(300)) + fadeIn(animationSpec = tween(280))) togetherWith
                 (slideOutHorizontally(animationSpec = tween(300)) + fadeOut(animationSpec = tween(220)))
         }, label = "permission_great_transition") {
             CheckSuccessScreen("Great", "Storage access is ready.", "CONTINUE") {
-                permissionGreatAcknowledged = true
                 permissionJustGranted = false
                 prefs.setSeenPermissionSuccess(true)
+                hasSeenPermissionSuccess = true
             }
         }
         return
     }
-    if (!firstScanCompleted && scanUiState !is ScanUiState.Loading && scanUiState !is ScanUiState.Success) {
+    if (hasSeenPermissionSuccess && !hasCompletedFirstScan && !hasCompletedOnboarding && scanUiState !is ScanUiState.Loading && scanUiState !is ScanUiState.Success) {
         ScanIntroScreen(onScan = onAiScanClick, scanning = scanUiState is ScanUiState.Loading)
         return
     }
@@ -200,7 +201,7 @@ fun WhatsCleanAppRoot(
         ScanProgressScreen(scanUiState)
         return
     }
-    if (scanUiState is ScanUiState.Success && !firstScanCompleted && !firstScanFinishedShown) {
+    if (scanUiState is ScanUiState.Success && !hasCompletedFirstScan && !hasCompletedOnboarding && !firstScanFinishedShown) {
         val msg = if (state.totalSize > 0L) "You can review ${com.example.whatsappcleaner.data.local.formatSize(state.totalSize)}" else "Your results are ready"
         CheckSuccessScreen("Your scan is finished!", msg, "CONTINUE") {
             prefs.setFirstScanCompleted(true)
