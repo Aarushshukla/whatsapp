@@ -30,6 +30,8 @@ class UserPrefs private constructor(context: Context) {
         private const val KEY_INCLUDE_DUPLICATES = "include_duplicates"
         private const val KEY_FREE_PREMIUM_ATTEMPTS = "free_premium_attempts"
         private const val KEY_SCAN_HISTORY = "scan_history_v1"
+        private const val KEY_LAST_SCAN_COMPLETED_AT = "last_scan_completed_at"
+        private const val KEY_CACHED_SCAN_SUMMARY = "cached_scan_summary_v1"
 
     private const val KEY_FIRST_SCAN_COMPLETED = "first_scan_completed"
     private const val KEY_PERMISSION_SUCCESS_SEEN = "permission_success_seen"
@@ -164,5 +166,68 @@ class UserPrefs private constructor(context: Context) {
                 }
             }
         }.getOrDefault(emptyList())
+    }
+
+    data class CachedScanSummary(
+        val totalSizeBytes: Long,
+        val potentialCleanupBytes: Long,
+        val fileCount: Int,
+        val lastScanCompletedAt: Long,
+        val categories: List<CachedCategorySummary>
+    )
+
+    data class CachedCategorySummary(
+        val title: String,
+        val count: Int,
+        val sizeBytes: Long
+    )
+
+    fun setLastScanCompletedAt(timestamp: Long) = prefs.edit().putLong(KEY_LAST_SCAN_COMPLETED_AT, timestamp).apply()
+    fun getLastScanCompletedAt(): Long = prefs.getLong(KEY_LAST_SCAN_COMPLETED_AT, 0L)
+
+    fun saveCachedScanSummary(summary: CachedScanSummary) {
+        val root = JSONObject().apply {
+            put("totalSizeBytes", summary.totalSizeBytes)
+            put("potentialCleanupBytes", summary.potentialCleanupBytes)
+            put("fileCount", summary.fileCount)
+            put("lastScanCompletedAt", summary.lastScanCompletedAt)
+            put("categories", JSONArray().apply {
+                summary.categories.forEach { category ->
+                    put(JSONObject().apply {
+                        put("title", category.title)
+                        put("count", category.count)
+                        put("sizeBytes", category.sizeBytes)
+                    })
+                }
+            })
+        }
+        prefs.edit().putString(KEY_CACHED_SCAN_SUMMARY, root.toString()).apply()
+    }
+
+    fun getCachedScanSummary(): CachedScanSummary? {
+        val raw = prefs.getString(KEY_CACHED_SCAN_SUMMARY, null) ?: return null
+        return runCatching {
+            val root = JSONObject(raw)
+            val categoriesJson = root.optJSONArray("categories") ?: JSONArray()
+            val categories = buildList {
+                for (i in 0 until categoriesJson.length()) {
+                    val item = categoriesJson.optJSONObject(i) ?: continue
+                    add(
+                        CachedCategorySummary(
+                            title = item.optString("title"),
+                            count = item.optInt("count"),
+                            sizeBytes = item.optLong("sizeBytes")
+                        )
+                    )
+                }
+            }
+            CachedScanSummary(
+                totalSizeBytes = root.optLong("totalSizeBytes"),
+                potentialCleanupBytes = root.optLong("potentialCleanupBytes"),
+                fileCount = root.optInt("fileCount"),
+                lastScanCompletedAt = root.optLong("lastScanCompletedAt"),
+                categories = categories
+            )
+        }.getOrNull()
     }
 }
