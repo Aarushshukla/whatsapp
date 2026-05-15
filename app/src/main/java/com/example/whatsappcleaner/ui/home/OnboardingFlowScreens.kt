@@ -54,14 +54,26 @@ private val MainText = Color(0xFF20242A)
 private val SecondaryText = Color(0xFF6B7280)
 
 @Composable
-fun PermissionIntroScreen(onAllow: () -> Unit, message: String?) {
+fun PermissionIntroScreen(
+    onAllow: () -> Unit,
+    onTryAgain: () -> Unit,
+    onOpenSettings: () -> Unit,
+    message: String?
+) {
     Column(Modifier.fillMaxSize().background(Bg).padding(20.dp), verticalArrangement = Arrangement.SpaceBetween) {
         Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Text("Your cleanup is just two steps away", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = MainText)
+            Text("Your chat cleanup is just two steps away", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = MainText)
             Card(colors = CardDefaults.cardColors(containerColor = Color.White)) { Text("Storage access needed", Modifier.padding(16.dp), color = MainText) }
-            Text("1. Give storage access\nWe need permission to scan your chat photos, videos, audio, and files.", color = SecondaryText)
-            Text("2. Scan for junk\nWe’ll show what can be safely reviewed to free up space.", color = SecondaryText)
-            if (!message.isNullOrBlank()) Text(message, color = Color(0xFFEF4444))
+            Text("1. Give media access\nWe need permission to scan your chat photos, videos, audio, and files.", color = SecondaryText)
+            Text("2. Scan chat junk\nWe’ll show what can be safely reviewed to free up space.", color = SecondaryText)
+            if (!message.isNullOrBlank()) {
+                Text("Storage access is needed", color = Color(0xFFEF4444))
+                Text("ChatSweep needs access to scan chat media locally.", color = SecondaryText)
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Button(onClick = onTryAgain) { Text("Try again") }
+                    Button(onClick = onOpenSettings) { Text("Open settings") }
+                }
+            }
         }
         Button(onClick = onAllow, modifier = Modifier.fillMaxWidth()) { Text("ALLOW STORAGE ACCESS") }
     }
