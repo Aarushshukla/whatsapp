@@ -39,8 +39,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.annotation.MainThread
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.withTimeout
-import kotlinx.coroutines.TimeoutCancellationException
 
 enum class PremiumFeature(val analyticsKey: String, val paywallSource: String) {
     SMART_CLEAN_ADVANCED("smart_clean_clicked", "smart_clean_advanced"),
@@ -164,7 +162,6 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         private const val INITIAL_LOAD_LIMIT = 100
         private const val LARGE_FILE_THRESHOLD_BYTES = 10L * 1024L * 1024L
         private const val OLD_FILE_AGE_DAYS = 30L
-        private const val SCAN_TIMEOUT_MILLIS = 90_000L
     }
 
     private val mediaLoader = MediaLoader(application)
@@ -217,6 +214,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         loadPreferences()
+        loadCachedSummary()
         // TODO: RE-ENABLE SUBSCRIPTION LATER
         /*
         subscriptionRepository.start()
@@ -277,7 +275,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
             try {
-                val allItems = withTimeout(SCAN_TIMEOUT_MILLIS) {
+                val allItems = runCatching {
                     val images = mediaLoader.loadAllDeviceMedia("image", limit = INITIAL_LOAD_LIMIT)
                     val videos = mediaLoader.loadAllDeviceMedia("video", limit = INITIAL_LOAD_LIMIT)
                     val initialItems = (images + videos).sortedByDescending { mediaItem -> mediaItem.addedMillis }
@@ -301,15 +299,32 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     _scanUiState.value = ScanUiState.Loading("Finding statuses and stickers", 0.85f)
                     _scanUiState.value = ScanUiState.Loading("Preparing results", 0.97f)
                     loadedItems
+                }.getOrElse { initialItemsOrEmpty ->
+                    Log.w(TAG, "Large scan paused. Showing results found so far.", initialItemsOrEmpty)
+                    _scanUiState.value = ScanUiState.Loading("Still scanning large media folders…", 0.9f)
+                    _uiState.value.allItems.ifEmpty { emptyList() }
                 }
                 _scanUiState.value = if (allItems.isEmpty()) ScanUiState.Empty else ScanUiState.Success(
                     "Found ${allItems.size} files (${formatSize(allItems.sumOf { it.sizeKb.toLong() * 1024L })})"
                 )
                 if (allItems.isNotEmpty()) {
+                    val now = System.currentTimeMillis()
                     val totalSizeBytes = allItems.sumOf { it.sizeKb.toLong() * 1024L }
+                    prefs.setLastScanCompletedAt(now)
+                    prefs.saveCachedScanSummary(
+                        UserPrefs.CachedScanSummary(
+                            totalSizeBytes = totalSizeBytes,
+                            potentialCleanupBytes = _uiState.value.smartSuggestionSummary.totalSpaceToFree,
+                            fileCount = allItems.size,
+                            lastScanCompletedAt = now,
+                            categories = _uiState.value.categorySummaries.map {
+                                UserPrefs.CachedCategorySummary(it.title, it.count, it.sizeBytes)
+                            }
+                        )
+                    )
                     prefs.appendScanHistory(
                         ScanHistoryRecord(
-                            scanDateMillis = System.currentTimeMillis(),
+                            scanDateMillis = now,
                             totalMediaSizeBytes = totalSizeBytes,
                             imageSizeBytes = allItems.filter { it.mimeType?.startsWith("image") == true }.sumOf { it.sizeKb.toLong() * 1024L },
                             videoSizeBytes = allItems.filter { it.mimeType?.startsWith("video") == true }.sumOf { it.sizeKb.toLong() * 1024L },
@@ -318,14 +333,6 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 }
                 hasLoadedInitialCache = true
-            } catch (error: TimeoutCancellationException) {
-                Log.e(TAG, "Media scan timed out.", error)
-                _scanUiState.value = ScanUiState.Error("Scan took too long. Please try again.")
-                withContext(Dispatchers.Main) {
-                    _uiState.update { currentState ->
-                        currentState.copy(summaryInfo = "Scan timeout. Please try again.", isLoading = false)
-                    }
-                }
             } catch (error: SecurityException) {
                 Log.e(TAG, "Media scan failed due to permission issue.", error)
                 withContext(Dispatchers.Main) {
@@ -348,6 +355,22 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private fun loadCachedSummary() {
+        val cached = prefs.getCachedScanSummary() ?: return
+        _uiState.update {
+            it.copy(
+                totalSize = cached.totalSizeBytes,
+                totalFiles = cached.fileCount,
+                summaryInfo = if (cached.fileCount > 0) "Found ${cached.fileCount} files (${formatSize(cached.totalSizeBytes)})" else "Ready to scan",
+                isLoading = false,
+                smartSuggestionSummary = it.smartSuggestionSummary.copy(totalSpaceToFree = cached.potentialCleanupBytes),
+                categorySummaries = cached.categories.map { category ->
+                    CategorySummaryUi(category.title, "Cached summary", category.count, category.sizeBytes, "REVIEW_CAREFULLY", emptyList())
+                }
+            )
+        }
+    }
+
     private suspend fun ensureMinimumLoadingDuration(startedAtMillis: Long) {
         val minimumDurationMillis = 800L
         val elapsed = System.currentTimeMillis() - startedAtMillis
@@ -357,17 +380,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private suspend fun applyLoadedMediaState(allItems: List<SimpleMediaItem>) {
-        val memes = withContext(Dispatchers.IO) {
-            val classifier = MemeClassifier(getApplication())
-            try {
-                val memeItems = ArrayList<SimpleMediaItem>(allItems.size / 4)
-                allItems.forEach { item ->
-                    if (isMeme(item, classifier)) memeItems.add(item)
-                }
-                memeItems
-            } finally {
-                classifier.close()
-            }
+        val memes = allItems.filter { item ->
+            item.name.contains("meme", ignoreCase = true) || item.path.contains("meme", ignoreCase = true)
         }
 
         val computedState = withContext(Dispatchers.Default) {

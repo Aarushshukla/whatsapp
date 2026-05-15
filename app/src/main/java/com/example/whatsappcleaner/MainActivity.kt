@@ -70,9 +70,7 @@ class MainActivity : ComponentActivity() {
                     val granted = permissions.isNotEmpty() && permissions.values.all { isGranted -> isGranted }
                     Log.d(TAG, "Permission result: $permissions")
                     viewModel.updatePermissionStatus(granted)
-                    if (granted) {
-                        viewModel.refreshMedia()
-                    } else {
+                    if (!granted) {
                         Log.w(TAG, "Media permissions denied. Showing fallback UI.")
                     }
                 }
@@ -106,16 +104,11 @@ class MainActivity : ComponentActivity() {
             .onFailure { error -> Log.e(TAG, "Unable to refresh purchases on resume.", error) }
         */
         val hasPermission = syncPermissionState()
-        if (hasPermission) {
-            viewModel.refreshMedia(showLoading = false)
-        }
+        if (!hasPermission) return
     }
 
     private fun ensureMediaAccessForSignedInUser() {
-        val hasPermission = syncPermissionState()
-        if (hasPermission) {
-            viewModel.refreshMedia()
-        }
+        syncPermissionState()
     }
 
     private fun requiredPermissions(): Array<String> =
@@ -155,7 +148,6 @@ class MainActivity : ComponentActivity() {
         if (permissions.isEmpty()) {
             Log.w(TAG, "No storage permissions are required on this device configuration.")
             viewModel.updatePermissionStatus(true)
-            viewModel.refreshMedia()
             return
         }
         val alreadyGranted = permissions.all { permission ->
@@ -164,7 +156,6 @@ class MainActivity : ComponentActivity() {
         if (alreadyGranted) {
             Log.d(TAG, "Storage permissions already granted.")
             viewModel.updatePermissionStatus(true)
-            viewModel.refreshMedia()
             return
         }
         Log.d(TAG, "Requesting media permissions: ${permissions.joinToString()}")

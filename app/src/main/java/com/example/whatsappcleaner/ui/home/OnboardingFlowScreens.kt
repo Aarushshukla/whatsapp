@@ -50,15 +50,17 @@ import androidx.compose.ui.unit.dp
 
 private val Bg = Color(0xFFF7F9FC)
 private val Green = Color(0xFF20A64A)
+private val MainText = Color(0xFF20242A)
+private val SecondaryText = Color(0xFF6B7280)
 
 @Composable
 fun PermissionIntroScreen(onAllow: () -> Unit, message: String?) {
     Column(Modifier.fillMaxSize().background(Bg).padding(20.dp), verticalArrangement = Arrangement.SpaceBetween) {
         Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Text("Your cleanup is just two steps away", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-            Card(colors = CardDefaults.cardColors(containerColor = Color.White)) { Text("Storage access needed", Modifier.padding(16.dp)) }
-            Text("1. Give storage access\nWe need permission to scan your chat photos, videos, audio, and files.")
-            Text("2. Scan for junk\nWe’ll show what can be safely reviewed to free up space.")
+            Text("Your cleanup is just two steps away", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = MainText)
+            Card(colors = CardDefaults.cardColors(containerColor = Color.White)) { Text("Storage access needed", Modifier.padding(16.dp), color = MainText) }
+            Text("1. Give storage access\nWe need permission to scan your chat photos, videos, audio, and files.", color = SecondaryText)
+            Text("2. Scan for junk\nWe’ll show what can be safely reviewed to free up space.", color = SecondaryText)
             if (!message.isNullOrBlank()) Text(message, color = Color(0xFFEF4444))
         }
         Button(onClick = onAllow, modifier = Modifier.fillMaxWidth()) { Text("ALLOW STORAGE ACCESS") }
@@ -76,8 +78,8 @@ fun CheckSuccessScreen(title: String, subtitle: String, buttonText: String, onCo
             }
         }
         Spacer(Modifier.height(16.dp))
-        Text(title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-        Text(subtitle)
+        Text(title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = MainText)
+        Text(subtitle, color = SecondaryText)
         Spacer(Modifier.height(20.dp))
         Button(onClick = onContinue) { Text(buttonText) }
     }
@@ -87,8 +89,8 @@ fun CheckSuccessScreen(title: String, subtitle: String, buttonText: String, onCo
 fun ScanIntroScreen(onScan: () -> Unit, scanning: Boolean) {
     val scale by animateFloatAsState(if (scanning) 0.96f else 1f, tween(180), label = "scan_button_scale")
     Column(Modifier.fillMaxSize().background(Bg), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-        Text("ChatSweep", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
-        Text("Private offline media cleaner")
+        Text("ChatSweep", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold, color = MainText)
+        Text("Private offline media cleaner", color = SecondaryText)
         Spacer(Modifier.height(24.dp))
         Button(
             onClick = onScan,
@@ -98,8 +100,8 @@ fun ScanIntroScreen(onScan: () -> Unit, scanning: Boolean) {
             modifier = Modifier.size(170.dp).scale(scale)
         ) { Text(if (scanning) "SCANNING..." else "SCAN") }
         Spacer(Modifier.height(18.dp))
-        Text("Find duplicate, large, old, and junk chat media.")
-        Text("Offline scan • No auto-delete • Review first")
+        Text("Find duplicate, large, old, and junk chat media.", color = SecondaryText)
+        Text("Offline scan • No auto-delete • Review first", color = SecondaryText)
     }
 }
 
