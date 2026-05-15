@@ -1,7 +1,11 @@
 package com.example.whatsappcleaner.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.core.tween
@@ -153,21 +157,26 @@ fun WhatsCleanAppRoot(
 ) {
         val context = LocalContext.current
     val prefs = remember { com.example.whatsappcleaner.data.local.UserPrefs.get(context) }
-    var permissionSuccessShown by remember { mutableStateOf(false) }
+    var permissionGreatAcknowledged by remember { mutableStateOf(false) }
     var firstScanFinishedShown by remember { mutableStateOf(false) }
     val firstScanCompleted = remember(state.permissionGranted, state.totalFiles) { prefs.isFirstScanCompleted() || state.totalFiles > 0 }
 
     if (!state.permissionGranted) {
+        permissionGreatAcknowledged = false
         PermissionIntroScreen(onAllow = onRequestPermission, message = if (scanUiState is ScanUiState.Error) "Storage access is needed to scan chat media." else null)
         return
     }
-    if (!permissionSuccessShown) {
-        LaunchedEffect(Unit) { kotlinx.coroutines.delay(900); permissionSuccessShown = true }
-        CheckSuccessScreen("Great", "Storage access is ready.", "Continue") { permissionSuccessShown = true }
+    if (!permissionGreatAcknowledged) {
+        AnimatedContent(targetState = "great", transitionSpec = {
+            (slideInHorizontally(animationSpec = tween(300)) + fadeIn(animationSpec = tween(280))) togetherWith
+                (slideOutHorizontally(animationSpec = tween(300)) + fadeOut(animationSpec = tween(220)))
+        }, label = "permission_great_transition") {
+            CheckSuccessScreen("Great", "Storage access is ready.", "CONTINUE") { permissionGreatAcknowledged = true }
+        }
         return
     }
     if (!firstScanCompleted && scanUiState !is ScanUiState.Loading && scanUiState !is ScanUiState.Success) {
-        ScanIntroScreen(onScan = { onAiScanClick() }, scanning = scanUiState is ScanUiState.Loading)
+        ScanIntroScreen(onScan = onAiScanClick, scanning = scanUiState is ScanUiState.Loading)
         return
     }
     if (scanUiState is ScanUiState.Loading) {
