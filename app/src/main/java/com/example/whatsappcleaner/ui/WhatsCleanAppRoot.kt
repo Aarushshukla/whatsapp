@@ -178,7 +178,7 @@ fun WhatsCleanAppRoot(
     var hasSeenPermissionSuccess by rememberSaveable { mutableStateOf(prefs.hasSeenPermissionSuccess()) }
     var hasCompletedFirstScan by rememberSaveable { mutableStateOf(prefs.isFirstScanCompleted()) }
     var hasCompletedOnboarding by rememberSaveable { mutableStateOf(prefs.hasCompletedOnboarding()) }
-    var appScreenState by rememberSaveable { mutableStateOf<AppScreenState>(AppScreenState.Resolving) }
+    var appScreenState by remember { mutableStateOf<AppScreenState>(AppScreenState.Resolving) }
     var scanLaunchInFlight by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(state.permissionGranted, permissionJustGranted, hasSeenPermissionSuccess, hasCompletedFirstScan, hasCompletedOnboarding, scanUiState, firstScanFinishedShown) {
