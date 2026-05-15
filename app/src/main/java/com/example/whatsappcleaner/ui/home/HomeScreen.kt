@@ -29,6 +29,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Collections
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.ImageSearch
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.SdStorage
@@ -37,6 +39,7 @@ import androidx.compose.material.icons.filled.ViewAgenda
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHost
@@ -66,6 +69,10 @@ private data class CategoryCardModel(
     val safety: String,
     val onClick: () -> Unit
 )
+private val AppBg = Color(0xFFF7F9FC)
+private val CardBg = Color(0xFFFFFFFF)
+private val MainText = Color(0xFF20242A)
+private val SecondaryText = Color(0xFF6B7280)
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -149,7 +156,6 @@ fun SimpleHomeScreen(
         CategoryCardModel(Icons.Default.ViewAgenda, "Status Files", "Temporary status media to review", 0, 0, "Review", onNavigateToMediaViewer),
         CategoryCardModel(Icons.Default.Collections, "Memes & Stickers", "Low-value shareables", memeCount, totalSize / 8, "Review first", onNavigateToMemeAnalyzer),
         CategoryCardModel(Icons.Default.ImageSearch, "Blurry Images", "Likely low-quality photos", 0, 0, "AI assist", onNavigateToSmartClean),
-        CategoryCardModel(Icons.Default.ContentCopy, "Forwarded Duplicates", "Repeated forwarded content", spamCount, totalSize / 10, "Review", onNavigateToSpam),
         CategoryCardModel(Icons.Default.Storage, "Review Carefully", "Potentially important files", junkCount, totalSize / 12, "Needs attention", onNavigateToJunk)
     )
 
@@ -161,17 +167,26 @@ fun SimpleHomeScreen(
     )
 
     LazyColumn(
-        modifier = Modifier.fillMaxSize().background(Color(0xFFF4F7FB)),
+        modifier = Modifier.fillMaxSize().background(AppBg),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         item {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Text("ChatSweep", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = MainText)
+                Row {
+                    IconButton(onClick = onNavigateToSettings) { Icon(Icons.Default.Menu, contentDescription = "Menu", tint = MainText) }
+                    IconButton(onClick = onRefreshClick, enabled = scanUiState !is ScanUiState.Loading) { Icon(Icons.Default.Storage, contentDescription = "Scan Again", tint = MainText) }
+                }
+            }
+        }
+        item {
             Text("You can free up ${formatSize(animatedBytes.toLong())}", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-            Text("Review files before deleting. Nothing is deleted automatically.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("Review files before deleting. Nothing is deleted automatically.", color = SecondaryText)
         }
 
         item {
-            Card(shape = RoundedCornerShape(24.dp), elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)) {
+            Card(shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = CardBg), elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)) {
                 Column(Modifier.fillMaxWidth().padding(18.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     Box(Modifier.size(136.dp), contentAlignment = Alignment.Center) {
                         androidx.compose.material3.CircularProgressIndicator(
@@ -187,13 +202,13 @@ fun SimpleHomeScreen(
                         }
                     }
                     Spacer(Modifier.height(10.dp))
-                    Text(scanStageText)
+                    Text(scanStageText, color = MainText)
                     Spacer(Modifier.height(12.dp))
                     Button(onClick = onRefreshClick, modifier = Modifier.fillMaxWidth(), enabled = scanUiState !is ScanUiState.Loading) {
-                        Text(if (isLoading) "Scanning..." else "Clean Safely")
+                        Text(if (isLoading) "Scanning..." else "Scan Again")
                     }
                     Spacer(Modifier.height(8.dp))
-                    Text("No auto-delete • Review before deleting • Offline scan", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("No auto-delete • Review before deleting • Offline scan", style = MaterialTheme.typography.bodySmall, color = SecondaryText)
                 }
             }
         }
@@ -207,12 +222,12 @@ fun SimpleHomeScreen(
             }
         }
 
-        item { Text("Scan Results", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) }
+        item { Text("Scan Results", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MainText) }
 
         if (visibleCards.isEmpty()) {
             item {
                 Card(shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = Color.White), modifier = Modifier.fillMaxWidth()) {
-                    Text("Everything looks clean for now. Run another scan anytime.", modifier = Modifier.padding(16.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Everything looks clean for now. Run another scan anytime.", modifier = Modifier.padding(16.dp), color = SecondaryText)
                 }
             }
         }
@@ -236,11 +251,15 @@ fun SimpleHomeScreen(
                             Icon(card.icon, null, tint = MaterialTheme.colorScheme.primary)
                         }
                         Column(Modifier.weight(1f).padding(start = 12.dp)) {
-                            Text(card.title, fontWeight = FontWeight.SemiBold)
-                            Text(card.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text("${card.fileCount} files • ${formatSize(card.storageBytes)}", style = MaterialTheme.typography.labelMedium)
+                            val pct = if (totalSize > 0L) ((card.storageBytes.toDouble() / totalSize.toDouble()) * 100.0).toInt().coerceIn(0, 100) else 0
+                            Text(card.title, fontWeight = FontWeight.SemiBold, color = MainText)
+                            Text(card.description, style = MaterialTheme.typography.bodySmall, color = SecondaryText)
+                            Text("${card.fileCount} files • ${formatSize(card.storageBytes)} • $pct%", style = MaterialTheme.typography.labelMedium, color = SecondaryText)
                         }
-                        Text(card.safety, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(card.safety, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = SecondaryText)
+                        }
                     }
                 }
             }
@@ -252,10 +271,10 @@ fun SimpleHomeScreen(
 
 @Composable
 private fun StatChip(title: String, value: String) {
-    Card(shape = RoundedCornerShape(14.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
+    Card(shape = RoundedCornerShape(14.dp), colors = CardDefaults.cardColors(containerColor = CardBg)) {
         Column(Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
-            Text(title, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(value, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            Text(title, style = MaterialTheme.typography.labelSmall, color = SecondaryText)
+            Text(value, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = MainText)
         }
     }
 }
