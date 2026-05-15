@@ -32,6 +32,8 @@ class UserPrefs private constructor(context: Context) {
         private const val KEY_SCAN_HISTORY = "scan_history_v1"
 
     private const val KEY_FIRST_SCAN_COMPLETED = "first_scan_completed"
+    private const val KEY_PERMISSION_SUCCESS_SEEN = "permission_success_seen"
+    private const val KEY_ONBOARDING_COMPLETED = "onboarding_completed"
     }
 
     data class ScanHistoryRecord(
@@ -122,6 +124,10 @@ class UserPrefs private constructor(context: Context) {
 
     fun isFirstScanCompleted(): Boolean = prefs.getBoolean(KEY_FIRST_SCAN_COMPLETED, false)
     fun setFirstScanCompleted(completed: Boolean) = prefs.edit().putBoolean(KEY_FIRST_SCAN_COMPLETED, completed).apply()
+    fun hasSeenPermissionSuccess(): Boolean = prefs.getBoolean(KEY_PERMISSION_SUCCESS_SEEN, false)
+    fun setSeenPermissionSuccess(seen: Boolean) = prefs.edit().putBoolean(KEY_PERMISSION_SUCCESS_SEEN, seen).apply()
+    fun hasCompletedOnboarding(): Boolean = prefs.getBoolean(KEY_ONBOARDING_COMPLETED, false)
+    fun setCompletedOnboarding(completed: Boolean) = prefs.edit().putBoolean(KEY_ONBOARDING_COMPLETED, completed).apply()
 
     fun appendScanHistory(record: ScanHistoryRecord) {
         val existing = getScanHistory().toMutableList().apply { add(record) }
@@ -160,4 +166,3 @@ class UserPrefs private constructor(context: Context) {
         }.getOrDefault(emptyList())
     }
 }
-
