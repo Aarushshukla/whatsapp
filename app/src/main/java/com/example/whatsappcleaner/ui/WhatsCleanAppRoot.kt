@@ -391,7 +391,11 @@ fun WhatsCleanAppRoot(
                 },
                 onNavigateToPrivacyPolicy = { navController.navigateSingleTop(Routes.PrivacyPolicy) },
                 onNavigateToTerms = { navController.navigateSingleTop(Routes.Terms) },
-                onNavigateToAbout = { navController.navigateSingleTop(Routes.About) }
+                onNavigateToAbout = { navController.navigateSingleTop(Routes.About) },
+                onNavigateToHelpFeedback = { navController.navigateSingleTop(Routes.Settings) },
+                onNavigateToScanHistory = { navController.navigateSingleTop(Routes.Analytics) },
+                onNavigateToCleanupReceipt = { navController.navigateSingleTop(Routes.SmartClean) },
+                onNavigateToStorageOverview = { navController.navigateSingleTop(Routes.Analytics) }
             )
         }
 
