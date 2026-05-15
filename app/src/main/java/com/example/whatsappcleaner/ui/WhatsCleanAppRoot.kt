@@ -120,6 +120,8 @@ fun WhatsCleanAppRoot(
     onOpenSystemStorage: () -> Unit,
     onRequestPermission: () -> Unit,
     onOpenAppSettings: () -> Unit,
+    showPermissionSettingsCta: Boolean,
+    permissionDeniedMessage: String?,
     onSettingsOpened: () -> Unit,
     onThemeSelected: (AppThemeMode) -> Unit,
     onSmartAlertsToggle: (Boolean) -> Unit,
@@ -171,7 +173,12 @@ fun WhatsCleanAppRoot(
 
     if (!state.permissionGranted) {
         permissionJustGranted = false
-        PermissionIntroScreen(onAllow = onRequestPermission, message = if (scanUiState is ScanUiState.Error) "Storage access is needed to scan chat media." else null)
+        PermissionIntroScreen(
+            onAllow = onRequestPermission,
+            message = permissionDeniedMessage ?: if (scanUiState is ScanUiState.Error) "Storage access is needed to scan chat media." else null,
+            showOpenSettings = showPermissionSettingsCta,
+            onOpenSettings = onOpenAppSettings
+        )
         return
     }
     if (permissionJustGranted && !permissionGreatAcknowledged) {
@@ -188,7 +195,7 @@ fun WhatsCleanAppRoot(
         return
     }
     if (!firstScanCompleted && scanUiState !is ScanUiState.Loading && scanUiState !is ScanUiState.Success) {
-        ScanIntroScreen(onScan = onAiScanClick, scanning = scanUiState is ScanUiState.Loading)
+        ScanIntroScreen(onScan = onRefreshClick, scanning = scanUiState is ScanUiState.Loading)
         return
     }
     if (scanUiState is ScanUiState.Loading) {
@@ -659,6 +666,8 @@ private fun NavHostController.navigateSingleTop(route: String) {
 private fun PermissionGate(
     onRequestPermission: () -> Unit,
     onOpenAppSettings: () -> Unit,
+    showPermissionSettingsCta: Boolean,
+    permissionDeniedMessage: String?,
     modifier: Modifier = Modifier
 ) {
     Column(

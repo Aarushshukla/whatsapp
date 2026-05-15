@@ -22,6 +22,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
 import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -45,6 +48,8 @@ class MainActivity : ComponentActivity() {
     private val subscriptionRepository by lazy(LazyThreadSafetyMode.NONE) { SubscriptionRepository.get(this) }
     private val adManager by lazy(LazyThreadSafetyMode.NONE) { AdManager(this) }
     private var hasShownExitAdThisSession = false
+    private var permissionDeniedMessage by mutableStateOf<String?>(null)
+    private var showPermissionSettingsCta by mutableStateOf(false)
     private val deleteLauncher =
         registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
             try {
@@ -72,6 +77,14 @@ class MainActivity : ComponentActivity() {
                     viewModel.updatePermissionStatus(granted)
                     if (!granted) {
                         Log.w(TAG, "Media permissions denied. Showing fallback UI.")
+                        permissionDeniedMessage = "Storage access is needed to scan chat media."
+                        val permanentlyDenied = requiredPermissions().any { permission ->
+                            !shouldShowRequestPermissionRationale(permission)
+                        }
+                        showPermissionSettingsCta = permanentlyDenied
+                    } else {
+                        permissionDeniedMessage = null
+                        showPermissionSettingsCta = false
                     }
                 }
             }
@@ -159,6 +172,8 @@ class MainActivity : ComponentActivity() {
             return
         }
         Log.d(TAG, "Requesting media permissions: ${permissions.joinToString()}")
+        permissionDeniedMessage = null
+        showPermissionSettingsCta = false
         requestPermissionLauncher.launch(permissions)
     }
 
@@ -420,6 +435,8 @@ class MainActivity : ComponentActivity() {
                 },
                 onRequestPermission = ::requestStoragePermissions,
                 onOpenAppSettings = ::openAppSettings,
+                showPermissionSettingsCta = showPermissionSettingsCta,
+                permissionDeniedMessage = permissionDeniedMessage,
                 onSettingsOpened = viewModel::onSettingsOpened,
                 onThemeSelected = viewModel::setThemeMode,
                 onSmartAlertsToggle = viewModel::setSmartAlerts,

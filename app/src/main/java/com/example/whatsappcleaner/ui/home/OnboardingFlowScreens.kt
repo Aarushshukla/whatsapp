@@ -54,16 +54,35 @@ private val MainText = Color(0xFF20242A)
 private val SecondaryText = Color(0xFF6B7280)
 
 @Composable
-fun PermissionIntroScreen(onAllow: () -> Unit, message: String?) {
+fun PermissionIntroScreen(
+    onAllow: () -> Unit,
+    message: String?,
+    showOpenSettings: Boolean,
+    onOpenSettings: () -> Unit
+) {
     Column(Modifier.fillMaxSize().background(Bg).padding(20.dp), verticalArrangement = Arrangement.SpaceBetween) {
         Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Text("Your cleanup is just two steps away", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = MainText)
+            Text("Your chat cleanup is just two steps away", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = MainText)
             Card(colors = CardDefaults.cardColors(containerColor = Color.White)) { Text("Storage access needed", Modifier.padding(16.dp), color = MainText) }
-            Text("1. Give storage access\nWe need permission to scan your chat photos, videos, audio, and files.", color = SecondaryText)
-            Text("2. Scan for junk\nWe’ll show what can be safely reviewed to free up space.", color = SecondaryText)
+            Card(colors = CardDefaults.cardColors(containerColor = Color.White)) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("Give media access", color = MainText, fontWeight = FontWeight.SemiBold)
+                    Text("We need permission to scan your chat photos, videos, audio, and files.", color = SecondaryText)
+                    Text("Scan chat junk", color = MainText, fontWeight = FontWeight.SemiBold)
+                    Text("We’ll show what can be safely reviewed to free up space.", color = SecondaryText)
+                }
+            }
             if (!message.isNullOrBlank()) Text(message, color = Color(0xFFEF4444))
         }
-        Button(onClick = onAllow, modifier = Modifier.fillMaxWidth()) { Text("ALLOW STORAGE ACCESS") }
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Button(onClick = onAllow, modifier = Modifier.fillMaxWidth()) { Text("ALLOW STORAGE ACCESS") }
+            if (!message.isNullOrBlank()) {
+                Button(onClick = onAllow, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF5A623), contentColor = Color.White)) { Text("Try again") }
+                if (showOpenSettings) {
+                    Button(onClick = onOpenSettings, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = MainText)) { Text("Open settings") }
+                }
+            }
+        }
     }
 }
 
@@ -81,7 +100,7 @@ fun CheckSuccessScreen(title: String, subtitle: String, buttonText: String, onCo
         Text(title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = MainText)
         Text(subtitle, color = SecondaryText)
         Spacer(Modifier.height(20.dp))
-        Button(onClick = onContinue) { Text(buttonText) }
+        Button(onClick = onContinue, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2F6FED), contentColor = Color.White)) { Text(buttonText) }
     }
 }
 
