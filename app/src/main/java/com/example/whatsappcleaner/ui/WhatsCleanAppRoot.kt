@@ -28,6 +28,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
@@ -157,21 +158,32 @@ fun WhatsCleanAppRoot(
 ) {
         val context = LocalContext.current
     val prefs = remember { com.example.whatsappcleaner.data.local.UserPrefs.get(context) }
-    var permissionGreatAcknowledged by remember { mutableStateOf(false) }
-    var firstScanFinishedShown by remember { mutableStateOf(false) }
-    val firstScanCompleted = remember(state.permissionGranted, state.totalFiles) { prefs.isFirstScanCompleted() || state.totalFiles > 0 }
+    var permissionGreatAcknowledged by rememberSaveable { mutableStateOf(prefs.hasSeenPermissionSuccess()) }
+    var firstScanFinishedShown by rememberSaveable { mutableStateOf(false) }
+    var permissionJustGranted by rememberSaveable { mutableStateOf(false) }
+    var previousPermissionGranted by rememberSaveable { mutableStateOf(state.permissionGranted) }
+    val firstScanCompleted = remember(state.totalFiles) { prefs.isFirstScanCompleted() || prefs.hasCompletedOnboarding() || state.totalFiles > 0 }
+
+    LaunchedEffect(state.permissionGranted) {
+        permissionJustGranted = !previousPermissionGranted && state.permissionGranted && !prefs.hasSeenPermissionSuccess()
+        previousPermissionGranted = state.permissionGranted
+    }
 
     if (!state.permissionGranted) {
-        permissionGreatAcknowledged = false
+        permissionJustGranted = false
         PermissionIntroScreen(onAllow = onRequestPermission, message = if (scanUiState is ScanUiState.Error) "Storage access is needed to scan chat media." else null)
         return
     }
-    if (!permissionGreatAcknowledged) {
+    if (permissionJustGranted && !permissionGreatAcknowledged) {
         AnimatedContent(targetState = "great", transitionSpec = {
             (slideInHorizontally(animationSpec = tween(300)) + fadeIn(animationSpec = tween(280))) togetherWith
                 (slideOutHorizontally(animationSpec = tween(300)) + fadeOut(animationSpec = tween(220)))
         }, label = "permission_great_transition") {
-            CheckSuccessScreen("Great", "Storage access is ready.", "CONTINUE") { permissionGreatAcknowledged = true }
+            CheckSuccessScreen("Great", "Storage access is ready.", "CONTINUE") {
+                permissionGreatAcknowledged = true
+                permissionJustGranted = false
+                prefs.setSeenPermissionSuccess(true)
+            }
         }
         return
     }
@@ -185,7 +197,11 @@ fun WhatsCleanAppRoot(
     }
     if (scanUiState is ScanUiState.Success && !firstScanCompleted && !firstScanFinishedShown) {
         val msg = if (state.totalSize > 0L) "You can review ${com.example.whatsappcleaner.data.local.formatSize(state.totalSize)}" else "Your results are ready"
-        CheckSuccessScreen("Your scan is finished!", msg, "CONTINUE") { prefs.setFirstScanCompleted(true); firstScanFinishedShown = true }
+        CheckSuccessScreen("Your scan is finished!", msg, "CONTINUE") {
+            prefs.setFirstScanCompleted(true)
+            prefs.setCompletedOnboarding(true)
+            firstScanFinishedShown = true
+        }
         return
     }
 if (state.isLoading && state.filteredItems.isEmpty() && state.permissionGranted) {

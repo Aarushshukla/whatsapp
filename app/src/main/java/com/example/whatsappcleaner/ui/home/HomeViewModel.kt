@@ -39,6 +39,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.annotation.MainThread
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.TimeoutCancellationException
 
 enum class PremiumFeature(val analyticsKey: String, val paywallSource: String) {
     SMART_CLEAN_ADVANCED("smart_clean_clicked", "smart_clean_advanced"),
@@ -162,6 +164,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         private const val INITIAL_LOAD_LIMIT = 100
         private const val LARGE_FILE_THRESHOLD_BYTES = 10L * 1024L * 1024L
         private const val OLD_FILE_AGE_DAYS = 30L
+        private const val SCAN_TIMEOUT_MILLIS = 90_000L
     }
 
     private val mediaLoader = MediaLoader(application)
@@ -265,7 +268,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 return@launch
             }
             refreshInProgress = true
-            _scanUiState.value = ScanUiState.Loading("Reading chat media folders", 0.1f)
+            _scanUiState.value = ScanUiState.Loading("Reading chat folders", 0.05f)
             Log.d(TAG, "Refreshing media library.")
             val loadStartedAt = System.currentTimeMillis()
             if (showLoading) {
@@ -274,28 +277,31 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
             try {
-                val images = mediaLoader.loadAllDeviceMedia("image", limit = INITIAL_LOAD_LIMIT)
-                val videos = mediaLoader.loadAllDeviceMedia("video", limit = INITIAL_LOAD_LIMIT)
-                val initialItems = (images + videos).sortedByDescending { mediaItem -> mediaItem.addedMillis }
-                _scanUiState.value = ScanUiState.Loading("Finding duplicate files", 0.3f)
-                if (showLoading) {
-                    ensureMinimumLoadingDuration(loadStartedAt)
-                }
-                applyLoadedMediaState(initialItems)
-                hasLoadedInitialCache = true
+                val allItems = withTimeout(SCAN_TIMEOUT_MILLIS) {
+                    val images = mediaLoader.loadAllDeviceMedia("image", limit = INITIAL_LOAD_LIMIT)
+                    val videos = mediaLoader.loadAllDeviceMedia("video", limit = INITIAL_LOAD_LIMIT)
+                    val initialItems = (images + videos).sortedByDescending { mediaItem -> mediaItem.addedMillis }
+                    _scanUiState.value = ScanUiState.Loading("Finding duplicates", 0.3f)
+                    if (showLoading) {
+                        ensureMinimumLoadingDuration(loadStartedAt)
+                    }
+                    applyLoadedMediaState(initialItems)
+                    hasLoadedInitialCache = true
 
-                val fullImages = mediaLoader.loadAllDeviceMedia("image")
-                val fullVideos = mediaLoader.loadAllDeviceMedia("video")
-                _scanUiState.value = ScanUiState.Loading("Checking large videos", 0.5f)
-                val allItems = (fullImages + fullVideos).sortedByDescending { mediaItem -> mediaItem.addedMillis }
-                Log.d("FILES", "Files found: ${allItems.size}")
-                _scanUiState.value = ScanUiState.Loading("Detecting old media", 0.7f)
+                    val fullImages = mediaLoader.loadAllDeviceMedia("image")
+                    val fullVideos = mediaLoader.loadAllDeviceMedia("video")
+                    _scanUiState.value = ScanUiState.Loading("Checking large videos", 0.5f)
+                    val loadedItems = (fullImages + fullVideos).sortedByDescending { mediaItem -> mediaItem.addedMillis }
+                    Log.d("FILES", "Files found: ${loadedItems.size}")
+                    _scanUiState.value = ScanUiState.Loading("Detecting old media", 0.7f)
 
-                if (allItems.size != initialItems.size) {
-                    applyLoadedMediaState(allItems)
+                    if (loadedItems.size != initialItems.size) {
+                        applyLoadedMediaState(loadedItems)
+                    }
+                    _scanUiState.value = ScanUiState.Loading("Finding statuses and stickers", 0.85f)
+                    _scanUiState.value = ScanUiState.Loading("Preparing results", 0.97f)
+                    loadedItems
                 }
-                _scanUiState.value = ScanUiState.Loading("Finding statuses and stickers", 0.85f)
-                _scanUiState.value = ScanUiState.Loading("Preparing safe cleanup", 0.97f)
                 _scanUiState.value = if (allItems.isEmpty()) ScanUiState.Empty else ScanUiState.Success(
                     "Found ${allItems.size} files (${formatSize(allItems.sumOf { it.sizeKb.toLong() * 1024L })})"
                 )
@@ -312,6 +318,14 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 }
                 hasLoadedInitialCache = true
+            } catch (error: TimeoutCancellationException) {
+                Log.e(TAG, "Media scan timed out.", error)
+                _scanUiState.value = ScanUiState.Error("Scan took too long. Please try again.")
+                withContext(Dispatchers.Main) {
+                    _uiState.update { currentState ->
+                        currentState.copy(summaryInfo = "Scan timeout. Please try again.", isLoading = false)
+                    }
+                }
             } catch (error: SecurityException) {
                 Log.e(TAG, "Media scan failed due to permission issue.", error)
                 withContext(Dispatchers.Main) {
