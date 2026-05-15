@@ -171,7 +171,12 @@ fun WhatsCleanAppRoot(
 
     if (!state.permissionGranted) {
         permissionJustGranted = false
-        PermissionIntroScreen(onAllow = onRequestPermission, message = if (scanUiState is ScanUiState.Error) "Storage access is needed to scan chat media." else null)
+        PermissionIntroScreen(
+            onAllow = onRequestPermission,
+            onTryAgain = onRequestPermission,
+            onOpenSettings = onOpenAppSettings,
+            message = if (scanUiState is ScanUiState.Error) "Storage access is needed to scan chat media." else null
+        )
         return
     }
     if (permissionJustGranted && !permissionGreatAcknowledged) {
