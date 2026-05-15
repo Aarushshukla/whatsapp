@@ -37,6 +37,9 @@ import androidx.compose.material.icons.filled.SdStorage
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.ViewAgenda
 import androidx.compose.material3.Button
+import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.rememberDrawerState
+import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.IconButton
@@ -49,6 +52,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -59,6 +63,8 @@ import com.example.whatsappcleaner.data.ReminderFreq
 import com.example.whatsappcleaner.data.ReminderTime
 import com.example.whatsappcleaner.data.local.SimpleMediaItem
 import com.example.whatsappcleaner.data.local.formatSize
+import com.example.whatsappcleaner.ui.navigation.AppDrawer
+import kotlinx.coroutines.launch
 
 private data class CategoryCardModel(
     val icon: ImageVector,
@@ -129,8 +135,13 @@ fun SimpleHomeScreen(
     suggestionReasonsByUri: Map<String, List<String>>,
     scanUiState: ScanUiState,
     onNavigateToFeatures: () -> Unit,
-    onAiFeatureClick: (AiFeature) -> Unit
+    onAiFeatureClick: (AiFeature) -> Unit,
+    onNavigateToPrivacyPolicy: () -> Unit,
+    onNavigateToTerms: () -> Unit,
+    onNavigateToAbout: () -> Unit
 ) {
+    val drawerState = rememberDrawerState(DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     LaunchedEffect(deleteSnackbarMessage) {
         deleteSnackbarMessage?.let {
@@ -166,6 +177,25 @@ fun SimpleHomeScreen(
         label = "space_countup"
     )
 
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            AppDrawer { route ->
+                scope.launch { drawerState.close() }
+                when (route) {
+                    "home" -> Unit
+                    "scan_again" -> onRefreshClick()
+                    "smart_review" -> onNavigateToSmartClean()
+                    "categories" -> onNavigateToFeatures()
+                    "storage_overview" -> onNavigateToAnalytics()
+                    "privacy_policy" -> onNavigateToPrivacyPolicy()
+                    "terms" -> onNavigateToTerms()
+                    "about" -> onNavigateToAbout()
+                    "settings" -> onNavigateToSettings()
+                }
+            }
+        }
+    ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize().background(AppBg),
         contentPadding = PaddingValues(16.dp),
@@ -175,13 +205,13 @@ fun SimpleHomeScreen(
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Text("ChatSweep", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = MainText)
                 Row {
-                    IconButton(onClick = onNavigateToSettings) { Icon(Icons.Default.Menu, contentDescription = "Menu", tint = MainText) }
+                    IconButton(onClick = { scope.launch { drawerState.open() } }) { Icon(Icons.Default.Menu, contentDescription = "Menu", tint = MainText) }
                     IconButton(onClick = onRefreshClick, enabled = scanUiState !is ScanUiState.Loading) { Icon(Icons.Default.Storage, contentDescription = "Scan Again", tint = MainText) }
                 }
             }
         }
         item {
-            Text("You can free up ${formatSize(animatedBytes.toLong())}", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            Text("You can free up ${formatSize(animatedBytes.toLong())}", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = MainText)
             Text("Review files before deleting. Nothing is deleted automatically.", color = SecondaryText)
         }
 
@@ -266,6 +296,7 @@ fun SimpleHomeScreen(
         }
 
         item { SnackbarHost(snackbarHostState) }
+    }
     }
 }
 

@@ -70,7 +70,10 @@ class MainActivity : ComponentActivity() {
                     val granted = permissions.isNotEmpty() && permissions.values.all { isGranted -> isGranted }
                     Log.d(TAG, "Permission result: $permissions")
                     viewModel.updatePermissionStatus(granted)
-                    if (!granted) {
+                    if (granted) {
+                        viewModel.onPermissionGranted()
+                    } else {
+                        viewModel.onPermissionRequestDenied()
                         Log.w(TAG, "Media permissions denied. Showing fallback UI.")
                     }
                 }
