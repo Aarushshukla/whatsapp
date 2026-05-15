@@ -115,8 +115,6 @@ class MainActivity : ComponentActivity() {
         val hasPermission = syncPermissionState()
         if (hasPermission) {
             viewModel.refreshMedia()
-        } else {
-            requestStoragePermissions()
         }
     }
 
