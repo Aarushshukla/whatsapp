@@ -30,6 +30,8 @@ class UserPrefs private constructor(context: Context) {
         private const val KEY_INCLUDE_DUPLICATES = "include_duplicates"
         private const val KEY_FREE_PREMIUM_ATTEMPTS = "free_premium_attempts"
         private const val KEY_SCAN_HISTORY = "scan_history_v1"
+
+    private const val KEY_FIRST_SCAN_COMPLETED = "first_scan_completed"
     }
 
     data class ScanHistoryRecord(
@@ -118,6 +120,9 @@ class UserPrefs private constructor(context: Context) {
 
     fun resetFreePremiumAttempts() = prefs.edit().putInt(KEY_FREE_PREMIUM_ATTEMPTS, 0).apply()
 
+    fun isFirstScanCompleted(): Boolean = prefs.getBoolean(KEY_FIRST_SCAN_COMPLETED, false)
+    fun setFirstScanCompleted(completed: Boolean) = prefs.edit().putBoolean(KEY_FIRST_SCAN_COMPLETED, completed).apply()
+
     fun appendScanHistory(record: ScanHistoryRecord) {
         val existing = getScanHistory().toMutableList().apply { add(record) }
         val trimmed = existing.sortedBy { it.scanDateMillis }.takeLast(12)
@@ -155,3 +160,4 @@ class UserPrefs private constructor(context: Context) {
         }.getOrDefault(emptyList())
     }
 }
+
