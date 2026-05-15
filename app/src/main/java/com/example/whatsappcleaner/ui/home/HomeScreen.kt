@@ -121,4 +121,32 @@ fun SimpleHomeScreen(
     }
 }
 
-@Composable private fun SegmentedBar(values: List<Long>, total: Long) { Row(Modifier.fillMaxWidth().height(10.dp).background(Border, RoundedCornerShape(99.dp))) { values.take(7).forEachIndexed { idx, v -> val w = if (total > 0L) (v.toFloat() / total.toFloat()).coerceIn(0f, 1f) else 0f; Box(Modifier.weight(if (w == 0f) 0.0001f else w).fillMaxSize().background(listOf(PrimaryBlue, Color(0xFF4F8EFF), Color(0xFF6BA2FF), Color(0xFF8DB8FF), Color(0xFFA6C9FF), Color(0xFFC0DAFF), Color(0xFFD9EBFF).getOrElse(idx){PrimaryBlue}))) } } }
+@Composable
+private fun SegmentedBar(values: List<Long>, total: Long) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .height(10.dp)
+            .background(color = Border, shape = RoundedCornerShape(99.dp))
+    ) {
+        values.take(7).forEachIndexed { idx, v ->
+            val w = if (total > 0L) (v.toFloat() / total.toFloat()).coerceIn(0f, 1f) else 0f
+            Box(
+                Modifier
+                    .weight(if (w == 0f) 0.0001f else w)
+                    .fillMaxSize()
+                    .background(
+                        color = listOf(
+                            PrimaryBlue,
+                            Color(0xFF4F8EFF),
+                            Color(0xFF6BA2FF),
+                            Color(0xFF8DB8FF),
+                            Color(0xFFA6C9FF),
+                            Color(0xFFC0DAFF),
+                            Color(0xFFD9EBFF)
+                        ).getOrElse(idx) { PrimaryBlue }
+                    )
+            )
+        }
+    }
+}
