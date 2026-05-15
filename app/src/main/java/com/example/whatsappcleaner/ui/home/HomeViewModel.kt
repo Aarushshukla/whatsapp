@@ -235,6 +235,17 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         */
     }
 
+
+    fun onPermissionRequestDenied() {
+        _scanUiState.value = ScanUiState.Error("Permission denied")
+    }
+
+    fun onPermissionGranted() {
+        if (_scanUiState.value is ScanUiState.Error) {
+            _scanUiState.value = ScanUiState.Idle
+        }
+    }
+
     fun updatePermissionStatus(granted: Boolean) {
         Log.d(TAG, "Permission state updated: granted=$granted")
         _uiState.update { currentState -> currentState.copy(permissionGranted = granted) }
