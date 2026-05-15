@@ -10,15 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Category
-import androidx.compose.material.icons.filled.CleaningServices
-import androidx.compose.material.icons.filled.Dashboard
-import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Policy
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
@@ -39,41 +31,27 @@ import com.example.whatsappcleaner.ui.theme.TextSecondary
 @Composable
 fun AppDrawer(onItemClick: (String) -> Unit) {
     ModalDrawerSheet(drawerContainerColor = SurfaceWhite, drawerContentColor = BrandNavy) {
-        Box(
-            modifier = Modifier.fillMaxWidth().height(180.dp).background(AccentBlue.copy(alpha = 0.18f)).padding(24.dp),
-            contentAlignment = Alignment.BottomStart
-        ) {
-            Column {
-                Box(Modifier.size(50.dp).background(AccentBlue, RoundedCornerShape(12.dp)))
-                Spacer(Modifier.height(12.dp))
-                Text("ChatSweep", style = MaterialTheme.typography.headlineSmall, color = BrandNavy)
-                Text("Clean chat media storage", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
-            }
+        Box(modifier = Modifier.fillMaxWidth().height(180.dp).background(AccentBlue.copy(alpha = 0.18f)).padding(24.dp), contentAlignment = Alignment.BottomStart) {
+            Column { Box(Modifier.size(50.dp).background(AccentBlue, RoundedCornerShape(12.dp))); Spacer(Modifier.height(12.dp)); Text("ChatSweep", style = MaterialTheme.typography.headlineSmall, color = BrandNavy); Text("Clean chat media storage", style = MaterialTheme.typography.bodySmall, color = TextSecondary) }
         }
-
         Spacer(Modifier.height(12.dp))
-        DrawerItem("Dashboard", Icons.Default.Dashboard) { onItemClick("home") }
-        DrawerItem("Scan Again", Icons.Default.Refresh) { onItemClick("scan_again") }
-        DrawerItem("Smart Review", Icons.Default.CleaningServices) { onItemClick("smart_review") }
-        DrawerItem("Categories", Icons.Default.Category) { onItemClick("categories") }
-        DrawerItem("Storage Overview", Icons.Default.Storage) { onItemClick("storage_overview") }
+        val primary = listOf(
+            Triple("Dashboard","home",Icons.Default.Dashboard), Triple("Smart Review","smart_review",Icons.Default.CleaningServices), Triple("Scan Again","scan_again",Icons.Default.Refresh),
+            Triple("Categories","categories",Icons.Default.Category), Triple("Photos","photos",Icons.Default.Image), Triple("Videos","videos",Icons.Default.VideoLibrary), Triple("Audio","audio",Icons.Default.GraphicEq), Triple("Documents","documents",Icons.Default.Description),
+            Triple("Statuses","statuses",Icons.Default.ViewAgenda), Triple("Stickers","stickers",Icons.Default.EmojiEmotions), Triple("Duplicate Finder","duplicate_finder",Icons.Default.ContentCopy), Triple("Large Files","large_files",Icons.Default.FolderOpen),
+            Triple("Old Media","old_media",Icons.Default.Schedule), Triple("Blurry Images","blurry_images",Icons.Default.ImageSearch), Triple("Scan History","scan_history",Icons.Default.History), Triple("Last Cleanup Receipt","last_cleanup_receipt",Icons.Default.ReceiptLong),
+            Triple("Storage Overview","storage_overview",Icons.Default.Storage)
+        )
+        primary.forEach { (label, route, icon) -> DrawerItem(label, icon) { onItemClick(route) } }
         HorizontalDivider(Modifier.padding(vertical = 14.dp, horizontal = 24.dp))
-        DrawerItem("Privacy Policy", Icons.Default.Policy) { onItemClick("privacy_policy") }
-        DrawerItem("Terms", Icons.Default.Description) { onItemClick("terms") }
-        DrawerItem("About", Icons.Default.Info) { onItemClick("about") }
-        DrawerItem("Settings", Icons.Default.Settings) { onItemClick("settings") }
+        listOf(
+            Triple("Privacy Policy","privacy_policy",Icons.Default.Policy), Triple("Terms & Conditions","terms",Icons.Default.Gavel), Triple("About ChatSweep","about",Icons.Default.Info),
+            Triple("Settings","settings",Icons.Default.Settings), Triple("Help & Feedback","help_feedback",Icons.Default.Help)
+        ).forEach { (label, route, icon) -> DrawerItem(label, icon) { onItemClick(route) } }
     }
 }
 
 @Composable
 private fun DrawerItem(label: String, icon: ImageVector, onClick: () -> Unit) {
-    NavigationDrawerItem(
-        label = { Text(label, style = MaterialTheme.typography.titleMedium) },
-        icon = { androidx.compose.material3.Icon(icon, null, tint = BrandNavy) },
-        selected = false,
-        onClick = onClick,
-        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-        shape = RoundedCornerShape(12.dp),
-        colors = NavigationDrawerItemDefaults.colors(unselectedContainerColor = Color.Transparent)
-    )
+    NavigationDrawerItem(label = { Text(label, style = MaterialTheme.typography.titleMedium) }, icon = { androidx.compose.material3.Icon(icon, null, tint = BrandNavy) }, selected = false, onClick = onClick, modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp), shape = RoundedCornerShape(12.dp), colors = NavigationDrawerItemDefaults.colors(unselectedContainerColor = Color.Transparent))
 }

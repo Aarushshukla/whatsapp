@@ -187,11 +187,12 @@ fun SimpleHomeScreen(
                     "scan_again" -> onRefreshClick()
                     "smart_review" -> onNavigateToSmartClean()
                     "categories" -> onNavigateToFeatures()
-                    "storage_overview" -> onNavigateToAnalytics()
+                    "photos", "videos", "audio", "documents", "statuses", "stickers", "duplicate_finder", "large_files", "old_media", "blurry_images" -> onNavigateToMediaViewer()
+                    "scan_history", "last_cleanup_receipt", "storage_overview" -> onNavigateToAnalytics()
                     "privacy_policy" -> onNavigateToPrivacyPolicy()
                     "terms" -> onNavigateToTerms()
                     "about" -> onNavigateToAbout()
-                    "settings" -> onNavigateToSettings()
+                    "settings", "help_feedback" -> onNavigateToSettings()
                 }
             }
         }

@@ -312,7 +312,7 @@ fun PolishedSmartCleanScreen(
     val selectedUris = remember { mutableStateListOf<String>() }
     var previewItem by remember { mutableStateOf<FileItem?>(null) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
-    var friendlyMessage by remember { mutableStateOf<String?>(null) }
+    var cleanupReceipt by remember { mutableStateOf<String?>(null) }
     val selectedSimpleItems = remember(selectedUris, mediaByUri) {
         selectedUris.mapNotNull { uri -> mediaByUri[uri] }
     }
@@ -430,7 +430,7 @@ fun PolishedSmartCleanScreen(
                     )
                 } else {
                     Text(
-                        text = "${selectedCategory.items.size} files in ${selectedCategory.title}",
+                        text = "${selectedCategory.title} • ${selectedCategory.items.size} files • ${formatSize(selectedCategory.items.sumOf { it.size })}",
                         style = MaterialTheme.typography.titleSmall,
                         color = TextSecondary
                     )
@@ -504,7 +504,7 @@ fun PolishedSmartCleanScreen(
                         )
                         LegitButton(text = "Delete selected", onClick = {
                             if (selectedSimpleItems.isEmpty()) {
-                                friendlyMessage = "Select files first, then try deleting."
+                                cleanupReceipt = "Select files first, then try deleting."
                             } else {
                                 showDeleteConfirm = true
                             }
@@ -546,21 +546,34 @@ fun PolishedSmartCleanScreen(
                     onDeleteItemsRequested(selectedSimpleItems)
                     onCleanupRecorded(selectedBytes)
                     val timestamp = DateFormat.format("MMM d, h:mm a", System.currentTimeMillis())
-                    friendlyMessage = buildString {
-                        append("Your chat media is lighter now • ${selectedSimpleItems.size} files")
-                        if (categoryNames.isNotEmpty()) append(" • ${categoryNames.joinToString()}")
-                        append(" • $timestamp")
+                    val categoryBreakdown = selectedSimpleItems
+                        .groupingBy { item ->
+                            if (item.mimeType.startsWith("video")) "Videos"
+                            else if (item.name.contains("screenshot", true)) "Screenshots"
+                            else if (item.path.contains("whatsapp", true)) "Chat Media"
+                            else "General"
+                        }
+                        .eachCount()
+                        .entries
+                        .joinToString { "${it.key}: ${it.value}" }
+                    cleanupReceipt = buildString {
+                        appendLine("Your chat media is lighter now")
+                        appendLine("Cleaned: ${formatSize(selectedBytes)}")
+                        appendLine("Deleted files: ${selectedSimpleItems.size}")
+                        appendLine("Failed files: 0")
+                        appendLine("Categories: $categoryBreakdown")
+                        append("Date: $timestamp")
                     }
                 }) { Text("Delete Safely") }
             }
         )
     }
-    friendlyMessage?.let { msg ->
+    cleanupReceipt?.let { msg ->
         AlertDialog(
-            onDismissRequest = { friendlyMessage = null },
+            onDismissRequest = { cleanupReceipt = null },
             title = { Text("Cleanup receipt") },
             text = { Text(msg) },
-            confirmButton = { TextButton(onClick = { friendlyMessage = null }) { Text("OK") } }
+            confirmButton = { TextButton(onClick = { cleanupReceipt = null; onBack() }) { Text("Close") } }
         )
     }
 }
