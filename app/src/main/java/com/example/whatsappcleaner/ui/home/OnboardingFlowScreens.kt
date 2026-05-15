@@ -2,9 +2,17 @@ package com.example.whatsappcleaner.ui.home
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,11 +23,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -30,7 +40,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.Row
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -56,7 +68,7 @@ fun PermissionIntroScreen(onAllow: () -> Unit, message: String?) {
 @Composable
 fun CheckSuccessScreen(title: String, subtitle: String, buttonText: String, onContinue: () -> Unit) {
     var visible by remember { mutableStateOf(false) }
-    visible = true
+    androidx.compose.runtime.LaunchedEffect(Unit) { visible = true }
     Column(Modifier.fillMaxSize().background(Bg), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
         AnimatedVisibility(visible, enter = scaleIn() + fadeIn()) {
             Box(Modifier.size(110.dp).background(Green.copy(alpha = 0.12f), CircleShape), contentAlignment = Alignment.Center) {
@@ -73,11 +85,18 @@ fun CheckSuccessScreen(title: String, subtitle: String, buttonText: String, onCo
 
 @Composable
 fun ScanIntroScreen(onScan: () -> Unit, scanning: Boolean) {
+    val scale by animateFloatAsState(if (scanning) 0.96f else 1f, tween(180), label = "scan_button_scale")
     Column(Modifier.fillMaxSize().background(Bg), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
         Text("ChatSweep", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
         Text("Private offline media cleaner")
         Spacer(Modifier.height(24.dp))
-        Button(onClick = onScan, enabled = !scanning, shape = CircleShape, modifier = Modifier.size(170.dp)) { Text("SCAN") }
+        Button(
+            onClick = onScan,
+            enabled = !scanning,
+            shape = CircleShape,
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+            modifier = Modifier.size(170.dp).scale(scale)
+        ) { Text(if (scanning) "SCANNING..." else "SCAN") }
         Spacer(Modifier.height(18.dp))
         Text("Find duplicate, large, old, and junk chat media.")
         Text("Offline scan • No auto-delete • Review first")
@@ -86,14 +105,65 @@ fun ScanIntroScreen(onScan: () -> Unit, scanning: Boolean) {
 
 @Composable
 fun ScanProgressScreen(scanUiState: ScanUiState) {
-    val progress = (scanUiState as? ScanUiState.Loading)?.progress ?: 0.2f
-    val stage = (scanUiState as? ScanUiState.Loading)?.stage ?: "Finding junk…"
+    val stages = listOf(
+        "Reading chat folders",
+        "Finding duplicates",
+        "Checking large videos",
+        "Detecting old media",
+        "Finding statuses and stickers",
+        "Preparing results"
+    )
+    val realProgress = (scanUiState as? ScanUiState.Loading)?.progress?.coerceIn(0f, 1f) ?: 0f
+    val isLoading = scanUiState is ScanUiState.Loading
+    var visualProgress by remember { mutableStateOf(0f) }
+
+    androidx.compose.runtime.LaunchedEffect(isLoading, realProgress) {
+        if (!isLoading) {
+            visualProgress = 1f
+        } else {
+            visualProgress = maxOf(realProgress, (visualProgress + 0.06f).coerceAtMost(0.9f))
+        }
+    }
+    val animatedProgress by animateFloatAsState(
+        targetValue = visualProgress,
+        animationSpec = tween(durationMillis = 320),
+        label = "smooth_scan_progress"
+    )
+
+    val stageIndex = remember(realProgress) {
+        ((realProgress.coerceAtMost(0.999f)) * stages.size).toInt().coerceIn(0, stages.lastIndex)
+    }
+    val pulse = rememberInfiniteTransition(label = "stage_pulse").animateFloat(
+        initialValue = 0.55f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(animation = tween(850), repeatMode = RepeatMode.Reverse),
+        label = "pulse"
+    )
+
     Column(Modifier.fillMaxSize().background(Bg).padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
         Box(contentAlignment = Alignment.Center) {
-            CircularProgressIndicator(progress = { progress }, modifier = Modifier.size(160.dp), strokeWidth = 12.dp)
-            Text("${(progress * 100).toInt()}%")
+            CircularProgressIndicator(progress = { animatedProgress }, modifier = Modifier.size(160.dp), strokeWidth = 12.dp)
+            Text("${(animatedProgress * 100).toInt()}%")
         }
-        Spacer(Modifier.height(16.dp))
-        AnimatedContent(targetState = stage, label = "stage") { Text(it, fontWeight = FontWeight.SemiBold) }
+        Spacer(Modifier.height(20.dp))
+        stages.forEachIndexed { index, label ->
+            val done = index < stageIndex
+            val current = index == stageIndex && isLoading
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth(0.86f).padding(vertical = 6.dp)) {
+                if (done) {
+                    androidx.compose.material3.Icon(Icons.Default.Check, null, tint = Green, modifier = Modifier.size(18.dp))
+                } else {
+                    Box(
+                        Modifier.size(10.dp).background(if (current) Green.copy(alpha = pulse.value) else Color(0xFFD1D5DB), CircleShape)
+                    )
+                }
+                Spacer(Modifier.width(10.dp))
+                AnimatedContent(targetState = label, transitionSpec = {
+                    (fadeIn(tween(260)) + slideInVertically { it / 2 }) togetherWith fadeOut(tween(220))
+                }, label = "stage_text") {
+                    Text(it, fontWeight = if (current) FontWeight.SemiBold else FontWeight.Normal, color = if (done || current) Color(0xFF0F172A) else Color(0xFF6B7280))
+                }
+            }
+        }
     }
 }
