@@ -123,7 +123,14 @@ private object Routes {
     const val AiScreenshotsCleaner = "ai_screenshots_cleaner"
     const val AiSpamDetector = "ai_spam_detector"
     const val SmartReview = "smart_review"
+    const val Categories = "categories"
     const val MediaOverview = "media_overview"
+    const val Photos = "photos"
+    const val Videos = "videos"
+    const val Audio = "audio"
+    const val Documents = "documents"
+    const val Statuses = "statuses"
+    const val Stickers = "stickers"
     const val DuplicateFinder = "duplicate_finder"
     const val LargeFiles = "large_files"
     const val OldMedia = "old_media"
@@ -131,7 +138,7 @@ private object Routes {
     const val MemesStickers = "memes_stickers"
     const val BlurryImages = "blurry_images"
     const val ScanHistory = "scan_history"
-    const val CleanupReceipt = "cleanup_receipt"
+    const val LastCleanupReceipt = "last_cleanup_receipt"
     const val StorageOverview = "storage_overview"
     const val HelpFeedback = "help_feedback"
 }
@@ -411,10 +418,17 @@ fun WhatsCleanAppRoot(
                 onNavigateToAbout = { navController.navigateSingleTop(Routes.About) },
                 onNavigateToHelpFeedback = { navController.navigateSingleTop(Routes.HelpFeedback) },
                 onNavigateToScanHistory = { navController.navigateSingleTop(Routes.ScanHistory) },
-                onNavigateToCleanupReceipt = { navController.navigateSingleTop(Routes.CleanupReceipt) },
+                onNavigateToCleanupReceipt = { navController.navigateSingleTop(Routes.LastCleanupReceipt) },
                 onNavigateToStorageOverview = { navController.navigateSingleTop(Routes.StorageOverview) },
                 onNavigateToSmartReview = { navController.navigateSingleTop(Routes.SmartReview) },
                 onNavigateToMediaOverview = { navController.navigateSingleTop(Routes.MediaOverview) },
+                onNavigateToCategories = { navController.navigateSingleTop(Routes.Categories) },
+                onNavigateToPhotos = { navController.navigateSingleTop(Routes.Photos) },
+                onNavigateToVideos = { navController.navigateSingleTop(Routes.Videos) },
+                onNavigateToAudio = { navController.navigateSingleTop(Routes.Audio) },
+                onNavigateToDocuments = { navController.navigateSingleTop(Routes.Documents) },
+                onNavigateToStatuses = { navController.navigateSingleTop(Routes.Statuses) },
+                onNavigateToStickers = { navController.navigateSingleTop(Routes.Stickers) },
                 onNavigateToDuplicateFinder = { navController.navigateSingleTop(Routes.DuplicateFinder) },
                 onNavigateToLargeFiles = { navController.navigateSingleTop(Routes.LargeFiles) },
                 onNavigateToOldMedia = { navController.navigateSingleTop(Routes.OldMedia) },
@@ -619,7 +633,7 @@ fun WhatsCleanAppRoot(
                 SimpleStatRow("Suggested cleanup", com.example.whatsappcleaner.data.local.formatSize(state.smartSuggestionSummary.totalSpaceToFree))
                 SimpleStatRow("Suggested files", state.smartSuggestionSummary.totalSuggestedFiles.toString())
                 Spacer(Modifier.height(8.dp))
-                Button(onClick = { navController.navigateSingleTop(Routes.SmartClean) }, modifier = Modifier.fillMaxWidth()) { Text("Review suggested files") }
+                Button(onClick = { navController.navigateSingleTop(Routes.AiSmartSuggestions) }, modifier = Modifier.fillMaxWidth()) { Text("Review suggested files") }
             }
         }
 
@@ -636,13 +650,34 @@ fun WhatsCleanAppRoot(
             )
             MediaOverviewScreen(items = buckets, onBack = { navController.popBackStack() }, onOpen = { navController.navigateSingleTop(Routes.MediaViewer) })
         }
+        composable(Routes.Categories) {
+            DashboardSubScreen("Categories", "Review by cleanup groups", { navController.popBackStack() }) {
+                listOf(
+                    "Duplicates" to Routes.DuplicateFinder,
+                    "Large Videos" to Routes.LargeFiles,
+                    "Old Media" to Routes.OldMedia,
+                    "Statuses" to Routes.Statuses,
+                    "Memes & Stickers" to Routes.MemesStickers,
+                    "Blurry Images" to Routes.BlurryImages
+                ).forEach { (title, route) ->
+                    Button(onClick = { navController.navigateSingleTop(route) }, modifier = Modifier.fillMaxWidth()) { Text(title) }
+                    Spacer(Modifier.height(6.dp))
+                }
+            }
+        }
+        composable(Routes.Photos) { mediaTypeScreen("Photos", "Photo and image media summary", state.allItems.filter { it.mimeType?.startsWith("image") == true }, "Review photos", { navController.popBackStack() }) { navController.navigateSingleTop(Routes.MediaViewer) } }
+        composable(Routes.Videos) { mediaTypeScreen("Videos", "Video media summary", state.allItems.filter { it.mimeType?.startsWith("video") == true }, "Review videos", { navController.popBackStack() }) { navController.navigateSingleTop(Routes.MediaViewer) } }
+        composable(Routes.Audio) { mediaTypeScreen("Audio", "Audio and voice notes", state.allItems.filter { it.mimeType?.startsWith("audio") == true }, "Review audio", { navController.popBackStack() }) { navController.navigateSingleTop(Routes.MediaViewer) } }
+        composable(Routes.Documents) { mediaTypeScreen("Documents", "Document media summary", state.allItems.filter { it.mimeType?.contains("pdf") == true || it.mimeType?.contains("text") == true }, "Review documents", { navController.popBackStack() }) { navController.navigateSingleTop(Routes.MediaViewer) } }
+        composable(Routes.Statuses) { mediaTypeScreen("Statuses", "Status media summary", state.sentFileItems, "Review statuses", { navController.popBackStack() }) { navController.navigateSingleTop(Routes.MediaViewer) } }
+        composable(Routes.Stickers) { mediaTypeScreen("Stickers", "Sticker media summary", state.memeItems, "Review stickers", { navController.popBackStack() }) { navController.navigateSingleTop(Routes.AiMemeCleaner) } }
 
         composable(Routes.DuplicateFinder) {
             DashboardSubScreen("Duplicate Finder", "Repeated photos and videos", { navController.popBackStack() }) {
                 SimpleStatRow("Duplicates", state.duplicateItems.size.toString())
                 SimpleStatRow("Cleanup potential", com.example.whatsappcleaner.data.local.formatSize(state.duplicateItems.sumOf { it.size }))
                 Text("Best copy is kept by recency and quality.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Button(onClick = { navController.navigateSingleTop(Routes.SmartClean) }, modifier = Modifier.fillMaxWidth()) {
+                Button(onClick = { navController.navigateSingleTop(Routes.AiDuplicateDetector) }, modifier = Modifier.fillMaxWidth()) {
                     Text("Review duplicates")
                 }
             }
@@ -705,7 +740,7 @@ fun WhatsCleanAppRoot(
                 }
             }
         }
-        composable(Routes.CleanupReceipt) {
+        composable(Routes.LastCleanupReceipt) {
             DashboardSubScreen("Last Cleanup Receipt", "Recent cleanup summary", { navController.popBackStack() }) {
                 SimpleStatRow("Cleaned amount", com.example.whatsappcleaner.data.local.formatSize(state.lastCleanupBytes))
                 SimpleStatRow("Deleted files", "See delete confirmations")
@@ -806,6 +841,26 @@ fun WhatsCleanAppRoot(
         composable(Routes.About) {
             AboutScreen(onBack = { navController.popBackStack() })
         }
+    }
+}
+
+@Composable
+private fun mediaTypeScreen(
+    title: String,
+    subtitle: String,
+    items: List<SimpleMediaItem>,
+    actionLabel: String,
+    onBack: () -> Unit,
+    onAction: () -> Unit
+) {
+    DashboardSubScreen(title, subtitle, onBack = onBack) {
+        SimpleStatRow("Count", items.size.toString())
+        SimpleStatRow("Total size", com.example.whatsappcleaner.data.local.formatSize(items.sumOf { it.size }))
+        if (items.isEmpty()) {
+            Text("No ${title.lowercase()} found", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Spacer(Modifier.height(8.dp))
+        Button(onClick = onAction, modifier = Modifier.fillMaxWidth()) { Text(actionLabel) }
     }
 }
 
