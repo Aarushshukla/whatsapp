@@ -12,7 +12,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -65,14 +68,15 @@ fun AppDrawer(
 }
 @Composable private fun Section(title: String) { Spacer(Modifier.height(10.dp)); Text(title, modifier = Modifier.padding(horizontal = 16.dp), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = Color(0xFF2F6FED)) }
 @Composable private fun DrawerItem(label: String, icon: ImageVector, selected: Boolean, onClick: () -> Unit) {
+    val selectedColor by animateColorAsState(if (selected) Color(0xFFE9F2FF) else Color.Transparent, tween(220), label = "drawer_selected")
     NavigationDrawerItem(
         modifier = Modifier.heightIn(min = 52.dp),
         label = { Row(Modifier.fillMaxWidth()) { Text(label); Spacer(Modifier.width(8.dp)) } },
         icon = { Icon(icon, null) },
         selected = selected,
         colors = NavigationDrawerItemDefaults.colors(
-            selectedContainerColor = Color(0xFFE9F2FF),
-            unselectedContainerColor = Color.Transparent
+            selectedContainerColor = selectedColor,
+            unselectedContainerColor = selectedColor
         ),
         onClick = onClick
     )

@@ -1,5 +1,8 @@
 package com.example.whatsappcleaner.ui.home
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -19,13 +22,17 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.draw.scale
 
 @Composable
 fun CleanupReminderScreen(
@@ -46,7 +53,8 @@ fun CleanupReminderScreen(
         Text("Get a gentle reminder to review chat media before it fills your storage.", color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(16.dp))
 
-        Card(colors = CardDefaults.cardColors(containerColor = Color.White), shape = RoundedCornerShape(16.dp)) {
+        val reminderCardScale by animateFloatAsState(targetValue = if (reminderEnabled) 1f else 0.985f, animationSpec = tween(220), label = "reminder_card_scale")
+        Card(modifier = Modifier.scale(reminderCardScale), colors = CardDefaults.cardColors(containerColor = Color.White), shape = RoundedCornerShape(16.dp)) {
             Column(Modifier.fillMaxWidth().padding(16.dp)) {
                 Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
                     Row {
@@ -56,7 +64,8 @@ fun CleanupReminderScreen(
                     Switch(checked = reminderEnabled, onCheckedChange = onEnableToggle)
                 }
                 Spacer(Modifier.height(8.dp))
-                Text(if (reminderEnabled) "Reminder active: every ${labelFor(selectedIntervalMinutes)}" else "No reminder set")
+                val reminderTextColor by animateColorAsState(if (reminderEnabled) Color(0xFF1B8E3E) else MaterialTheme.colorScheme.onSurfaceVariant, tween(220), label = "reminder_text")
+                Text(if (reminderEnabled) "Reminder active: every ${labelFor(selectedIntervalMinutes)}" else "No reminder set", color = reminderTextColor)
             }
         }
 
@@ -69,9 +78,15 @@ fun CleanupReminderScreen(
             ) {
                 options.forEach { minutes ->
                     val selected = minutes == selectedIntervalMinutes
-                    OutlinedButton(onClick = { onIntervalSelected(minutes) }) {
-                        Text(if (selected) "✓ ${labelFor(minutes)}" else labelFor(minutes))
-                    }
+                    val chipScale by animateFloatAsState(targetValue = if (selected) 1f else 0.96f, animationSpec = tween(180), label = "chip_scale_$minutes")
+                    FilterChip(
+                        modifier = Modifier.scale(chipScale),
+                        selected = selected,
+                        onClick = { onIntervalSelected(minutes) },
+                        label = { Text(labelFor(minutes)) },
+                        leadingIcon = if (selected) ({ Text("✓") }) else null,
+                        colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Color(0xFFE9F7EF))
+                    )
                 }
             }
         }
