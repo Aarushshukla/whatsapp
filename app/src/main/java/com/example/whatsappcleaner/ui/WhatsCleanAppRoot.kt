@@ -631,12 +631,21 @@ fun WhatsCleanAppRoot(
         }
 
         composable(Routes.SmartReview) {
-            DashboardSubScreen("Smart Review", "Best first cleanup suggestions", onBack = { navController.popBackStack() }) {
-                SimpleStatRow("Suggested cleanup", com.example.whatsappcleaner.data.local.formatSize(state.smartSuggestionSummary.totalSpaceToFree))
-                SimpleStatRow("Suggested files", state.smartSuggestionSummary.totalSuggestedFiles.toString())
-                Spacer(Modifier.height(8.dp))
-                Button(onClick = { navController.navigateSingleTop(Routes.AiSmartSuggestions) }, modifier = Modifier.fillMaxWidth()) { Text("Review suggested files") }
-            }
+            standardSummaryScreen(
+                title = "Smart Review",
+                subtitle = "Prioritized cleanup groups for fastest space recovery",
+                lines = listOf(
+                    "Suggested cleanup size" to com.example.whatsappcleaner.data.local.formatSize(state.smartSuggestionSummary.totalSpaceToFree),
+                    "Suggested file count" to state.smartSuggestionSummary.totalSuggestedFiles.toString(),
+                    "Groups" to "Duplicates, Large videos, Old statuses, Memes & stickers, Blurry images"
+                ),
+                hasData = state.smartSuggestionSummary.totalSuggestedFiles > 0,
+                emptyTitle = "No suggestions yet",
+                emptySubtitle = "Run a scan first to generate smart review groups.",
+                actionLabel = "REVIEW SUGGESTED FILES",
+                onBack = { navController.popBackStack() },
+                onAction = { navController.navigateSingleTop(Routes.AiSmartSuggestions) }
+            )
         }
 
         composable(Routes.MediaOverview) {
@@ -743,13 +752,16 @@ fun WhatsCleanAppRoot(
             }
         }
         composable(Routes.CleanupReminder) {
-            DashboardSubScreen(
+            standardSummaryScreen(
                 title = "Cleanup Reminder",
-                subtitle = "Configure cleanup reminder preferences and schedule.",
-                stats = listOf(SimpleStatRow("Status", if (state.remindersEnabled) "Enabled" else "Disabled")),
-                actions = listOf("Open reminder settings"),
+                subtitle = "Reminder controls live in Settings",
+                lines = listOf("Reminder status" to if (state.remindersEnabled) "Enabled" else "Disabled"),
+                hasData = true,
+                emptyTitle = "",
+                emptySubtitle = "",
+                actionLabel = "OPEN SETTINGS",
                 onBack = { navController.popBackStack() },
-                onPrimaryAction = { navController.navigateSingleTop(Routes.Settings) }
+                onAction = { navController.navigateSingleTop(Routes.Settings) }
             )
         }
         composable(Routes.LastCleanupReceipt) {
@@ -772,16 +784,22 @@ fun WhatsCleanAppRoot(
             }
         }
         composable(Routes.HelpFeedback) {
-            DashboardSubScreen("Help & Feedback", "Quick answers", { navController.popBackStack() }) {
-                listOf(
-                    "How does scanning work?",
-                    "Why is media access needed?",
-                    "Does ChatSweep upload files?",
-                    "How does deletion work?"
-                ).forEach {
-                    Text("• $it", color = MaterialTheme.colorScheme.onSurface)
-                }
-            }
+            standardSummaryScreen(
+                title = "Help & Feedback",
+                subtitle = "Frequently asked questions",
+                lines = listOf(
+                    "Scanning" to "Runs locally on your device",
+                    "Permissions" to "Needed to read media metadata",
+                    "Uploads" to "No cloud upload for scans",
+                    "Deletion" to "You confirm before delete"
+                ),
+                hasData = true,
+                emptyTitle = "",
+                emptySubtitle = "",
+                actionLabel = "OPEN FAQ",
+                onBack = { navController.popBackStack() },
+                onAction = onFaq
+            )
         }
 
         composable(Routes.Paywall) {
@@ -952,5 +970,20 @@ private fun PermissionGate(
         Button(onClick = onRequestPermission) { Text("Retry") }
         Spacer(modifier = Modifier.height(12.dp))
         Button(onClick = onOpenAppSettings) { Text("Open Settings") }
+    }
+}
+
+
+@Composable
+private fun standardSummaryScreen(title:String, subtitle:String, lines:List<Pair<String,String>>, hasData:Boolean, emptyTitle:String, emptySubtitle:String, actionLabel:String, onBack:()->Unit, onAction:()->Unit){
+    DashboardSubScreen(title, subtitle, onBack){
+        if (hasData){
+            lines.forEach { (k,v) -> SimpleStatRow(k,v) }
+        } else {
+            Text(emptyTitle, color = MaterialTheme.colorScheme.onSurface)
+            Text(emptySubtitle, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Spacer(Modifier.height(8.dp))
+        Button(onClick=onAction, modifier=Modifier.fillMaxWidth()){ Text(actionLabel) }
     }
 }
