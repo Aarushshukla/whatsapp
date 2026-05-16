@@ -79,6 +79,14 @@ class MainActivity : ComponentActivity() {
                 }
             }
         )
+    private val notificationPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) {
+                viewModel.saveCleanupReminder()
+            } else {
+                viewModel.onReminderPermissionDenied()
+            }
+        }
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
@@ -135,6 +143,23 @@ class MainActivity : ComponentActivity() {
                 Log.e(TAG, "Unable to open app settings.", error)
                 openSystemStorage()
             }
+    }
+
+    private fun hasNotificationPermission(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return true
+        return ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun requestNotificationPermissionForReminder() {
+        if (hasNotificationPermission()) {
+            viewModel.saveCleanupReminder()
+            return
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            viewModel.saveCleanupReminder()
+        }
     }
 
     private fun syncPermissionState(): Boolean {
@@ -416,6 +441,10 @@ class MainActivity : ComponentActivity() {
                 onFrequencyChange = viewModel::setFrequency,
                 onTimeChange = viewModel::setTime,
                 onRemindersToggle = viewModel::toggleReminders,
+                onReminderEnableRequested = ::requestNotificationPermissionForReminder,
+                onCleanupReminderIntervalSelected = viewModel::setCleanupReminderInterval,
+                onSaveCleanupReminder = ::requestNotificationPermissionForReminder,
+                onCancelCleanupReminder = viewModel::cancelCleanupReminder,
                 onOpenInSystem = { item -> openFileInSystem(item.uri) },
                 onOpenSystemStorage = {
                     viewModel.onStorageScreenOpened()
