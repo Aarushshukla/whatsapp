@@ -80,7 +80,30 @@ fun SimpleHomeScreen(items: List<SimpleMediaItem>, onRefreshClick: () -> Unit, s
         AppDrawer(selectedRoute = "home", lastScanSummary = if (hasScanSummary) summaryInfo else null) { route ->
             scope.launch { drawerState.close() }
             when (route) {
-                "smart_review" -> onNavigateToSmartReview(); "scan_again" -> onRefreshClick(); "duplicate_finder" -> onNavigateToDuplicateFinder(); "large_files" -> onNavigateToLargeFiles(); "old_media" -> onNavigateToOldMedia(); "blurry_images" -> onNavigateToBlurryImages(); "scan_history" -> onNavigateToScanHistory(); "last_cleanup_receipt" -> onNavigateToCleanupReceipt(); "storage_overview" -> onNavigateToStorageOverview(); "media_overview" -> onNavigateToMediaOverview(); "photos" -> onNavigateToPhotos(); "videos" -> onNavigateToVideos(); "audio" -> onNavigateToAudio(); "documents" -> onNavigateToDocuments(); "statuses" -> onNavigateToStatuses(); "stickers" -> onNavigateToStickers(); "memes_stickers" -> onNavigateToMemesStickers(); "cleanup_reminder" -> onNavigateToCleanupReminder(); "help_feedback" -> onNavigateToHelpFeedback(); "settings" -> onNavigateToSettings(); "privacy_policy" -> onNavigateToPrivacyPolicy(); "terms" -> onNavigateToTerms(); "about" -> onNavigateToAbout(); else -> Unit
+                "media_overview" -> onNavigateToMediaOverview()
+                "photos" -> onNavigateToPhotos()
+                "videos" -> onNavigateToVideos()
+                "audio" -> onNavigateToAudio()
+                "documents" -> onNavigateToDocuments()
+                "statuses" -> onNavigateToStatuses()
+                "stickers" -> onNavigateToStickers()
+                "smart_review" -> onNavigateToSmartReview()
+                "duplicate_finder" -> onNavigateToDuplicateFinder()
+                "large_files" -> onNavigateToLargeFiles()
+                "old_media" -> onNavigateToOldMedia()
+                "memes_stickers" -> onNavigateToMemesStickers()
+                "blurry_images" -> onNavigateToBlurryImages()
+                "scan_again" -> onRefreshClick()
+                "cleanup_reminder" -> onNavigateToCleanupReminder()
+                "scan_history" -> onNavigateToScanHistory()
+                "last_cleanup_receipt" -> onNavigateToCleanupReceipt()
+                "storage_overview" -> onNavigateToStorageOverview()
+                "settings" -> onNavigateToSettings()
+                "help_feedback" -> onNavigateToHelpFeedback()
+                "privacy_policy" -> onNavigateToPrivacyPolicy()
+                "terms" -> onNavigateToTerms()
+                "about" -> onNavigateToAbout()
+                else -> Unit
             }
         }
     }) {
