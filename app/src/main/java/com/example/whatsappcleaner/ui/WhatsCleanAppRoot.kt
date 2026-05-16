@@ -141,6 +141,7 @@ private object Routes {
     const val LastCleanupReceipt = "last_cleanup_receipt"
     const val StorageOverview = "storage_overview"
     const val HelpFeedback = "help_feedback"
+    const val CleanupReminder = "cleanup_reminder"
 }
 
 @Composable
@@ -434,7 +435,8 @@ fun WhatsCleanAppRoot(
                 onNavigateToOldMedia = { navController.navigateSingleTop(Routes.OldMedia) },
                 onNavigateToStatusCleaner = { navController.navigateSingleTop(Routes.StatusCleaner) },
                 onNavigateToMemesStickers = { navController.navigateSingleTop(Routes.MemesStickers) },
-                onNavigateToBlurryImages = { navController.navigateSingleTop(Routes.BlurryImages) }
+                onNavigateToBlurryImages = { navController.navigateSingleTop(Routes.BlurryImages) },
+                onNavigateToCleanupReminder = { navController.navigateSingleTop(Routes.CleanupReminder) }
             )
         }
 
@@ -739,6 +741,16 @@ fun WhatsCleanAppRoot(
                     Text("Run your first scan to see storage trends.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
+        }
+        composable(Routes.CleanupReminder) {
+            DashboardSubScreen(
+                title = "Cleanup Reminder",
+                subtitle = "Configure cleanup reminder preferences and schedule.",
+                stats = listOf(SimpleStatRow("Status", if (state.remindersEnabled) "Enabled" else "Disabled")),
+                actions = listOf("Open reminder settings"),
+                onBack = { navController.popBackStack() },
+                onPrimaryAction = { navController.navigateSingleTop(Routes.Settings) }
+            )
         }
         composable(Routes.LastCleanupReceipt) {
             DashboardSubScreen("Last Cleanup Receipt", "Recent cleanup summary", { navController.popBackStack() }) {
