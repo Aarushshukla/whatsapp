@@ -31,7 +31,7 @@ class ReminderNotificationHelper(
         notificationManager.createNotificationChannel(channel)
     }
 
-    fun showReminderNotification(freeableBytes: Long, messageBody: String) {
+    fun showReminderNotification(potentialCleanupBytes: Long, hasCachedSummary: Boolean) {
         val openAppIntent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
@@ -42,12 +42,17 @@ class ReminderNotificationHelper(
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val spaceText = if (freeableBytes > 0) "Potential free space: ${com.example.whatsappcleaner.data.local.formatSize(freeableBytes)}" else "Quick storage check available"
+        val (title, body) = if (hasCachedSummary && potentialCleanupBytes > 0) {
+            "Review up to ${com.example.whatsappcleaner.data.local.formatSize(potentialCleanupBytes)} from chat media" to
+                "Duplicates, large videos, and old statuses may be taking space. Review safely."
+        } else {
+            "Chat storage check" to "Run a quick scan to see what can be reviewed safely."
+        }
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle("ChatSweep")
-            .setContentText(spaceText)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(messageBody))
+            .setContentTitle(title)
+            .setContentText(body)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(body))
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)

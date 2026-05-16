@@ -94,6 +94,7 @@ import com.example.whatsappcleaner.ui.home.DashboardSubScreen
 import com.example.whatsappcleaner.ui.home.SimpleStatRow
 import com.example.whatsappcleaner.ui.home.PermissionIntroScreen
 import com.example.whatsappcleaner.ui.home.CheckSuccessScreen
+import com.example.whatsappcleaner.ui.home.CleanupReminderScreen
 import com.example.whatsappcleaner.ui.home.ScanIntroScreen
 import com.example.whatsappcleaner.ui.home.ScanProgressScreen
 import com.example.whatsappcleaner.ui.home.SpamMediaScreen
@@ -175,6 +176,10 @@ fun WhatsCleanAppRoot(
     onFrequencyChange: (ReminderFreq) -> Unit,
     onTimeChange: (ReminderTime) -> Unit,
     onRemindersToggle: (Boolean) -> Unit,
+    onReminderEnableRequested: () -> Unit,
+    onCleanupReminderIntervalSelected: (Long) -> Unit,
+    onSaveCleanupReminder: () -> Unit,
+    onCancelCleanupReminder: () -> Unit,
     onOpenInSystem: (SimpleMediaItem) -> Unit,
     onOpenSystemStorage: () -> Unit,
     onRequestPermission: () -> Unit,
@@ -706,16 +711,18 @@ fun WhatsCleanAppRoot(
             }
         }
         composable(Routes.CleanupReminder) {
-            standardSummaryScreen(
-                title = "Cleanup Reminder",
-                subtitle = "Reminder controls live in Settings",
-                lines = listOf("Reminder status" to if (state.remindersEnabled) "Enabled" else "Disabled"),
-                hasData = true,
-                emptyTitle = "",
-                emptySubtitle = "",
-                actionLabel = "OPEN SETTINGS",
-                onBack = { navController.popBackStack() },
-                onAction = { navController.navigateSingleTop(Routes.Settings) }
+            LaunchedEffect(Unit) { com.example.whatsappcleaner.data.analytics.trackEvent(context, "reminder_opened") }
+            CleanupReminderScreen(
+                reminderEnabled = state.remindersEnabled,
+                selectedIntervalMinutes = state.cleanupReminderIntervalMinutes,
+                permissionDenied = state.reminderPermissionDenied,
+                onIntervalSelected = onCleanupReminderIntervalSelected,
+                onEnableToggle = { enabled ->
+                    if (enabled) onReminderEnableRequested() else onCancelCleanupReminder()
+                },
+                onSave = onSaveCleanupReminder,
+                onCancelReminder = onCancelCleanupReminder,
+                onOpenSettings = onOpenAppSettings
             )
         }
         composable(Routes.LastCleanupReceipt) {
