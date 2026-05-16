@@ -2,6 +2,13 @@ package com.example.whatsappcleaner.ui.home
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.animateIntAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInVertically
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -34,8 +41,14 @@ import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -80,7 +93,9 @@ fun SimpleHomeScreen(items: List<SimpleMediaItem>, onRefreshClick: () -> Unit, s
                 IconButton(onClick = onRefreshClick) { Icon(Icons.Default.Refresh, contentDescription = "Scan again", tint = PrimaryBlue) }
             }
 
-            MainStorageCard(hasScanSummary, totalSize, totalFiles, summaryInfo, potentialCleanupSize, duplicateCount, largeTodaySizeText, onNavigateToSmartReview, onRefreshClick)
+            AnimatedVisibility(visible = true, enter = fadeIn(tween(400)) + slideInVertically(tween(400)) { it / 4 }) {
+                MainStorageCard(hasScanSummary, totalSize, totalFiles, summaryInfo, potentialCleanupSize, duplicateCount, largeTodaySizeText, onNavigateToSmartReview, onRefreshClick)
+            }
             FeatureGrid(onNavigateToMediaOverview, onNavigateToDuplicateFinder, onNavigateToLargeFiles, onNavigateToStatusCleaner)
             ReviewToolsSection(onNavigateToMemesStickers, onNavigateToBlurryImages, onNavigateToOldMedia, onNavigateToStorageOverview)
             Text("No cloud upload. Nothing is deleted automatically.", color = SecondaryText, style = MaterialTheme.typography.labelMedium)
@@ -93,9 +108,10 @@ private fun MainStorageCard(hasScanSummary: Boolean, totalSize: Long, totalFiles
     Card(colors = CardDefaults.cardColors(containerColor = CardBg), border = BorderStroke(1.dp, Border), shape = RoundedCornerShape(16.dp)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text("Chat media", fontWeight = FontWeight.SemiBold, color = MainText)
+            val totalCount by animateIntAsState(targetValue = if (hasScanSummary) totalFiles else 0, animationSpec = tween(700), label = "total_file_count")
             Text(if (hasScanSummary) formatSize(totalSize) else "No scan yet", style = MaterialTheme.typography.headlineMedium, color = MainText, fontWeight = FontWeight.Bold)
             Text(if (hasScanSummary && potentialCleanupSize > 0) "Review up to ${formatSize(potentialCleanupSize)}" else "No scan yet", color = SecondaryText)
-            InfoRow("File count", if (hasScanSummary) "$totalFiles" else "—")
+            InfoRow("File count", if (hasScanSummary) "$totalCount" else "—")
             InfoRow("Last scan time", if (hasScanSummary) summaryInfo else "No scan yet")
 
             SegmentedCategoryBar(hasScanSummary)
@@ -118,7 +134,11 @@ private fun FeatureGrid(onMedia: () -> Unit, onDuplicates: () -> Unit, onLargeFi
     LazyVerticalGrid(columns = GridCells.Fixed(2), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp), userScrollEnabled = false, modifier = Modifier.height(190.dp)) {
         items(cards.size) { idx ->
             val (title, icon, action) = cards[idx]
-            DashboardFeatureCard(title, icon, "Open", action)
+            var show by remember { mutableStateOf(false) }
+            LaunchedEffect(Unit) { kotlinx.coroutines.delay((idx * 70).toLong()); show = true }
+            AnimatedVisibility(visible = show, enter = fadeIn(tween(320)) + slideInVertically(tween(320)) { it / 3 }) {
+                DashboardFeatureCard(title, icon, "Open", action)
+            }
         }
     }
 }
@@ -141,7 +161,13 @@ private fun ReviewRow(title: String, icon: ImageVector, onClick: () -> Unit) = D
 
 @Composable
 private fun DashboardFeatureCard(title: String, icon: ImageVector, subtitle: String, onClick: () -> Unit) {
-    Card(onClick = onClick, colors = CardDefaults.cardColors(containerColor = CardBg), border = BorderStroke(1.dp, Border), shape = RoundedCornerShape(14.dp)) {
+    var pressed by remember { mutableStateOf(false) }
+    val scale by animateFloatAsState(targetValue = if (pressed) 0.98f else 1f, animationSpec = tween(120), label = "card_press_scale")
+    Card(onClick = onClick, interactionSource = remember { MutableInteractionSource() }.also { source ->
+        LaunchedEffect(source) { source.interactions.collect { interaction ->
+            pressed = interaction is androidx.compose.foundation.interaction.PressInteraction.Press
+        }}
+    }, colors = CardDefaults.cardColors(containerColor = CardBg), border = BorderStroke(1.dp, Border), shape = RoundedCornerShape(14.dp), modifier = Modifier.scale(scale)) {
         Row(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Icon(icon, contentDescription = null, tint = PrimaryBlue)
@@ -157,7 +183,9 @@ private fun SegmentedCategoryBar(hasScanSummary: Boolean) {
     val labels = listOf("Duplicates", "Large videos", "Statuses", "Memes & Stickers", "Blurry images", "Review carefully")
     Row(Modifier.fillMaxWidth().height(12.dp).background(Border, RoundedCornerShape(100.dp))) {
         labels.forEachIndexed { idx, _ ->
-            Row(Modifier.weight(1f).fillMaxSize().background(if (hasScanSummary) SegmentColors[idx] else Color(0xFFDDE3EE))) {}
+            val target = if (hasScanSummary) 1f else 0.4f
+            val animatedWeight by animateFloatAsState(targetValue = target, animationSpec = tween(450 + (idx * 80)), label = "segment_weight_$idx")
+            Row(Modifier.weight(animatedWeight).fillMaxSize().background(if (hasScanSummary) SegmentColors[idx] else Color(0xFFDDE3EE))) {}
         }
     }
 }

@@ -559,7 +559,7 @@ fun PolishedSmartCleanScreen(
         AlertDialog(
             onDismissRequest = { friendlyMessage = null },
             title = { Text("Cleanup receipt") },
-            text = { Text(msg) },
+            text = { AnimatedCleanupReceipt(msg) },
             confirmButton = { TextButton(onClick = { friendlyMessage = null }) { Text("OK") } }
         )
     }
@@ -1156,6 +1156,28 @@ fun AboutScreen(onBack: () -> Unit) {
                     showAction = false
                 )
             }
+        }
+    }
+}
+
+
+@Composable
+private fun AnimatedCleanupReceipt(message: String) {
+    val numberMatch = remember(message) { """\b(\d+) files\b""".toRegex().find(message) }
+    val target = numberMatch?.groupValues?.getOrNull(1)?.toIntOrNull() ?: 0
+    val animatedCount by animateIntAsState(targetValue = target, animationSpec = spring(stiffness = 180f), label = "receipt_count")
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        androidx.compose.animation.AnimatedVisibility(visible = true, enter = scaleIn() + fadeIn()) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Icon(Icons.Default.Check, contentDescription = null, tint = Color(0xFF20A64A))
+                Text("Cleanup completed", fontWeight = FontWeight.SemiBold)
+            }
+        }
+        if (target > 0 && numberMatch != null) {
+            val animatedMessage = message.replace(numberMatch.value, "${animatedCount} files")
+            Text(animatedMessage)
+        } else {
+            Text(message)
         }
     }
 }
