@@ -1,3 +1,4 @@
+@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 package com.example.whatsappcleaner.ui.home
 
 import androidx.compose.animation.animateColorAsState
