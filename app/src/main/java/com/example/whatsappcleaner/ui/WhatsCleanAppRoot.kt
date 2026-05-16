@@ -12,6 +12,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -21,6 +22,25 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.Button
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.BottomAppBar
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -631,21 +651,7 @@ fun WhatsCleanAppRoot(
         }
 
         composable(Routes.SmartReview) {
-            standardSummaryScreen(
-                title = "Smart Review",
-                subtitle = "Prioritized cleanup groups for fastest space recovery",
-                lines = listOf(
-                    "Suggested cleanup size" to com.example.whatsappcleaner.data.local.formatSize(state.smartSuggestionSummary.totalSpaceToFree),
-                    "Suggested file count" to state.smartSuggestionSummary.totalSuggestedFiles.toString(),
-                    "Groups" to "Duplicates, Large videos, Old statuses, Memes & stickers, Blurry images"
-                ),
-                hasData = state.smartSuggestionSummary.totalSuggestedFiles > 0,
-                emptyTitle = "No suggestions yet",
-                emptySubtitle = "Run a scan first to generate smart review groups.",
-                actionLabel = "REVIEW SUGGESTED FILES",
-                onBack = { navController.popBackStack() },
-                onAction = { navController.navigateSingleTop(Routes.AiSmartSuggestions) }
-            )
+            reviewGridScreen("Review Carefully", state.smartSuggestedItems, onBack = { navController.popBackStack() }, onDeleteSelected = { onDeleteMediaRequest(it, "review_carefully") }, onOpenPreview = onOpenInSystem)
         }
 
         composable(Routes.MediaOverview) {
@@ -676,69 +682,17 @@ fun WhatsCleanAppRoot(
                 }
             }
         }
-        composable(Routes.Photos) { mediaTypeScreen("Photos", "Photo and image media summary", state.allItems.filter { it.mimeType?.startsWith("image") == true }, "Review photos", { navController.popBackStack() }) { navController.navigateSingleTop(Routes.MediaViewer) } }
-        composable(Routes.Videos) { mediaTypeScreen("Videos", "Video media summary", state.allItems.filter { it.mimeType?.startsWith("video") == true }, "Review videos", { navController.popBackStack() }) { navController.navigateSingleTop(Routes.MediaViewer) } }
-        composable(Routes.Audio) { mediaTypeScreen("Audio", "Audio and voice notes", state.allItems.filter { it.mimeType?.startsWith("audio") == true }, "Review audio", { navController.popBackStack() }) { navController.navigateSingleTop(Routes.MediaViewer) } }
-        composable(Routes.Documents) { mediaTypeScreen("Documents", "Document media summary", state.allItems.filter { it.mimeType?.contains("pdf") == true || it.mimeType?.contains("text") == true }, "Review documents", { navController.popBackStack() }) { navController.navigateSingleTop(Routes.MediaViewer) } }
-        composable(Routes.Statuses) { mediaTypeScreen("Statuses", "Status media summary", state.sentFileItems, "Review statuses", { navController.popBackStack() }) { navController.navigateSingleTop(Routes.MediaViewer) } }
-        composable(Routes.Stickers) { mediaTypeScreen("Stickers", "Sticker media summary", state.memeItems, "Review stickers", { navController.popBackStack() }) { navController.navigateSingleTop(Routes.AiMemeCleaner) } }
-
-        composable(Routes.DuplicateFinder) {
-            DashboardSubScreen("Duplicate Finder", "Repeated photos and videos", { navController.popBackStack() }) {
-                SimpleStatRow("Duplicates", state.duplicateItems.size.toString())
-                SimpleStatRow("Cleanup potential", com.example.whatsappcleaner.data.local.formatSize(state.duplicateItems.sumOf { it.size }))
-                Text("Best copy is kept by recency and quality.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Button(onClick = { navController.navigateSingleTop(Routes.AiDuplicateDetector) }, modifier = Modifier.fillMaxWidth()) {
-                    Text("Review duplicates")
-                }
-            }
-        }
-        composable(Routes.LargeFiles) {
-            DashboardSubScreen("Large Files", "Big files with high impact", { navController.popBackStack() }) {
-                SimpleStatRow("Large files", state.largeFileItems.size.toString())
-                SimpleStatRow("Total size", com.example.whatsappcleaner.data.local.formatSize(state.largeFileItems.sumOf { it.size }))
-                Button(onClick = { navController.navigateSingleTop(Routes.AiLargeFilesFinder) }, modifier = Modifier.fillMaxWidth()) {
-                    Text("Review large files")
-                }
-            }
-        }
-        composable(Routes.OldMedia) {
-            DashboardSubScreen("Old Media", "Review older media by age", { navController.popBackStack() }) {
-                SimpleStatRow("Old media", state.oldFileItems.size.toString())
-                SimpleStatRow("Total size", com.example.whatsappcleaner.data.local.formatSize(state.oldFileItems.sumOf { it.size }))
-                Button(onClick = { navController.navigateSingleTop(Routes.AiOldMediaCleaner) }, modifier = Modifier.fillMaxWidth()) {
-                    Text("Review old media")
-                }
-            }
-        }
-        composable(Routes.StatusCleaner) {
-            DashboardSubScreen("Status Cleaner", "Old temporary status files", { navController.popBackStack() }) {
-                SimpleStatRow("Statuses", state.sentFileItems.size.toString())
-                SimpleStatRow("Size", com.example.whatsappcleaner.data.local.formatSize(state.sentFileItems.sumOf { it.size }))
-                Text("Review before deleting", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Button(onClick = { navController.navigateSingleTop(Routes.MediaViewer) }, modifier = Modifier.fillMaxWidth()) {
-                    Text("Review statuses")
-                }
-            }
-        }
-        composable(Routes.MemesStickers) {
-            DashboardSubScreen("Memes & Stickers", "Forwarded and low-value media", { navController.popBackStack() }) {
-                SimpleStatRow("Items", state.memeItems.size.toString())
-                SimpleStatRow("Size", com.example.whatsappcleaner.data.local.formatSize(state.memeItems.sumOf { it.size }))
-                Button(onClick = { navController.navigateSingleTop(Routes.AiMemeCleaner) }, modifier = Modifier.fillMaxWidth()) {
-                    Text("Review memes & stickers")
-                }
-            }
-        }
-        composable(Routes.BlurryImages) {
-            DashboardSubScreen("Blurry Images", "Low-quality images to review", { navController.popBackStack() }) {
-                SimpleStatRow("Blurry images", state.blurryImageItems.size.toString())
-                SimpleStatRow("Estimated size", com.example.whatsappcleaner.data.local.formatSize(state.blurryImageItems.sumOf { it.size }))
-                Button(onClick = { navController.navigateSingleTop(Routes.AiBlurryPhotos) }, modifier = Modifier.fillMaxWidth()) {
-                    Text("Review blurry images")
-                }
-            }
-        }
+        composable(Routes.Photos) { reviewGridScreen("Photos", state.allItems.filter { it.mimeType?.startsWith("image") == true }, onBack = { navController.popBackStack() }, onDeleteSelected = { onDeleteMediaRequest(it, "photos") }, onOpenPreview = onOpenInSystem) }
+        composable(Routes.Videos) { reviewGridScreen("Videos", state.allItems.filter { it.mimeType?.startsWith("video") == true }, onBack = { navController.popBackStack() }, onDeleteSelected = { onDeleteMediaRequest(it, "videos") }, onOpenPreview = onOpenInSystem) }
+        composable(Routes.Audio) { reviewGridScreen("Audio", state.allItems.filter { it.mimeType?.startsWith("audio") == true }, onBack = { navController.popBackStack() }, onDeleteSelected = { onDeleteMediaRequest(it, "audio") }, onOpenPreview = onOpenInSystem) }
+        composable(Routes.Documents) { reviewGridScreen("Documents", state.allItems.filter { it.mimeType?.contains("pdf") == true || it.mimeType?.contains("text") == true }, onBack = { navController.popBackStack() }, onDeleteSelected = { onDeleteMediaRequest(it, "documents") }, onOpenPreview = onOpenInSystem) }
+        composable(Routes.Statuses) { reviewGridScreen("Statuses", state.sentFileItems, onBack = { navController.popBackStack() }, onDeleteSelected = { onDeleteMediaRequest(it, "statuses") }, onOpenPreview = onOpenInSystem) }
+        composable(Routes.Stickers) { reviewGridScreen("Stickers", state.memeItems, onBack = { navController.popBackStack() }, onDeleteSelected = { onDeleteMediaRequest(it, "stickers") }, onOpenPreview = onOpenInSystem) }
+        composable(Routes.DuplicateFinder) { reviewGridScreen("Duplicates", state.duplicateItems, onBack = { navController.popBackStack() }, onDeleteSelected = { onDeleteMediaRequest(it, "duplicates") }, onOpenPreview = onOpenInSystem) }
+        composable(Routes.LargeFiles) { reviewGridScreen("Large Files", state.largeFileItems, onBack = { navController.popBackStack() }, onDeleteSelected = { onDeleteMediaRequest(it, "large_files") }, onOpenPreview = onOpenInSystem) }
+        composable(Routes.OldMedia) { reviewGridScreen("Old Media", state.oldFileItems, onBack = { navController.popBackStack() }, onDeleteSelected = { onDeleteMediaRequest(it, "old_media") }, onOpenPreview = onOpenInSystem) }
+        composable(Routes.MemesStickers) { reviewGridScreen("Memes & Stickers", state.memeItems, onBack = { navController.popBackStack() }, onDeleteSelected = { onDeleteMediaRequest(it, "memes_stickers") }, onOpenPreview = onOpenInSystem) }
+        composable(Routes.BlurryImages) { reviewGridScreen("Blurry Images", state.blurryImageItems, onBack = { navController.popBackStack() }, onDeleteSelected = { onDeleteMediaRequest(it, "blurry_images") }, onOpenPreview = onOpenInSystem) }
         composable(Routes.ScanHistory) {
             DashboardSubScreen("Scan History", "Previous scans and trends", { navController.popBackStack() }) {
                 if (state.totalSize > 0L) {
@@ -873,6 +827,44 @@ fun WhatsCleanAppRoot(
         }
     }
 }
+
+
+@Composable
+private fun reviewGridScreen(title: String, items: List<SimpleMediaItem>, onBack: () -> Unit, onDeleteSelected: (List<SimpleMediaItem>) -> Unit, onOpenPreview: (SimpleMediaItem) -> Unit) {
+    val selectedUris = remember { mutableStateListOf<String>() }
+    val totalSelected = items.filter { selectedUris.contains(it.uri.toString()) }
+    Scaffold(topBar = { TopAppBar(title = { Text(title) }, navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") } }) }, bottomBar = {
+        if (totalSelected.isNotEmpty()) BottomAppBar { Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Text("${totalSelected.size} selected • ${com.example.whatsappcleaner.data.local.formatSize(totalSelected.sumOf { it.size })}"); Button(onClick = { onDeleteSelected(totalSelected) }) { Text("DELETE SELECTED") } } }
+    }) { pv ->
+        Column(Modifier.padding(pv).padding(12.dp)) {
+            Text("${com.example.whatsappcleaner.data.local.formatSize(items.sumOf { it.size })} • ${items.size} files", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = {
+                    selectedUris.clear(); selectedUris.addAll(items.filter { it.reviewSafetyLabel() == "SAFE" && !it.isProtectedForAutoSelection() }.map { it.uri.toString() })
+                }, modifier = Modifier.weight(1f)) { Text("SELECT SAFE") }
+                OutlinedButton(onClick = { selectedUris.clear() }, modifier = Modifier.weight(1f)) { Text("DESELECT") }
+            }
+            Spacer(Modifier.height(10.dp))
+            LazyVerticalGrid(columns = GridCells.Adaptive(150.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(items, key = { it.uri.toString() }) { item ->
+                    val sel = selectedUris.contains(item.uri.toString())
+                    Column(Modifier.clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surfaceVariant).clickable { onOpenPreview(item) }.padding(8.dp)) {
+                        if (item.mimeType?.startsWith("image") == true || item.mimeType?.startsWith("video") == true) {
+                            AsyncImage(model = item.uri, contentDescription = item.name, modifier = Modifier.fillMaxWidth().height(100.dp).clip(RoundedCornerShape(8.dp)), contentScale = ContentScale.Crop)
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) { Checkbox(checked = sel, onCheckedChange = { if (it) selectedUris.add(item.uri.toString()) else selectedUris.remove(item.uri.toString()) }); Text(com.example.whatsappcleaner.data.local.formatSize(item.size), fontSize = 12.sp) }
+                        Text(item.reviewSafetyLabel(), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Text(item.name, maxLines = 1, fontSize = 12.sp)
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun SimpleMediaItem.reviewSafetyLabel(): String = if (isProtectedForAutoSelection()) "PROTECTED" else if (path.contains("status", true) || path.contains("sticker", true) || name.contains("meme", true)) "SAFE" else "REVIEW"
+private fun SimpleMediaItem.isProtectedForAutoSelection(): Boolean = (System.currentTimeMillis() - addedMillis) < (3L * 24L * 60L * 60L * 1000L)
 
 @Composable
 private fun mediaTypeScreen(
