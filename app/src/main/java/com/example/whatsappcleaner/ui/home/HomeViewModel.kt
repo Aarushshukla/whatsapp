@@ -102,6 +102,9 @@ data class HomeUiState(
     val deepCleanCredits: Int = 0,
     val shouldShowInterstitialForDelete: Boolean = false,
     val categorySummaries: List<CategorySummaryUi> = emptyList()
+    ,
+    val cleanupReminderIntervalMinutes: Long = 60L,
+    val reminderPermissionDenied: Boolean = false
 ) {
     // TODO: RE-ENABLE SUBSCRIPTION LATER
     /*
@@ -760,8 +763,31 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             ReminderScheduler.cancelPeriodicReminder(getApplication())
         }
         _uiState.update { currentState ->
-            currentState.copy(remindersEnabled = enabled, settings = currentState.settings.copy(dailyReminderEnabled = enabled))
+            currentState.copy(remindersEnabled = enabled, reminderPermissionDenied = false, settings = currentState.settings.copy(dailyReminderEnabled = enabled))
         }
+    }
+
+    fun setCleanupReminderInterval(minutes: Long) {
+        prefs.setCleanupReminderIntervalMinutes(minutes)
+        _uiState.update { it.copy(cleanupReminderIntervalMinutes = minutes) }
+    }
+
+    fun saveCleanupReminder() {
+        prefs.setRemindersEnabled(true)
+        ReminderScheduler.schedulePeriodicReminder(getApplication(), _uiState.value.cleanupReminderIntervalMinutes)
+        trackEvent(appContext, "reminder_enabled")
+        _uiState.update { it.copy(remindersEnabled = true, reminderPermissionDenied = false) }
+    }
+
+    fun cancelCleanupReminder() {
+        prefs.setRemindersEnabled(false)
+        ReminderScheduler.cancelPeriodicReminder(getApplication())
+        trackEvent(appContext, "reminder_disabled")
+        _uiState.update { it.copy(remindersEnabled = false) }
+    }
+
+    fun onReminderPermissionDenied() {
+        _uiState.update { it.copy(reminderPermissionDenied = true, remindersEnabled = false) }
     }
 
     fun setFrequency(option: ReminderFreq) {
@@ -1192,6 +1218,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.update { currentState ->
             currentState.copy(
                 remindersEnabled = prefs.isRemindersEnabled(),
+                cleanupReminderIntervalMinutes = prefs.getCleanupReminderIntervalMinutes(),
                 selectedFrequency = reminderFreq,
                 selectedTime = reminderTime,
                 settings = SettingsUiState(

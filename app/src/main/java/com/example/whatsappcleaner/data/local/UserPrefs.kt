@@ -32,6 +32,7 @@ class UserPrefs private constructor(context: Context) {
         private const val KEY_SCAN_HISTORY = "scan_history_v1"
         private const val KEY_LAST_SCAN_COMPLETED_AT = "last_scan_completed_at"
         private const val KEY_CACHED_SCAN_SUMMARY = "cached_scan_summary_v1"
+        private const val KEY_CLEANUP_REMINDER_INTERVAL_MIN = "cleanup_reminder_interval_min"
 
     private const val KEY_FIRST_SCAN_COMPLETED = "first_scan_completed"
     private const val KEY_PERMISSION_SUCCESS_SEEN = "permission_success_seen"
@@ -99,6 +100,10 @@ class UserPrefs private constructor(context: Context) {
         .putLong(KEY_AUTO_CLEAN_INTERVAL_MIN, option.intervalMinutes)
         .remove(KEY_AUTO_CLEAN_DAYS)
         .apply()
+
+    fun getCleanupReminderIntervalMinutes(): Long = prefs.getLong(KEY_CLEANUP_REMINDER_INTERVAL_MIN, 60L)
+    fun setCleanupReminderIntervalMinutes(intervalMinutes: Long) =
+        prefs.edit().putLong(KEY_CLEANUP_REMINDER_INTERVAL_MIN, intervalMinutes).apply()
 
     fun getFileSizeFilterMb(): Int = prefs.getInt(KEY_FILE_SIZE_MB, 50)
     fun setFileSizeFilterMb(value: Int) = prefs.edit().putInt(KEY_FILE_SIZE_MB, value).apply()
