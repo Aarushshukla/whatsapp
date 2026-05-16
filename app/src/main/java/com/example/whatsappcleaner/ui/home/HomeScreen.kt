@@ -49,11 +49,15 @@ import com.example.whatsappcleaner.data.local.formatSize
 import com.example.whatsappcleaner.ui.navigation.AppDrawer
 import kotlinx.coroutines.launch
 
-private val AppBg = Color(0xFFF7F9FC)
+private val AppBg = Color(0xFFF4F7FB)
 private val CardBg = Color(0xFFFFFFFF)
 private val MainText = Color(0xFF20242A)
 private val SecondaryText = Color(0xFF6B7280)
 private val PrimaryBlue = Color(0xFF2F6FED)
+private val SuccessGreen = Color(0xFF2E8B35)
+private val YellowAccent = Color(0xFFFFD84D)
+private val OrangeAccent = Color(0xFFFF8A00)
+private val DeleteRed = Color(0xFFEF4444)
 private val Border = Color(0xFFE5E7EB)
 
 @Composable
@@ -160,6 +164,8 @@ fun SimpleHomeScreen(items: List<SimpleMediaItem>, onRefreshClick: () -> Unit, s
                     )
                 }
             }
+            MediaPreviewStrip(items = items, onNavigateToMediaOverview = onNavigateToMediaOverview, onOpenItem = onOpenInSystem)
+
             FeatureGrid(
                 duplicateCount = duplicateCount,
                 totalFiles = totalFiles,
@@ -174,6 +180,48 @@ fun SimpleHomeScreen(items: List<SimpleMediaItem>, onRefreshClick: () -> Unit, s
                 onBlurry = onNavigateToBlurryImages,
                 onScanHistory = onNavigateToScanHistory
             )
+        }
+    }
+}
+
+
+@Composable
+private fun MediaPreviewStrip(
+    items: List<SimpleMediaItem>,
+    onNavigateToMediaOverview: () -> Unit,
+    onOpenItem: (SimpleMediaItem) -> Unit
+) {
+    val topItems = items.take(3)
+    Card(
+        colors = CardDefaults.cardColors(containerColor = CardBg),
+        border = BorderStroke(1.dp, Border),
+        shape = RoundedCornerShape(16.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Text("Recent media preview", color = MainText, fontWeight = FontWeight.SemiBold)
+                OutlinedButton(onClick = onNavigateToMediaOverview) { Text("Review") }
+            }
+            if (topItems.isEmpty()) {
+                Text("Run a scan to load thumbnails and review items.", color = SecondaryText)
+            } else {
+                topItems.forEachIndexed { index, item ->
+                    Card(
+                        onClick = { onOpenItem(item) },
+                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        border = BorderStroke(1.dp, when (index) {0 -> YellowAccent; 1 -> OrangeAccent; else -> SuccessGreen}),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(Modifier.fillMaxWidth().padding(10.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text(item.displayName, color = MainText, modifier = Modifier.weight(1f))
+                            Text(formatSize(item.size), color = SecondaryText)
+                        }
+                    }
+                }
+                Text("Select items in Media Overview before deleting. No direct delete from dashboard.", color = DeleteRed, style = MaterialTheme.typography.labelMedium)
+            }
         }
     }
 }
