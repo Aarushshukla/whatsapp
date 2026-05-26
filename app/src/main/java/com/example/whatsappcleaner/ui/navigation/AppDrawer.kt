@@ -30,8 +30,8 @@ fun AppDrawer(
 ) {
     ModalDrawerSheet(drawerContainerColor = Color.White) {
         Column(Modifier.fillMaxWidth().background(Color.White).padding(20.dp)) {
-            Text("ChatSweep", style = MaterialTheme.typography.headlineSmall)
-            Text("Private offline media cleaner", style = MaterialTheme.typography.bodySmall)
+            Text("ChatSweep", style = MaterialTheme.typography.headlineSmall, color = Color(0xFF20242A))
+            Text("Private offline media cleaner", style = MaterialTheme.typography.bodySmall, color = Color(0xFF6B7280))
             if (!lastScanSummary.isNullOrBlank()) {
                 Spacer(Modifier.height(6.dp))
                 Text(lastScanSummary, style = MaterialTheme.typography.labelMedium, color = Color(0xFF607D8B))
@@ -43,16 +43,12 @@ fun AppDrawer(
         DrawerItem("Videos", Icons.Default.VideoFile, selectedRoute == "videos") { onItemClick("videos") }
         DrawerItem("Audio", Icons.Default.GraphicEq, selectedRoute == "audio") { onItemClick("audio") }
         DrawerItem("Documents", Icons.Default.Description, selectedRoute == "documents") { onItemClick("documents") }
-        DrawerItem("Statuses", Icons.Default.Schedule, selectedRoute == "statuses") { onItemClick("statuses") }
-        DrawerItem("Stickers", Icons.Default.EmojiEmotions, selectedRoute == "stickers") { onItemClick("stickers") }
         Section("CLEANING TOOLS")
         DrawerItem("Smart Review", Icons.Default.AutoAwesome, selectedRoute == "smart_review") { onItemClick("smart_review") }
         DrawerItem("Duplicate Finder", Icons.Default.ContentCopy, selectedRoute == "duplicate_finder") { onItemClick("duplicate_finder") }
         DrawerItem("Large Files", Icons.Default.Folder, selectedRoute == "large_files") { onItemClick("large_files") }
         DrawerItem("Old Media", Icons.Default.History, selectedRoute == "old_media") { onItemClick("old_media") }
-        DrawerItem("Memes & Stickers", Icons.Default.Mood, selectedRoute == "memes_stickers") { onItemClick("memes_stickers") }
         DrawerItem("Blurry Images", Icons.Default.BlurOn, selectedRoute == "blurry_images") { onItemClick("blurry_images") }
-        DrawerItem("Scan Again", Icons.Default.Refresh, false) { onItemClick("scan_again") }
         Section("REMINDERS")
         DrawerItem("Cleanup Reminder", Icons.Default.Notifications, selectedRoute == "cleanup_reminder") { onItemClick("cleanup_reminder") }
         Section("APP")

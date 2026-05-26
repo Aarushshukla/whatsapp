@@ -658,21 +658,43 @@ fun WhatsCleanAppRoot(
         }
 
         composable(Routes.SmartReview) {
-            reviewGridScreen("Review Carefully", state.smartSuggestedItems, onBack = { navController.popBackStack() }, onDeleteSelected = { onDeleteMediaRequest(it, "review_carefully") }, onOpenPreview = onOpenInSystem)
+            val suggestions = remember(state.allItems, state.duplicateItems, state.largeFileItems, state.oldFileItems, state.blurryImageItems, state.smartSuggestedItems) {
+                (state.duplicateItems + state.largeFileItems + state.oldFileItems + state.blurryImageItems + state.smartSuggestedItems).distinctBy { it.uri.toString() }
+            }
+            reviewGridScreen("Smart Review", suggestions, onBack = { navController.popBackStack() }, onDeleteSelected = { onDeleteMediaRequest(it, "smart_review") }, onOpenPreview = onOpenInSystem)
         }
 
         composable(Routes.MediaOverview) {
             val total = state.totalSize.coerceAtLeast(1L)
+            val photos = state.allItems.filter { isPhoto(it) }
+            val videos = state.allItems.filter { isVideo(it) }
+            val audio = state.allItems.filter { isAudio(it) }
+            val documents = state.allItems.filter { isDocument(it) }
+            val statuses = state.allItems.filter { isStatus(it) }
+            val stickers = state.allItems.filter { isSticker(it) }
+            val other = state.allItems.filter { !isPhoto(it) && !isVideo(it) && !isAudio(it) && !isDocument(it) && !isStatus(it) && !isSticker(it) }
             val buckets = listOf(
-                DashboardMediaBucket("Photos", state.allItems.count{it.mimeType?.startsWith("image")==true}, state.allItems.filter{it.mimeType?.startsWith("image")==true}.sumOf{it.size}, ((state.allItems.filter{it.mimeType?.startsWith("image")==true}.sumOf{it.size}*100)/total).toInt()),
-                DashboardMediaBucket("Videos", state.allItems.count{it.mimeType?.startsWith("video")==true}, state.allItems.filter{it.mimeType?.startsWith("video")==true}.sumOf{it.size}, ((state.allItems.filter{it.mimeType?.startsWith("video")==true}.sumOf{it.size}*100)/total).toInt()),
-                DashboardMediaBucket("Audio", state.allItems.count{it.mimeType?.startsWith("audio")==true}, state.allItems.filter{it.mimeType?.startsWith("audio")==true}.sumOf{it.size}, ((state.allItems.filter{it.mimeType?.startsWith("audio")==true}.sumOf{it.size}*100)/total).toInt()),
-                DashboardMediaBucket("Documents", state.allItems.count{it.mimeType?.contains("pdf")==true || it.mimeType?.contains("text")==true}, state.allItems.filter{it.mimeType?.contains("pdf")==true || it.mimeType?.contains("text")==true}.sumOf{it.size}, 0),
-                DashboardMediaBucket("Statuses", state.sentFileItems.size, state.sentFileItems.sumOf{it.size}, 0),
-                DashboardMediaBucket("Stickers", state.memeItems.size, state.memeItems.sumOf{it.size}, 0),
-                DashboardMediaBucket("Other", state.allItems.size, state.totalSize, 100)
+                DashboardMediaBucket("Photos", photos.size, photos.sumOf { it.size }, ((photos.sumOf { it.size } * 100) / total).toInt()),
+                DashboardMediaBucket("Videos", videos.size, videos.sumOf { it.size }, ((videos.sumOf { it.size } * 100) / total).toInt()),
+                DashboardMediaBucket("Audio", audio.size, audio.sumOf { it.size }, ((audio.sumOf { it.size } * 100) / total).toInt()),
+                DashboardMediaBucket("Documents", documents.size, documents.sumOf { it.size }, ((documents.sumOf { it.size } * 100) / total).toInt()),
+                DashboardMediaBucket("Statuses", statuses.size, statuses.sumOf { it.size }, ((statuses.sumOf { it.size } * 100) / total).toInt()),
+                DashboardMediaBucket("Stickers", stickers.size, stickers.sumOf { it.size }, ((stickers.sumOf { it.size } * 100) / total).toInt()),
+                DashboardMediaBucket("Other", other.size, other.sumOf { it.size }, ((other.sumOf { it.size } * 100) / total).toInt())
             )
-            MediaOverviewScreen(items = buckets, onBack = { navController.popBackStack() }, onOpen = { navController.navigateSingleTop(Routes.MediaViewer) })
+            MediaOverviewScreen(items = buckets.filter { it.count > 0 }, onBack = { navController.popBackStack() }, onOpen = {
+                navController.navigateSingleTop(
+                    when (it) {
+                        "Photos" -> Routes.Photos
+                        "Videos" -> Routes.Videos
+                        "Audio" -> Routes.Audio
+                        "Documents" -> Routes.Documents
+                        "Statuses" -> Routes.Statuses
+                        "Stickers" -> Routes.Stickers
+                        else -> Routes.MediaViewer
+                    }
+                )
+            })
         }
         composable(Routes.Categories) {
             DashboardSubScreen("Categories", "Review by cleanup groups", { navController.popBackStack() }) {
@@ -689,10 +711,10 @@ fun WhatsCleanAppRoot(
                 }
             }
         }
-        composable(Routes.Photos) { reviewGridScreen("Photos", state.allItems.filter { it.mimeType?.startsWith("image") == true }, onBack = { navController.popBackStack() }, onDeleteSelected = { onDeleteMediaRequest(it, "photos") }, onOpenPreview = onOpenInSystem) }
-        composable(Routes.Videos) { reviewGridScreen("Videos", state.allItems.filter { it.mimeType?.startsWith("video") == true }, onBack = { navController.popBackStack() }, onDeleteSelected = { onDeleteMediaRequest(it, "videos") }, onOpenPreview = onOpenInSystem) }
-        composable(Routes.Audio) { reviewGridScreen("Audio", state.allItems.filter { it.mimeType?.startsWith("audio") == true }, onBack = { navController.popBackStack() }, onDeleteSelected = { onDeleteMediaRequest(it, "audio") }, onOpenPreview = onOpenInSystem) }
-        composable(Routes.Documents) { reviewGridScreen("Documents", state.allItems.filter { it.mimeType?.contains("pdf") == true || it.mimeType?.contains("text") == true }, onBack = { navController.popBackStack() }, onDeleteSelected = { onDeleteMediaRequest(it, "documents") }, onOpenPreview = onOpenInSystem) }
+        composable(Routes.Photos) { reviewGridScreen("Photos", state.allItems.filter(::isPhoto), onBack = { navController.popBackStack() }, onDeleteSelected = { onDeleteMediaRequest(it, "photos") }, onOpenPreview = onOpenInSystem) }
+        composable(Routes.Videos) { reviewGridScreen("Videos", state.allItems.filter(::isVideo), onBack = { navController.popBackStack() }, onDeleteSelected = { onDeleteMediaRequest(it, "videos") }, onOpenPreview = onOpenInSystem) }
+        composable(Routes.Audio) { reviewGridScreen("Audio", state.allItems.filter(::isAudio), onBack = { navController.popBackStack() }, onDeleteSelected = { onDeleteMediaRequest(it, "audio") }, onOpenPreview = onOpenInSystem) }
+        composable(Routes.Documents) { reviewGridScreen("Documents", state.allItems.filter(::isDocument), onBack = { navController.popBackStack() }, onDeleteSelected = { onDeleteMediaRequest(it, "documents") }, onOpenPreview = onOpenInSystem) }
         composable(Routes.Statuses) { reviewGridScreen("Statuses", state.sentFileItems, onBack = { navController.popBackStack() }, onDeleteSelected = { onDeleteMediaRequest(it, "statuses") }, onOpenPreview = onOpenInSystem) }
         composable(Routes.StatusCleaner) { reviewGridScreen("Statuses", state.sentFileItems, onBack = { navController.popBackStack() }, onDeleteSelected = { onDeleteMediaRequest(it, "statuses") }, onOpenPreview = onOpenInSystem) }
         composable(Routes.Stickers) { reviewGridScreen("Stickers", state.memeItems, onBack = { navController.popBackStack() }, onDeleteSelected = { onDeleteMediaRequest(it, "stickers") }, onOpenPreview = onOpenInSystem) }
@@ -943,6 +965,28 @@ private fun NavHostController.navigateSingleTop(route: String) {
             saveState = true
         }
     }
+}
+
+private fun isStatus(item: SimpleMediaItem): Boolean {
+    val text = "${item.bucketName.orEmpty()} ${item.name} ${item.path}".lowercase()
+    return "status" in text
+}
+
+private fun isSticker(item: SimpleMediaItem): Boolean {
+    val mime = item.mimeType.orEmpty().lowercase()
+    val text = "${item.bucketName.orEmpty()} ${item.name} ${item.path}".lowercase()
+    return mime.contains("webp") || "sticker" in text
+}
+
+private fun isPhoto(item: SimpleMediaItem): Boolean = item.mimeType.orEmpty().lowercase().startsWith("image/") && !isSticker(item)
+private fun isVideo(item: SimpleMediaItem): Boolean = item.mimeType.orEmpty().lowercase().startsWith("video/")
+private fun isAudio(item: SimpleMediaItem): Boolean = item.mimeType.orEmpty().lowercase().startsWith("audio/")
+private fun isDocument(item: SimpleMediaItem): Boolean {
+    val mime = item.mimeType.orEmpty().lowercase()
+    val name = item.name.lowercase()
+    return mime.contains("pdf") || mime.contains("msword") || mime.contains("spreadsheet") || mime.contains("presentation") ||
+        mime.contains("text") || mime.contains("zip") || name.endsWith(".pdf") || name.endsWith(".doc") || name.endsWith(".docx") ||
+        name.endsWith(".txt") || name.endsWith(".xls") || name.endsWith(".xlsx") || name.endsWith(".ppt") || name.endsWith(".pptx") || name.endsWith(".zip")
 }
 
 @Composable

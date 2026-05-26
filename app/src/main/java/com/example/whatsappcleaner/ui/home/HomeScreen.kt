@@ -27,8 +27,6 @@ import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.HourglassBottom
 import androidx.compose.material.icons.filled.ImageSearch
 import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.StickyNote2
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material3.Button
@@ -113,14 +111,13 @@ fun SimpleHomeScreen(items: List<SimpleMediaItem>, onRefreshClick: () -> Unit, s
                     IconButton(onClick = { scope.launch { drawerState.open() } }) { Icon(Icons.Default.Menu, contentDescription = "Open menu") }
                     Text("ChatSweep", fontWeight = FontWeight.Bold, color = MainText)
                 }
-                IconButton(onClick = onRefreshClick) { Icon(Icons.Default.Refresh, contentDescription = "Scan again", tint = PrimaryBlue) }
             }
 
             AnimatedVisibility(visible = true, enter = fadeIn(tween(400)) + slideInVertically(tween(400)) { it / 4 }) {
                 MainStorageCard(hasScanSummary, totalSize, totalFiles, summaryInfo, potentialCleanupSize, duplicateCount, largeTodaySizeText, onNavigateToSmartReview, onRefreshClick)
             }
-            FeatureGrid(onNavigateToMediaOverview, onNavigateToDuplicateFinder, onNavigateToLargeFiles, onNavigateToStatusCleaner)
-            ReviewToolsSection(onNavigateToMemesStickers, onNavigateToBlurryImages, onNavigateToOldMedia, onNavigateToStorageOverview)
+            FeatureGrid(onNavigateToMediaOverview, onNavigateToDuplicateFinder, onNavigateToLargeFiles, onNavigateToOldMedia)
+            CompactToolsGrid(onNavigateToOldMedia, onNavigateToBlurryImages, onNavigateToStorageOverview, onNavigateToCleanupReminder)
             Text("No cloud upload. Nothing is deleted automatically.", color = SecondaryText, style = MaterialTheme.typography.labelMedium)
         }
     }
@@ -135,7 +132,7 @@ private fun MainStorageCard(hasScanSummary: Boolean, totalSize: Long, totalFiles
             Text(if (hasScanSummary) formatSize(totalSize) else "No scan yet", style = MaterialTheme.typography.headlineMedium, color = MainText, fontWeight = FontWeight.Bold)
             Text(if (hasScanSummary && potentialCleanupSize > 0) "Review up to ${formatSize(potentialCleanupSize)}" else "No scan yet", color = SecondaryText)
             InfoRow("File count", if (hasScanSummary) "$totalCount" else "—")
-            InfoRow("Last scan time", if (hasScanSummary) summaryInfo else "No scan yet")
+            InfoRow("Last scan", if (hasScanSummary) "Today" else "Not scanned yet")
 
             SegmentedCategoryBar(hasScanSummary)
             LegendRows(totalSize, potentialCleanupSize, duplicateCount, largeVideosText)
@@ -167,20 +164,20 @@ private fun FeatureGrid(onMedia: () -> Unit, onDuplicates: () -> Unit, onLargeFi
 }
 
 @Composable
-private fun ReviewToolsSection(onMemes: () -> Unit, onBlurry: () -> Unit, onOldMedia: () -> Unit, onStorage: () -> Unit) {
-    Card(colors = CardDefaults.cardColors(containerColor = CardBg), border = BorderStroke(1.dp, Border), shape = RoundedCornerShape(16.dp)) {
-        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Review tools", color = MainText, fontWeight = FontWeight.SemiBold)
-            ReviewRow("Memes & Stickers", Icons.Default.StickyNote2, onMemes)
-            ReviewRow("Blurry Images", Icons.Default.ImageSearch, onBlurry)
-            ReviewRow("Old Media", Icons.Default.VideoLibrary, onOldMedia)
-            ReviewRow("Storage Overview", Icons.Default.Storage, onStorage)
+private fun CompactToolsGrid(onOldMedia: () -> Unit, onBlurry: () -> Unit, onStorage: () -> Unit, onReminder: () -> Unit) {
+    val cards = listOf(
+        Triple("Old Media", Icons.Default.VideoLibrary, onOldMedia),
+        Triple("Blurry Images", Icons.Default.ImageSearch, onBlurry),
+        Triple("Storage Overview", Icons.Default.Storage, onStorage),
+        Triple("Cleanup Reminder", Icons.Default.HourglassBottom, onReminder)
+    )
+    LazyVerticalGrid(columns = GridCells.Fixed(2), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp), userScrollEnabled = false, modifier = Modifier.height(190.dp)) {
+        items(cards.size) { idx ->
+            val (title, icon, action) = cards[idx]
+            DashboardFeatureCard(title, icon, "Open", action)
         }
     }
 }
-
-@Composable
-private fun ReviewRow(title: String, icon: ImageVector, onClick: () -> Unit) = DashboardFeatureCard(title, icon, "Open", onClick)
 
 @Composable
 private fun DashboardFeatureCard(title: String, icon: ImageVector, subtitle: String, onClick: () -> Unit) {
