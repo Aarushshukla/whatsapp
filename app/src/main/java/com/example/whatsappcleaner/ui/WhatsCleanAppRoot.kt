@@ -95,6 +95,7 @@ import com.example.whatsappcleaner.ui.home.ScanUiState
 import com.example.whatsappcleaner.ui.home.SimpleHomeScreen
 import com.example.whatsappcleaner.ui.home.MediaOverviewScreen
 import com.example.whatsappcleaner.ui.home.DashboardMediaBucket
+import com.example.whatsappcleaner.ui.home.CategorySummaryUi
 import com.example.whatsappcleaner.ui.home.DashboardSubScreen
 import com.example.whatsappcleaner.ui.home.SimpleStatRow
 import com.example.whatsappcleaner.ui.home.PermissionIntroScreen
