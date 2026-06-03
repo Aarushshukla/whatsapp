@@ -3,7 +3,6 @@ package com.example.whatsappcleaner.ui.theme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
-import androidx.compose.material3.darkColorScheme
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
@@ -18,19 +17,19 @@ import androidx.compose.ui.unit.sp
 
 private val LightColorScheme = lightColorScheme(
     primary = PremiumPrimary,
-    onPrimary = PremiumBackground,
-    primaryContainer = PremiumPrimary.copy(alpha = 0.20f),
+    onPrimary = Color.White,
+    primaryContainer = Color(0xFFE8F0FF),
     onPrimaryContainer = PremiumTextPrimary,
     secondary = PremiumSecondary,
-    onSecondary = PremiumTextPrimary,
-    secondaryContainer = PremiumSecondary.copy(alpha = 0.20f),
+    onSecondary = Color.White,
+    secondaryContainer = Color(0xFFE8F0FF),
     onSecondaryContainer = PremiumTextPrimary,
     tertiary = PremiumAccent,
-    onTertiary = PremiumBackground,
-    tertiaryContainer = PremiumAccent.copy(alpha = 0.20f),
+    onTertiary = Color.White,
+    tertiaryContainer = Color(0xFFE8F7EF),
     onTertiaryContainer = PremiumTextPrimary,
     error = PremiumDanger,
-    onError = PremiumTextPrimary,
+    onError = Color.White,
     background = PremiumBackground,
     onBackground = PremiumTextPrimary,
     surface = PremiumSurface,
@@ -38,35 +37,10 @@ private val LightColorScheme = lightColorScheme(
     surfaceVariant = PremiumSurfaceVariant,
     onSurfaceVariant = PremiumTextSecondary,
     outline = DividerColor,
-    outlineVariant = DividerColor.copy(alpha = 0.75f)
+    outlineVariant = DividerColor
 )
 
-private val DarkColorScheme = darkColorScheme(
-    primary = PremiumPrimary,
-    onPrimary = PremiumBackground,
-    primaryContainer = PremiumPrimary.copy(alpha = 0.22f),
-    onPrimaryContainer = PremiumTextPrimary,
-    secondary = PremiumSecondary,
-    onSecondary = PremiumTextPrimary,
-    secondaryContainer = PremiumSecondary.copy(alpha = 0.22f),
-    onSecondaryContainer = PremiumTextPrimary,
-    tertiary = PremiumAccent,
-    onTertiary = PremiumBackground,
-    tertiaryContainer = PremiumAccent.copy(alpha = 0.24f),
-    onTertiaryContainer = PremiumTextPrimary,
-    error = PremiumDanger,
-    onError = PremiumTextPrimary,
-    errorContainer = PremiumDanger.copy(alpha = 0.24f),
-    onErrorContainer = PremiumTextPrimary,
-    background = PremiumBackground,
-    onBackground = PremiumTextPrimary,
-    surface = PremiumSurface,
-    onSurface = PremiumTextPrimary,
-    surfaceVariant = PremiumSurfaceVariant,
-    onSurfaceVariant = PremiumTextSecondary,
-    outline = DividerColor,
-    outlineVariant = DividerColor.copy(alpha = 0.75f)
-)
+
 
 val AppShapes = Shapes(
     extraSmall = RoundedCornerShape(10.dp),
@@ -99,54 +73,6 @@ fun WhatsCleanTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit
 ) {
-    val colorScheme = remember(darkTheme) {
-        if (darkTheme) darkColorScheme(
-            primary = DarkColorScheme.primary,
-            onPrimary = DarkColorScheme.onPrimary,
-            primaryContainer = DarkColorScheme.primaryContainer,
-            onPrimaryContainer = DarkColorScheme.onPrimaryContainer,
-            secondary = DarkColorScheme.secondary,
-            onSecondary = DarkColorScheme.onSecondary,
-            secondaryContainer = DarkColorScheme.secondaryContainer,
-            onSecondaryContainer = DarkColorScheme.onSecondaryContainer,
-            tertiary = DarkColorScheme.tertiary,
-            onTertiary = DarkColorScheme.onTertiary,
-            tertiaryContainer = DarkColorScheme.tertiaryContainer,
-            onTertiaryContainer = DarkColorScheme.onTertiaryContainer,
-            background = DarkColorScheme.background,
-            onBackground = DarkColorScheme.onBackground,
-            surface = DarkColorScheme.surface,
-            onSurface = DarkColorScheme.onSurface,
-            surfaceVariant = DarkColorScheme.surfaceVariant,
-            onSurfaceVariant = DarkColorScheme.onSurfaceVariant,
-            outline = DarkColorScheme.outline,
-            outlineVariant = DarkColorScheme.outlineVariant,
-            error = DarkColorScheme.error,
-            onError = DarkColorScheme.onError
-        ) else lightColorScheme(
-            primary = LightColorScheme.primary,
-            onPrimary = LightColorScheme.onPrimary,
-            primaryContainer = LightColorScheme.primaryContainer,
-            onPrimaryContainer = LightColorScheme.onPrimaryContainer,
-            secondary = LightColorScheme.secondary,
-            onSecondary = LightColorScheme.onSecondary,
-            secondaryContainer = LightColorScheme.secondaryContainer,
-            onSecondaryContainer = LightColorScheme.onSecondaryContainer,
-            tertiary = LightColorScheme.tertiary,
-            onTertiary = LightColorScheme.onTertiary,
-            tertiaryContainer = LightColorScheme.tertiaryContainer,
-            onTertiaryContainer = LightColorScheme.onTertiaryContainer,
-            background = LightColorScheme.background,
-            onBackground = LightColorScheme.onBackground,
-            surface = LightColorScheme.surface,
-            onSurface = LightColorScheme.onSurface,
-            surfaceVariant = LightColorScheme.surfaceVariant,
-            onSurfaceVariant = LightColorScheme.onSurfaceVariant,
-            outline = LightColorScheme.outline,
-            outlineVariant = LightColorScheme.outlineVariant,
-            error = LightColorScheme.error,
-            onError = LightColorScheme.onError
-        )
-    }
+    val colorScheme = remember(darkTheme) { LightColorScheme }
     MaterialTheme(colorScheme = colorScheme, typography = AppTypography, shapes = AppShapes, content = content)
 }

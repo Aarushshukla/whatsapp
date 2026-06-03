@@ -56,16 +56,13 @@ class MediaLoader(private val context: Context) {
         offset: Int = 0
     ): List<SimpleMediaItem> {
         val resolver: ContentResolver = context.contentResolver
-        val collectionUri = if (mediaType == "video") {
-            MediaStore.Video.Media.EXTERNAL_CONTENT_URI
-        } else {
-            MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+        val collectionUri = when (mediaType) {
+            "video" -> MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+            "audio" -> MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
+            "file" -> MediaStore.Files.getContentUri("external")
+            else -> MediaStore.Images.Media.EXTERNAL_CONTENT_URI
         }
-        val idColumnName = if (mediaType == "video") {
-            MediaStore.Video.Media._ID
-        } else {
-            MediaStore.Images.Media._ID
-        }
+        val idColumnName = MediaStore.MediaColumns._ID
 
         val projection = arrayOf(
             idColumnName,
