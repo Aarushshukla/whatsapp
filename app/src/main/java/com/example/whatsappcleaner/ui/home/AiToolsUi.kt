@@ -744,7 +744,7 @@ fun LargeFilesFinderFeatureScreen(count: Int, totalBytes: Long, onBack: () -> Un
     AiFeatureDetailScreen(
         feature = AiFeature.LARGE_FILES_FINDER,
         stats = listOf(
-            Triple("Large files", count.toString(), "Files over 10MB"),
+            Triple("Large files", count.toString(), "Files over 20MB"),
             Triple("Heavy media size", formatSize(totalBytes), "Sorted largest first")
         ),
         items = items,

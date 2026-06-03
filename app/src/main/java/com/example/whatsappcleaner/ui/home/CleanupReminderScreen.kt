@@ -19,6 +19,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -34,6 +35,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.text.font.FontWeight
 
 @Composable
 fun CleanupReminderScreen(
@@ -43,15 +45,14 @@ fun CleanupReminderScreen(
     onIntervalSelected: (Long) -> Unit,
     onEnableToggle: (Boolean) -> Unit,
     onSave: () -> Unit,
-    onCancelReminder: () -> Unit,
     onOpenSettings: () -> Unit
 ) {
     val options = listOf(15L, 30L, 45L, 60L, 120L, 240L, 360L, 720L, 1440L, 10080L)
     Column(
         modifier = Modifier.fillMaxSize().background(Color(0xFFF6F8FC)).verticalScroll(rememberScrollState()).padding(16.dp)
     ) {
-        Text("Cleanup Reminder", style = MaterialTheme.typography.headlineSmall)
-        Text("Get a gentle reminder to review chat media before it fills your storage.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("Cleanup Reminder", style = MaterialTheme.typography.headlineSmall, color = Color(0xFF20242A), fontWeight = FontWeight.Bold)
+        Text("Get reminders to review chat media before it fills your storage.", color = Color(0xFF6B7280))
         Spacer(Modifier.height(16.dp))
 
         val reminderCardScale by animateFloatAsState(targetValue = if (reminderEnabled) 1f else 0.985f, animationSpec = tween(220), label = "reminder_card_scale")
@@ -59,14 +60,14 @@ fun CleanupReminderScreen(
             Column(Modifier.fillMaxWidth().padding(16.dp)) {
                 Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
                     Row {
-                        Icon(Icons.Default.AccessTime, contentDescription = null)
-                        Text(" Enable reminder", modifier = Modifier.padding(start = 8.dp))
+                        Icon(Icons.Default.AccessTime, contentDescription = null, tint = Color(0xFF2F6FED))
+                        Text(" Enable reminder", modifier = Modifier.padding(start = 8.dp), color = Color(0xFF20242A), fontWeight = FontWeight.SemiBold)
                     }
                     Switch(checked = reminderEnabled, onCheckedChange = onEnableToggle)
                 }
                 Spacer(Modifier.height(8.dp))
-                val reminderTextColor by animateColorAsState(if (reminderEnabled) Color(0xFF1B8E3E) else MaterialTheme.colorScheme.onSurfaceVariant, tween(220), label = "reminder_text")
-                Text(if (reminderEnabled) "Reminder active: every ${labelFor(selectedIntervalMinutes)}" else "No reminder set", color = reminderTextColor)
+                val reminderTextColor by animateColorAsState(if (reminderEnabled) Color(0xFF1B8E3E) else Color(0xFF6B7280), tween(220), label = "reminder_text")
+                Text(if (reminderEnabled) "Reminder active: every ${labelFor(selectedIntervalMinutes)}" else "No reminder set", color = reminderTextColor, fontWeight = FontWeight.Medium)
             }
         }
 
@@ -84,9 +85,14 @@ fun CleanupReminderScreen(
                         modifier = Modifier.scale(chipScale),
                         selected = selected,
                         onClick = { onIntervalSelected(minutes) },
-                        label = { Text(labelFor(minutes)) },
-                        leadingIcon = if (selected) ({ Text("✓") }) else null,
-                        colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Color(0xFFE9F7EF))
+                        label = { Text(labelFor(minutes), color = if (selected) Color(0xFF20242A) else Color(0xFF6B7280)) },
+                        leadingIcon = if (selected) ({ Text("✓", color = Color(0xFF1B8E3E)) }) else null,
+                        colors = FilterChipDefaults.filterChipColors(
+                            containerColor = Color.White,
+                            labelColor = Color(0xFF6B7280),
+                            selectedContainerColor = Color(0xFFE9F7EF),
+                            selectedLabelColor = Color(0xFF20242A)
+                        )
                     )
                 }
             }
@@ -96,7 +102,7 @@ fun CleanupReminderScreen(
             Spacer(Modifier.height(12.dp))
             Card(colors = CardDefaults.cardColors(containerColor = Color.White)) {
                 Column(Modifier.padding(16.dp)) {
-                    Text("Notifications are blocked. Enable notification permission in Settings to receive reminders.")
+                    Text("Notification permission is needed for reminders.", color = Color(0xFF20242A), fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.height(8.dp))
                     OutlinedButton(onClick = onOpenSettings) { Text("Open Settings") }
                 }
@@ -104,9 +110,11 @@ fun CleanupReminderScreen(
         }
 
         Spacer(Modifier.height(16.dp))
-        Button(onClick = onSave, modifier = Modifier.fillMaxWidth()) { Text("Save Reminder") }
-        Spacer(Modifier.height(8.dp))
-        OutlinedButton(onClick = onCancelReminder, modifier = Modifier.fillMaxWidth()) { Text("Cancel Reminder") }
+        Button(
+            onClick = onSave,
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2F6FED), contentColor = Color.White)
+        ) { Text("Save Reminder") }
     }
 }
 
