@@ -130,10 +130,16 @@ object CategoryFilters {
     private fun isBlurryOrLowQualityImage(item: SimpleMediaItem): Boolean {
         if (!item.mimeType.orEmpty().lowercase().startsWith("image/")) return false
         val marker = "${item.name} ${item.bucketName.orEmpty()} ${item.path}".lowercase()
-        val hasWidth = item.width != null && item.width > 0
-        val hasHeight = item.height != null && item.height > 0
-        return (hasWidth && item.width < 720) ||
-            (hasHeight && item.height < 720) ||
+        val width = item.width
+        val height = item.height
+        val hasWidth = width != null && width > 0
+        val hasHeight = height != null && height > 0
+        val isLowResolution = width != null &&
+            height != null &&
+            width > 0 &&
+            height > 0 &&
+            (width < 720 || height < 720)
+        return isLowResolution ||
             item.size < BLURRY_SMALL_IMAGE_BYTES ||
             marker.contains("thumb") || marker.contains("thumbnail") || marker.contains("cache") ||
             ((!hasWidth || !hasHeight) && item.size < BLURRY_MISSING_RESOLUTION_BYTES)
