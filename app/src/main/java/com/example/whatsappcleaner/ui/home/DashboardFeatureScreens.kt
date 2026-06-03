@@ -1171,7 +1171,11 @@ private fun AnimatedCleanupReceipt(message: String) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         androidx.compose.animation.AnimatedVisibility(visible = true, enter = scaleIn() + fadeIn()) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Icon(Icons.Default.Check, contentDescription = null, tint = Color(0xFF20A64A))
+                Icon(
+                    imageVector = Icons.Default.Check,
+                    contentDescription = null,
+                    tint = Color(0xFF20A64A)
+                )
                 Text("Cleanup completed", fontWeight = FontWeight.SemiBold)
             }
         }
