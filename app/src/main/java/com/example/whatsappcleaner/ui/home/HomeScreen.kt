@@ -12,8 +12,8 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -104,20 +104,27 @@ fun SimpleHomeScreen(items: List<SimpleMediaItem>, onRefreshClick: () -> Unit, s
             }
         }
     }) {
-        Column(modifier = Modifier.fillMaxSize().background(AppBg).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = { scope.launch { drawerState.open() } }) { Icon(Icons.Default.Menu, contentDescription = "Open menu") }
-                    Text("ChatSweep", fontWeight = FontWeight.Bold, color = MainText)
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().background(AppBg),
+            contentPadding = PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            item {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(onClick = { scope.launch { drawerState.open() } }) { Icon(Icons.Default.Menu, contentDescription = "Open menu") }
+                        Text("ChatSweep", fontWeight = FontWeight.Bold, color = MainText)
+                    }
                 }
             }
-
-            AnimatedVisibility(visible = true, enter = fadeIn(tween(400)) + slideInVertically(tween(400)) { it / 4 }) {
-                MainStorageCard(hasScanSummary, totalSize, totalFiles, summaryInfo, potentialCleanupSize, duplicateCount, largeTodaySizeText, onNavigateToSmartReview, onRefreshClick)
+            item {
+                AnimatedVisibility(visible = true, enter = fadeIn(tween(400)) + slideInVertically(tween(400)) { it / 4 }) {
+                    MainStorageCard(hasScanSummary, totalSize, totalFiles, summaryInfo, potentialCleanupSize, duplicateCount, largeTodaySizeText, onNavigateToSmartReview, onRefreshClick)
+                }
             }
-            FeatureGrid(onNavigateToMediaOverview, onNavigateToDuplicateFinder, onNavigateToLargeFiles, onNavigateToOldMedia)
-            CompactToolsGrid(onNavigateToOldMedia, onNavigateToBlurryImages, onNavigateToStorageOverview, onNavigateToCleanupReminder)
-            Text("No cloud upload. Nothing is deleted automatically.", color = SecondaryText, style = MaterialTheme.typography.labelMedium)
+            item { FeatureGrid(onNavigateToMediaOverview, onNavigateToDuplicateFinder, onNavigateToLargeFiles, onNavigateToOldMedia) }
+            item { CompactToolsGrid(onNavigateToBlurryImages, onNavigateToStorageOverview, onNavigateToCleanupReminder) }
+            item { Text("No cloud upload. Nothing is deleted automatically.", color = SecondaryText, style = MaterialTheme.typography.labelMedium) }
         }
     }
 }
@@ -150,29 +157,41 @@ private fun FeatureGrid(onMedia: () -> Unit, onDuplicates: () -> Unit, onLargeFi
         Triple("Large Files", Icons.Default.Folder, onLargeFiles),
         Triple("Old Media", Icons.Default.HourglassBottom, onOldMedia)
     )
-    LazyVerticalGrid(columns = GridCells.Fixed(2), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp), userScrollEnabled = false, modifier = Modifier.height(190.dp)) {
-        items(cards.size) { idx ->
-            val (title, icon, action) = cards[idx]
-            var show by remember { mutableStateOf(false) }
-            LaunchedEffect(Unit) { kotlinx.coroutines.delay((idx * 70).toLong()); show = true }
-            AnimatedVisibility(visible = show, enter = fadeIn(tween(320)) + slideInVertically(tween(320)) { it / 3 }) {
-                DashboardFeatureCard(title, icon, "Open", action)
-            }
-        }
-    }
+    EqualCardGrid(cards = cards, animate = true)
 }
 
 @Composable
-private fun CompactToolsGrid(onOldMedia: () -> Unit, onBlurry: () -> Unit, onStorage: () -> Unit, onReminder: () -> Unit) {
+private fun CompactToolsGrid(onBlurry: () -> Unit, onStorage: () -> Unit, onReminder: () -> Unit) {
     val cards = listOf(
         Triple("Blurry Images", Icons.Default.ImageSearch, onBlurry),
         Triple("Storage Overview", Icons.Default.Storage, onStorage),
         Triple("Cleanup Reminder", Icons.Default.HourglassBottom, onReminder)
     )
-    LazyVerticalGrid(columns = GridCells.Fixed(2), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp), userScrollEnabled = false, modifier = Modifier.height(142.dp)) {
-        items(cards.size) { idx ->
-            val (title, icon, action) = cards[idx]
-            DashboardFeatureCard(title, icon, "Open", action)
+    EqualCardGrid(cards = cards, animate = false)
+}
+
+@Composable
+private fun EqualCardGrid(cards: List<Triple<String, ImageVector, () -> Unit>>, animate: Boolean) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        cards.chunked(2).forEachIndexed { rowIndex, rowCards ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                rowCards.forEachIndexed { columnIndex, card ->
+                    val idx = rowIndex * 2 + columnIndex
+                    val (title, icon, action) = card
+                    var show by remember { mutableStateOf(!animate) }
+                    LaunchedEffect(animate) { if (animate) { kotlinx.coroutines.delay((idx * 70).toLong()); show = true } }
+                    AnimatedVisibility(
+                        visible = show,
+                        enter = fadeIn(tween(320)) + slideInVertically(tween(320)) { it / 3 },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        DashboardFeatureCard(title, icon, "Open", action)
+                    }
+                }
+                if (rowCards.size == 1) {
+                    androidx.compose.foundation.layout.Box(Modifier.weight(1f))
+                }
+            }
         }
     }
 }
