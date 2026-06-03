@@ -22,6 +22,7 @@ import com.example.whatsappcleaner.data.billing.SubscriptionState
 import com.example.whatsappcleaner.data.local.CategoryFilters
 import com.example.whatsappcleaner.data.local.MediaLoader
 import com.example.whatsappcleaner.data.local.SimpleMediaItem
+import com.example.whatsappcleaner.ui.CategorySummaryUi
 import com.example.whatsappcleaner.data.local.UserPrefs
 import com.example.whatsappcleaner.data.local.UserPrefs.ScanHistoryRecord
 import com.example.whatsappcleaner.data.local.formatSize
@@ -115,14 +116,6 @@ data class HomeUiState(
     val isDeleting: Boolean get() = isDeleteInProgress
 }
 
-data class CategorySummaryUi(
-    val title: String,
-    val description: String,
-    val count: Int,
-    val sizeBytes: Long,
-    val safetyBadge: String,
-    val items: List<SimpleMediaItem>
-)
 
 data class SmartSuggestionSummary(
     val duplicateFiles: Int = 0,
