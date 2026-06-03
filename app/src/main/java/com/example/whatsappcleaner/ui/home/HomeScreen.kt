@@ -28,7 +28,6 @@ import androidx.compose.material.icons.filled.HourglassBottom
 import androidx.compose.material.icons.filled.ImageSearch
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Storage
-import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -144,12 +143,12 @@ private fun MainStorageCard(hasScanSummary: Boolean, totalSize: Long, totalFiles
 }
 
 @Composable
-private fun FeatureGrid(onMedia: () -> Unit, onDuplicates: () -> Unit, onLargeFiles: () -> Unit, onStatuses: () -> Unit) {
+private fun FeatureGrid(onMedia: () -> Unit, onDuplicates: () -> Unit, onLargeFiles: () -> Unit, onOldMedia: () -> Unit) {
     val cards = listOf(
         Triple("Media", Icons.Default.Collections, onMedia),
         Triple("Duplicates", Icons.Default.ContentCopy, onDuplicates),
         Triple("Large Files", Icons.Default.Folder, onLargeFiles),
-        Triple("Statuses", Icons.Default.HourglassBottom, onStatuses)
+        Triple("Old Media", Icons.Default.HourglassBottom, onOldMedia)
     )
     LazyVerticalGrid(columns = GridCells.Fixed(2), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp), userScrollEnabled = false, modifier = Modifier.height(190.dp)) {
         items(cards.size) { idx ->
@@ -166,12 +165,11 @@ private fun FeatureGrid(onMedia: () -> Unit, onDuplicates: () -> Unit, onLargeFi
 @Composable
 private fun CompactToolsGrid(onOldMedia: () -> Unit, onBlurry: () -> Unit, onStorage: () -> Unit, onReminder: () -> Unit) {
     val cards = listOf(
-        Triple("Old Media", Icons.Default.VideoLibrary, onOldMedia),
         Triple("Blurry Images", Icons.Default.ImageSearch, onBlurry),
         Triple("Storage Overview", Icons.Default.Storage, onStorage),
         Triple("Cleanup Reminder", Icons.Default.HourglassBottom, onReminder)
     )
-    LazyVerticalGrid(columns = GridCells.Fixed(2), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp), userScrollEnabled = false, modifier = Modifier.height(190.dp)) {
+    LazyVerticalGrid(columns = GridCells.Fixed(2), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp), userScrollEnabled = false, modifier = Modifier.height(142.dp)) {
         items(cards.size) { idx ->
             val (title, icon, action) = cards[idx]
             DashboardFeatureCard(title, icon, "Open", action)
@@ -188,7 +186,7 @@ private fun DashboardFeatureCard(title: String, icon: ImageVector, subtitle: Str
             pressed = interaction is androidx.compose.foundation.interaction.PressInteraction.Press
         }}
     }, colors = CardDefaults.cardColors(containerColor = CardBg), border = BorderStroke(1.dp, Border), shape = RoundedCornerShape(14.dp), modifier = Modifier.scale(scale)) {
-        Row(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth().height(72.dp).padding(12.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Icon(icon, contentDescription = null, tint = PrimaryBlue)
                 Column { Text(title, color = MainText, fontWeight = FontWeight.SemiBold); Text(subtitle, color = SecondaryText, style = MaterialTheme.typography.bodySmall) }

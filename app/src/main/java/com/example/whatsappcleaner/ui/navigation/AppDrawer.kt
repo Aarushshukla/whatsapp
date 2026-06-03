@@ -67,12 +67,16 @@ fun AppDrawer(
     val selectedColor by animateColorAsState(if (selected) Color(0xFFE9F2FF) else Color.Transparent, tween(220), label = "drawer_selected")
     NavigationDrawerItem(
         modifier = Modifier.heightIn(min = 52.dp),
-        label = { Row(Modifier.fillMaxWidth()) { Text(label); Spacer(Modifier.width(8.dp)) } },
-        icon = { Icon(icon, null) },
+        label = { Row(Modifier.fillMaxWidth()) { Text(label, color = Color(0xFF20242A)); Spacer(Modifier.width(8.dp)) } },
+        icon = { Icon(icon, null, tint = Color(0xFF2F6FED)) },
         selected = selected,
         colors = NavigationDrawerItemDefaults.colors(
             selectedContainerColor = selectedColor,
-            unselectedContainerColor = selectedColor
+            unselectedContainerColor = selectedColor,
+            selectedTextColor = Color(0xFF20242A),
+            unselectedTextColor = Color(0xFF20242A),
+            selectedIconColor = Color(0xFF2F6FED),
+            unselectedIconColor = Color(0xFF2F6FED)
         ),
         onClick = onClick
     )

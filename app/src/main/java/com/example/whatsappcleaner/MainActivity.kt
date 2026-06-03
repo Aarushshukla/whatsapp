@@ -83,8 +83,10 @@ class MainActivity : ComponentActivity() {
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             if (granted) {
                 viewModel.saveCleanupReminder()
+                Toast.makeText(this, "Reminder saved", Toast.LENGTH_SHORT).show()
             } else {
                 viewModel.onReminderPermissionDenied()
+                Toast.makeText(this, "Notification permission is needed for reminders.", Toast.LENGTH_LONG).show()
             }
         }
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -153,6 +155,7 @@ class MainActivity : ComponentActivity() {
     private fun requestNotificationPermissionForReminder() {
         if (hasNotificationPermission()) {
             viewModel.saveCleanupReminder()
+            Toast.makeText(this, "Reminder saved", Toast.LENGTH_SHORT).show()
             return
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
