@@ -163,7 +163,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     companion object {
         private const val TAG = "HomeViewModel"
         private const val INITIAL_LOAD_LIMIT = 100
-        private const val LARGE_FILE_THRESHOLD_BYTES = 10L * 1024L * 1024L
+        private const val LARGE_FILE_THRESHOLD_BYTES = 20L * 1024L * 1024L
         private const val OLD_FILE_AGE_DAYS = 30L
     }
 
@@ -292,7 +292,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 val allItems = runCatching {
                     val images = mediaLoader.loadAllDeviceMedia("image", limit = INITIAL_LOAD_LIMIT)
                     val videos = mediaLoader.loadAllDeviceMedia("video", limit = INITIAL_LOAD_LIMIT)
-                    val initialItems = (images + videos).sortedByDescending { mediaItem -> mediaItem.addedMillis }
+                    val audio = mediaLoader.loadAllDeviceMedia("audio", limit = INITIAL_LOAD_LIMIT)
+                    val files = mediaLoader.loadAllDeviceMedia("file", limit = INITIAL_LOAD_LIMIT)
+                    val initialItems = (images + videos + audio + files).distinctBy { it.uri.toString() }.sortedByDescending { mediaItem -> mediaItem.addedMillis }
                     _scanUiState.value = ScanUiState.Loading("Finding duplicates", 0.3f)
                     if (showLoading) {
                         ensureMinimumLoadingDuration(loadStartedAt)
@@ -302,8 +304,10 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
                     val fullImages = mediaLoader.loadAllDeviceMedia("image")
                     val fullVideos = mediaLoader.loadAllDeviceMedia("video")
+                    val fullAudio = mediaLoader.loadAllDeviceMedia("audio")
+                    val fullFiles = mediaLoader.loadAllDeviceMedia("file")
                     _scanUiState.value = ScanUiState.Loading("Checking large videos", 0.5f)
-                    val loadedItems = (fullImages + fullVideos).sortedByDescending { mediaItem -> mediaItem.addedMillis }
+                    val loadedItems = (fullImages + fullVideos + fullAudio + fullFiles).distinctBy { it.uri.toString() }.sortedByDescending { mediaItem -> mediaItem.addedMillis }
                     Log.d("FILES", "Files found: ${loadedItems.size}")
                     _scanUiState.value = ScanUiState.Loading("Detecting old media", 0.7f)
 
@@ -321,11 +325,11 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     partial
                 }
                 _scanUiState.value = if (allItems.isEmpty()) ScanUiState.Empty else ScanUiState.Success(
-                    "Found ${allItems.size} files (${formatSize(allItems.sumOf { it.sizeKb.toLong() * 1024L })})"
+                    "Found ${allItems.size} files (${formatSize(allItems.sumOf { it.size })})"
                 )
                 if (allItems.isNotEmpty()) {
                     val now = System.currentTimeMillis()
-                    val totalSizeBytes = allItems.sumOf { it.sizeKb.toLong() * 1024L }
+                    val totalSizeBytes = allItems.sumOf { it.size }
                     prefs.setLastScanCompletedAt(now)
                     prefs.saveCachedScanSummary(
                         UserPrefs.CachedScanSummary(
@@ -347,8 +351,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                         ScanHistoryRecord(
                             scanDateMillis = now,
                             totalMediaSizeBytes = totalSizeBytes,
-                            imageSizeBytes = allItems.filter { it.mimeType?.startsWith("image") == true }.sumOf { it.sizeKb.toLong() * 1024L },
-                            videoSizeBytes = allItems.filter { it.mimeType?.startsWith("video") == true }.sumOf { it.sizeKb.toLong() * 1024L },
+                            imageSizeBytes = allItems.filter { it.mimeType?.startsWith("image") == true }.sumOf { it.size },
+                            videoSizeBytes = allItems.filter { it.mimeType?.startsWith("video") == true }.sumOf { it.size },
                             duplicateSizeBytes = 0L
                         )
                     )
@@ -417,19 +421,28 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             val junkItems = smartJunkAnalyzer.findJunk(allItems)
             val spamItems = spamMediaAnalyzer.findSpamMedia(allItems)
             val baseReport = phoneRealityAnalyzer.generateReport(allItems)
-            val totalSize = allItems.sumOf { mediaItem -> mediaItem.sizeKb.toLong() * 1024L }
+            val totalSize = allItems.sumOf { mediaItem -> mediaItem.size }
             val now = System.currentTimeMillis()
             val oldFileCutoff = now - (OLD_FILE_AGE_DAYS * 24L * 60L * 60L * 1000L)
             val oldStatusCutoff = now - (24L * 60L * 60L * 1000L)
-            val duplicateGroups = allItems
-                .groupBy { mediaItem -> "${mediaItem.name.lowercase()}_${mediaItem.size}" }
-                .values
-                .filter { groupedItems -> groupedItems.size > 1 }
-            val duplicateSuggestedItems = duplicateGroups.flatten()
-            val largeSuggestedItems = allItems
+            val duplicateGroups = findDuplicateGroups(allItems)
+            val duplicateSuggestedItems = duplicateGroups.flatMap { group -> group.drop(1) }
+            val largeOverThreshold = allItems
                 .filter { mediaItem -> mediaItem.size > LARGE_FILE_THRESHOLD_BYTES }
                 .sortedByDescending { mediaItem -> mediaItem.size }
-            val oldSuggestedItems = allItems.filter { mediaItem -> mediaItem.addedMillis < oldFileCutoff }
+            val largeSuggestedItems = if (largeOverThreshold.size >= 10) {
+                largeOverThreshold
+            } else {
+                allItems.sortedByDescending { mediaItem -> mediaItem.size }.take(50)
+            }
+            val oldSuggestedItems = allItems.filter { mediaItem ->
+                val fileDate = when {
+                    mediaItem.modifiedMillis > 0L -> mediaItem.modifiedMillis
+                    mediaItem.addedMillis > 0L -> mediaItem.addedMillis
+                    else -> 0L
+                }
+                fileDate in 1 until oldFileCutoff
+            }
             val statusItems = allItems.filter { item ->
                 val marker = "${item.name} ${item.path} ${item.bucketName.orEmpty()}".lowercase()
                 marker.contains(".statuses") || marker.contains("statuses") || marker.contains("status")
@@ -448,11 +461,10 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 !duplicatesKeySet.contains("${item.name.lowercase()}_${item.size}") &&
                     !(item.name.lowercase().contains("status") || item.name.lowercase().contains("sticker") || item.name.lowercase().contains("meme"))
             }
-            val largeFiles = allItems.filter { mediaItem -> mediaItem.size > LARGE_FILE_THRESHOLD_BYTES }
-                .sortedWith(compareByDescending<SimpleMediaItem> { it.mimeType?.startsWith("video") == true }.thenByDescending { it.size })
+            val largeFiles = largeSuggestedItems
 
             val categorySummaries = listOf(
-                CategorySummaryUi("Large Files", "Files larger than 10 MB. Videos prioritized.", largeFiles.size, largeFiles.sumOf { it.size }, "REVIEW_CAREFULLY", largeFiles),
+                CategorySummaryUi("Large Files", "Files larger than 20 MB, or top largest files when fewer than 10 match.", largeFiles.size, largeFiles.sumOf { it.size }, "REVIEW_CAREFULLY", largeFiles),
                 CategorySummaryUi("Old Media", "Media modified more than 30 days ago.", oldSuggestedItems.size, oldSuggestedItems.sumOf { it.size }, "REVIEW_CAREFULLY", oldSuggestedItems),
                 CategorySummaryUi("Status Files", "Statuses folder/bucket files. Older than 24h is likely junk.", statusItems.size, statusItems.sumOf { it.size }, "PROBABLY_JUNK", statusItems),
                 CategorySummaryUi("Memes & Stickers", "Sticker/meme/funny/gif/forwarded/status-like media.", memeStickerItems.size, memeStickerItems.sumOf { it.size }, "PROBABLY_JUNK", memeStickerItems),
@@ -481,7 +493,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             }
             largeSuggestedItems.forEach { item ->
                 suggestedReasonMap.getOrPut(item.uri.toString()) { linkedSetOf() }
-                    .add("Large file (>10MB)")
+                    .add("Large file (>20MB)")
             }
             oldSuggestedItems.forEach { item ->
                 suggestedReasonMap.getOrPut(item.uri.toString()) { linkedSetOf() }
@@ -513,26 +525,26 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 filteredItems = filteredItems,
                 summaryInfo = summary,
                 largeTodayCount = largeItems.size,
-                largeTodaySizeText = formatSize(largeItems.sumOf { i -> i.sizeKb.toLong() * 1024 }),
+                largeTodaySizeText = formatSize(largeItems.sumOf { i -> i.size }),
                 screenshotTodayCount = screenshots.size,
-                screenshotTodaySizeText = formatSize(screenshots.sumOf { i -> i.sizeKb.toLong() * 1024 }),
+                screenshotTodaySizeText = formatSize(screenshots.sumOf { i -> i.size }),
                 memeCount = memes.size,
                 memeItems = memes,
                 junkCount = junkItems.size,
-                duplicateCount = junkBreakdown.duplicates.size,
+                duplicateCount = duplicateSuggestedItems.size,
                 spamCount = spamItems.size,
                 totalFiles = allItems.size,
                 totalSize = totalSize,
-                duplicateItems = junkBreakdown.duplicates,
+                duplicateItems = duplicateSuggestedItems,
                 spamItems = spamItems,
-                largeFileItems = junkBreakdown.largeFiles,
+                largeFileItems = largeSuggestedItems,
                 sentFileItems = junkBreakdown.sentFiles,
                 smartSuggestionSummary = smartSuggestionSummary,
                 smartSuggestedItems = smartSuggestedItems,
                 suggestionReasonsByUri = suggestedReasonMap.mapValues { entry -> entry.value.toList() },
                 report = baseReport.copy(
                     memeCount = memes.size,
-                    duplicateCount = junkBreakdown.duplicates.size,
+                    duplicateCount = duplicateSuggestedItems.size,
                     spamCount = spamItems.size
                 ),
                 duplicateGroups = duplicateGroups,
@@ -583,6 +595,33 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             }
             _items.value = computed.allItems
         }
+    }
+
+
+    private fun findDuplicateGroups(items: List<SimpleMediaItem>): List<List<SimpleMediaItem>> = items
+        .filter { it.size > 0L }
+        .groupBy { it.size }
+        .values
+        .flatMap { sameSizeItems ->
+            sameSizeItems
+                .groupBy { item -> normalizedDuplicateName(item.name) }
+                .values
+                .filter { group -> group.size > 1 }
+                .map { group ->
+                    group.sortedWith(
+                        compareByDescending<SimpleMediaItem> { it.modifiedMillis }
+                            .thenByDescending { it.addedMillis }
+                            .thenBy { it.name.length }
+                    )
+                }
+        }
+
+    private fun normalizedDuplicateName(name: String): String {
+        val extensionless = name.substringBeforeLast('.', name).lowercase()
+        return extensionless
+            .replace(Regex("\\(\\d+\\)|[-_ ]copy|[-_ ]\\d+$"), "")
+            .replace(Regex("[^a-z0-9]"), "")
+            .ifBlank { extensionless }
     }
 
     private suspend fun isMeme(item: SimpleMediaItem, classifier: MemeClassifier): Boolean {
@@ -1121,7 +1160,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             val remainingSpamItems = currentState.spamItems.filterNot { item -> item.id in deletedIds }
             val remainingLargeFileItems = currentState.largeFileItems.filterNot { item -> item.id in deletedIds }
             val remainingSentFileItems = currentState.sentFileItems.filterNot { item -> item.id in deletedIds }
-            val remainingTotalSize = remainingItems.sumOf { mediaItem -> mediaItem.sizeKb.toLong() * 1024L }
+            val remainingTotalSize = remainingItems.sumOf { mediaItem -> mediaItem.size }
             val today = System.currentTimeMillis() - 86400000
             val remainingLargeToday = remainingItems.filter { mediaItem ->
                 mediaItem.addedMillis > today && mediaItem.sizeKb > 5000
@@ -1131,7 +1170,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             }
             val deletedBytes = currentState.allItems
                 .filter { item -> item.id in deletedIds }
-                .sumOf { mediaItem -> mediaItem.sizeKb.toLong() * 1024L }
+                .sumOf { mediaItem -> mediaItem.size }
             val failedCount = (currentState.pendingDeleteIds - deletedIds).size.coerceAtLeast(0)
             val streak = prefs.recordCleanupDay()
             val deleteMessage = buildString {
@@ -1173,9 +1212,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 totalFiles = remainingItems.size,
                 totalSize = remainingTotalSize,
                 largeTodayCount = remainingLargeToday.size,
-                largeTodaySizeText = formatSize(remainingLargeToday.sumOf { i -> i.sizeKb.toLong() * 1024 }),
+                largeTodaySizeText = formatSize(remainingLargeToday.sumOf { i -> i.size }),
                 screenshotTodayCount = remainingScreenshotsToday.size,
-                screenshotTodaySizeText = formatSize(remainingScreenshotsToday.sumOf { i -> i.sizeKb.toLong() * 1024 }),
+                screenshotTodaySizeText = formatSize(remainingScreenshotsToday.sumOf { i -> i.size }),
                 report = currentState.report.copy(
                     memeCount = remainingMemeItems.size,
                     duplicateCount = remainingDuplicateItems.size,

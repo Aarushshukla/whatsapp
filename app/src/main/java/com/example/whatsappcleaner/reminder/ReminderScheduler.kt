@@ -15,7 +15,7 @@ object ReminderScheduler {
         context: Context,
         intervalMinutes: Long
     ) {
-        val normalizedIntervalMinutes = intervalMinutes.coerceIn(15L, 24L * 60L)
+        val normalizedIntervalMinutes = intervalMinutes.coerceAtLeast(15L)
         val periodicRequest = PeriodicWorkRequestBuilder<ReminderWorker>(
             normalizedIntervalMinutes,
             TimeUnit.MINUTES

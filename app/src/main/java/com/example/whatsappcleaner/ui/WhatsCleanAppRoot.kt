@@ -68,6 +68,9 @@ import com.example.whatsappcleaner.data.ReminderFreq
 import com.example.whatsappcleaner.data.ReminderTime
 import com.example.whatsappcleaner.data.billing.BillingProduct
 import com.example.whatsappcleaner.data.local.SimpleMediaItem
+import com.example.whatsappcleaner.data.local.formatCount
+import com.example.whatsappcleaner.data.local.formatPercent
+import com.example.whatsappcleaner.data.local.formatSize
 import com.example.whatsappcleaner.ui.components.FriendlyState
 import com.example.whatsappcleaner.ui.home.AiFeature
 import com.example.whatsappcleaner.ui.home.AnalyticsScreen
@@ -146,6 +149,7 @@ private object Routes {
     const val AiScreenshotsCleaner = "ai_screenshots_cleaner"
     const val AiSpamDetector = "ai_spam_detector"
     const val SmartReview = "smart_review"
+    const val SmartReviewList = "smart_review_list"
     const val Categories = "categories"
     const val MediaOverview = "media_overview"
     const val Photos = "photos"
@@ -155,8 +159,11 @@ private object Routes {
     const val Statuses = "statuses"
     const val Stickers = "stickers"
     const val DuplicateFinder = "duplicate_finder"
+    const val DuplicateReview = "duplicate_review"
     const val LargeFiles = "large_files"
+    const val LargeFilesReview = "large_files_review"
     const val OldMedia = "old_media"
+    const val OldMediaReview = "old_media_review"
     const val StatusCleaner = "status_cleaner"
     const val MemesStickers = "memes_stickers"
     const val BlurryImages = "blurry_images"
@@ -381,7 +388,7 @@ fun WhatsCleanAppRoot(
                 },
                 onNavigateToDuplicates = {
                     if (true) {
-                        navController.navigateSingleTop(Routes.SmartClean)
+                        navController.navigateSingleTop(Routes.DuplicateFinder)
                     } else navController.navigateSingleTop(Routes.Paywall)
                 },
                 onBulkDeleteClick = {
@@ -596,7 +603,7 @@ fun WhatsCleanAppRoot(
         composable(Routes.AiLargeFilesFinder) {
             LargeFilesFinderFeatureScreen(
                 count = state.largeFileItems.size,
-                totalBytes = state.largeFileItems.sumOf { mediaItem -> mediaItem.sizeKb.toLong() * 1024L },
+                totalBytes = state.largeFileItems.sumOf { mediaItem -> mediaItem.size },
                 items = state.largeFileItems.sortedByDescending { it.size },
                 onDeleteItemsRequested = { items -> onDeleteMediaRequest(items, "ai_large") },
                 onBack = { navController.popBackStack() }
@@ -661,27 +668,34 @@ fun WhatsCleanAppRoot(
             val suggestions = remember(state.allItems, state.duplicateItems, state.largeFileItems, state.oldFileItems, state.blurryImageItems, state.smartSuggestedItems) {
                 (state.duplicateItems + state.largeFileItems + state.oldFileItems + state.blurryImageItems + state.smartSuggestedItems).distinctBy { it.uri.toString() }
             }
-            reviewGridScreen("Smart Review", suggestions, onBack = { navController.popBackStack() }, onDeleteSelected = { onDeleteMediaRequest(it, "smart_review") }, onOpenPreview = onOpenInSystem)
+            standardSummaryScreen(
+                title = "Smart Review",
+                subtitle = if (suggestions.isEmpty()) "Run a scan to find cleanup opportunities." else "Real cleanup suggestions from your latest scan",
+                lines = listOf(
+                    "Suggested cleanup size" to formatSize(suggestions.sumOf { it.size }),
+                    "Suggested file count" to formatCount(suggestions.size),
+                    "Duplicates" to formatCount(state.duplicateItems.size),
+                    "Large files" to formatCount(state.largeFileItems.size),
+                    "Old media" to formatCount(state.oldFileItems.size),
+                    "Blurry images" to formatCount(state.blurryImageItems.size)
+                ),
+                hasData = suggestions.isNotEmpty(),
+                emptyTitle = "No smart suggestions yet",
+                emptySubtitle = "Run a scan to find cleanup opportunities.",
+                actionLabel = if (suggestions.isEmpty()) "SCAN AGAIN" else "REVIEW SUGGESTED FILES",
+                onBack = { navController.popBackStack() },
+                onAction = { if (suggestions.isEmpty()) onRefreshClick() else navController.navigateSingleTop(Routes.SmartReviewList) }
+            )
+        }
+        composable(Routes.SmartReviewList) {
+            val suggestions = (state.duplicateItems + state.largeFileItems + state.oldFileItems + state.blurryImageItems + state.smartSuggestedItems).distinctBy { it.uri.toString() }
+            reviewGridScreen("Suggested Files", suggestions, onBack = { navController.popBackStack() }, onDeleteSelected = { onDeleteMediaRequest(it, "smart_review") }, onOpenPreview = onOpenInSystem)
         }
 
         composable(Routes.MediaOverview) {
-            val total = state.totalSize.coerceAtLeast(1L)
-            val photos = state.allItems.filter { isPhoto(it) }
-            val videos = state.allItems.filter { isVideo(it) }
-            val audio = state.allItems.filter { isAudio(it) }
-            val documents = state.allItems.filter { isDocument(it) }
-            val statuses = state.allItems.filter { isStatus(it) }
-            val stickers = state.allItems.filter { isSticker(it) }
-            val other = state.allItems.filter { !isPhoto(it) && !isVideo(it) && !isAudio(it) && !isDocument(it) && !isStatus(it) && !isSticker(it) }
-            val buckets = listOf(
-                DashboardMediaBucket("Photos", photos.size, photos.sumOf { it.size }, ((photos.sumOf { it.size } * 100) / total).toInt()),
-                DashboardMediaBucket("Videos", videos.size, videos.sumOf { it.size }, ((videos.sumOf { it.size } * 100) / total).toInt()),
-                DashboardMediaBucket("Audio", audio.size, audio.sumOf { it.size }, ((audio.sumOf { it.size } * 100) / total).toInt()),
-                DashboardMediaBucket("Documents", documents.size, documents.sumOf { it.size }, ((documents.sumOf { it.size } * 100) / total).toInt()),
-                DashboardMediaBucket("Statuses", statuses.size, statuses.sumOf { it.size }, ((statuses.sumOf { it.size } * 100) / total).toInt()),
-                DashboardMediaBucket("Stickers", stickers.size, stickers.sumOf { it.size }, ((stickers.sumOf { it.size } * 100) / total).toInt()),
-                DashboardMediaBucket("Other", other.size, other.sumOf { it.size }, ((other.sumOf { it.size } * 100) / total).toInt())
-            )
+            val buckets = remember(state.allItems, state.categorySummaries, state.totalSize) {
+                buildMediaBuckets(state.allItems, state.categorySummaries, state.totalSize)
+            }
             MediaOverviewScreen(items = buckets.filter { it.count > 0 }, onBack = { navController.popBackStack() }, onOpen = {
                 navController.navigateSingleTop(
                     when (it) {
@@ -711,16 +725,68 @@ fun WhatsCleanAppRoot(
                 }
             }
         }
-        composable(Routes.Photos) { reviewGridScreen("Photos", state.allItems.filter(::isPhoto), onBack = { navController.popBackStack() }, onDeleteSelected = { onDeleteMediaRequest(it, "photos") }, onOpenPreview = onOpenInSystem) }
-        composable(Routes.Videos) { reviewGridScreen("Videos", state.allItems.filter(::isVideo), onBack = { navController.popBackStack() }, onDeleteSelected = { onDeleteMediaRequest(it, "videos") }, onOpenPreview = onOpenInSystem) }
-        composable(Routes.Audio) { reviewGridScreen("Audio", state.allItems.filter(::isAudio), onBack = { navController.popBackStack() }, onDeleteSelected = { onDeleteMediaRequest(it, "audio") }, onOpenPreview = onOpenInSystem) }
-        composable(Routes.Documents) { reviewGridScreen("Documents", state.allItems.filter(::isDocument), onBack = { navController.popBackStack() }, onDeleteSelected = { onDeleteMediaRequest(it, "documents") }, onOpenPreview = onOpenInSystem) }
+        composable(Routes.Photos) { reviewGridScreen("Photos", state.allItems.filter { classifyMediaCategory(it) == "Photos" }, onBack = { navController.popBackStack() }, onDeleteSelected = { onDeleteMediaRequest(it, "photos") }, onOpenPreview = onOpenInSystem) }
+        composable(Routes.Videos) { reviewGridScreen("Videos", state.allItems.filter { classifyMediaCategory(it) == "Videos" }, onBack = { navController.popBackStack() }, onDeleteSelected = { onDeleteMediaRequest(it, "videos") }, onOpenPreview = onOpenInSystem) }
+        composable(Routes.Audio) { reviewGridScreen("Audio", state.allItems.filter { classifyMediaCategory(it) == "Audio" }, onBack = { navController.popBackStack() }, onDeleteSelected = { onDeleteMediaRequest(it, "audio") }, onOpenPreview = onOpenInSystem) }
+        composable(Routes.Documents) { reviewGridScreen("Documents", state.allItems.filter { classifyMediaCategory(it) == "Documents" }, onBack = { navController.popBackStack() }, onDeleteSelected = { onDeleteMediaRequest(it, "documents") }, onOpenPreview = onOpenInSystem) }
         composable(Routes.Statuses) { reviewGridScreen("Statuses", state.sentFileItems, onBack = { navController.popBackStack() }, onDeleteSelected = { onDeleteMediaRequest(it, "statuses") }, onOpenPreview = onOpenInSystem) }
         composable(Routes.StatusCleaner) { reviewGridScreen("Statuses", state.sentFileItems, onBack = { navController.popBackStack() }, onDeleteSelected = { onDeleteMediaRequest(it, "statuses") }, onOpenPreview = onOpenInSystem) }
         composable(Routes.Stickers) { reviewGridScreen("Stickers", state.memeItems, onBack = { navController.popBackStack() }, onDeleteSelected = { onDeleteMediaRequest(it, "stickers") }, onOpenPreview = onOpenInSystem) }
-        composable(Routes.DuplicateFinder) { reviewGridScreen("Duplicates", state.duplicateItems, onBack = { navController.popBackStack() }, onDeleteSelected = { onDeleteMediaRequest(it, "duplicates") }, onOpenPreview = onOpenInSystem) }
-        composable(Routes.LargeFiles) { reviewGridScreen("Large Files", state.largeFileItems, onBack = { navController.popBackStack() }, onDeleteSelected = { onDeleteMediaRequest(it, "large_files") }, onOpenPreview = onOpenInSystem) }
-        composable(Routes.OldMedia) { reviewGridScreen("Old Media", state.oldFileItems, onBack = { navController.popBackStack() }, onDeleteSelected = { onDeleteMediaRequest(it, "old_media") }, onOpenPreview = onOpenInSystem) }
+        composable(Routes.DuplicateFinder) {
+            standardSummaryScreen(
+                title = "Duplicate Finder",
+                subtitle = if (state.duplicateItems.isEmpty()) "No duplicates found" else "Duplicate candidates from current scan",
+                lines = listOf(
+                    "Duplicate groups" to formatCount(state.duplicateGroups.size),
+                    "Duplicate files" to formatCount(state.duplicateItems.size),
+                    "Cleanup potential" to formatSize(state.duplicateItems.sumOf { it.size })
+                ),
+                hasData = state.duplicateItems.isNotEmpty(),
+                emptyTitle = "No duplicates found",
+                emptySubtitle = "Run a scan to find duplicate chat media.",
+                actionLabel = "REVIEW DUPLICATES",
+                onBack = { navController.popBackStack() },
+                onAction = { navController.navigateSingleTop(Routes.DuplicateReview) }
+            )
+        }
+        composable(Routes.DuplicateReview) { reviewGridScreen("Review Duplicates", state.duplicateItems, onBack = { navController.popBackStack() }, onDeleteSelected = { onDeleteMediaRequest(it, "duplicates") }, onOpenPreview = onOpenInSystem) }
+        composable(Routes.LargeFiles) {
+            standardSummaryScreen(
+                title = "Large Files",
+                subtitle = "Files over 20 MB, sorted largest first",
+                lines = listOf(
+                    "Large file count" to formatCount(state.largeFileItems.size),
+                    "Total size" to formatSize(state.largeFileItems.sumOf { it.size }),
+                    "Sort" to "Largest • Newest • Oldest"
+                ),
+                hasData = state.largeFileItems.isNotEmpty(),
+                emptyTitle = "No large files found",
+                emptySubtitle = "Run a scan to find large media.",
+                actionLabel = "REVIEW LARGE FILES",
+                onBack = { navController.popBackStack() },
+                onAction = { navController.navigateSingleTop(Routes.LargeFilesReview) }
+            )
+        }
+        composable(Routes.LargeFilesReview) { reviewGridScreen("Review Large Files", state.largeFileItems.sortedByDescending { it.size }, onBack = { navController.popBackStack() }, onDeleteSelected = { onDeleteMediaRequest(it, "large_files") }, onOpenPreview = onOpenInSystem) }
+        composable(Routes.OldMedia) {
+            standardSummaryScreen(
+                title = "Old Media",
+                subtitle = "Older than 30 days by modified or added date",
+                lines = listOf(
+                    "30+ days" to formatCount(state.oldFileItems.size),
+                    "90+ days" to formatCount(state.oldFileItems.count { ageDays(it) >= 90L }),
+                    "180+ days" to formatCount(state.oldFileItems.count { ageDays(it) >= 180L }),
+                    "Total size" to formatSize(state.oldFileItems.sumOf { it.size })
+                ),
+                hasData = state.oldFileItems.isNotEmpty(),
+                emptyTitle = "No old media found",
+                emptySubtitle = "Files without dates are kept for careful review instead.",
+                actionLabel = "REVIEW OLD MEDIA",
+                onBack = { navController.popBackStack() },
+                onAction = { navController.navigateSingleTop(Routes.OldMediaReview) }
+            )
+        }
+        composable(Routes.OldMediaReview) { reviewGridScreen("Review Old Media", state.oldFileItems, onBack = { navController.popBackStack() }, onDeleteSelected = { onDeleteMediaRequest(it, "old_media") }, onOpenPreview = onOpenInSystem) }
         composable(Routes.MemesStickers) { reviewGridScreen("Memes & Stickers", state.memeItems, onBack = { navController.popBackStack() }, onDeleteSelected = { onDeleteMediaRequest(it, "memes_stickers") }, onOpenPreview = onOpenInSystem) }
         composable(Routes.BlurryImages) { reviewGridScreen("Blurry Images", state.blurryImageItems, onBack = { navController.popBackStack() }, onDeleteSelected = { onDeleteMediaRequest(it, "blurry_images") }, onOpenPreview = onOpenInSystem) }
         composable(Routes.ScanHistory) {
@@ -746,7 +812,6 @@ fun WhatsCleanAppRoot(
                     if (enabled) onReminderEnableRequested() else onCancelCleanupReminder()
                 },
                 onSave = onSaveCleanupReminder,
-                onCancelReminder = onCancelCleanupReminder,
                 onOpenSettings = onOpenAppSettings
             )
         }
@@ -964,6 +1029,48 @@ private fun NavHostController.navigateSingleTop(route: String) {
         popUpTo(graph.startDestinationId) {
             saveState = true
         }
+    }
+}
+
+
+
+private fun ageDays(item: SimpleMediaItem): Long {
+    val date = when {
+        item.modifiedMillis > 0L -> item.modifiedMillis
+        item.addedMillis > 0L -> item.addedMillis
+        else -> return 0L
+    }
+    return ((System.currentTimeMillis() - date).coerceAtLeast(0L)) / (24L * 60L * 60L * 1000L)
+}
+
+private fun buildMediaBuckets(items: List<SimpleMediaItem>, cachedSummaries: List<CategorySummaryUi>, totalSize: Long): List<DashboardMediaBucket> {
+    if (items.isEmpty()) {
+        return cachedSummaries.map { cached ->
+            DashboardMediaBucket(cached.title, cached.count, cached.sizeBytes, formatPercent(cached.sizeBytes, totalSize).removeSuffix("%").toFloatOrNull()?.toInt() ?: 0)
+        }
+    }
+    val grouped = items.groupBy { classifyMediaCategory(it) }
+    val total = items.sumOf { it.size }.coerceAtLeast(0L)
+    return listOf("Photos", "Videos", "Audio", "Documents", "Statuses", "Stickers", "Other").map { name ->
+        val categoryItems = grouped[name].orEmpty()
+        val bytes = categoryItems.sumOf { it.size }
+        DashboardMediaBucket(name, categoryItems.size, bytes, formatPercent(bytes, total).removeSuffix("%").toFloatOrNull()?.toInt() ?: 0)
+    }
+}
+
+private fun classifyMediaCategory(item: SimpleMediaItem): String {
+    val mime = item.mimeType.orEmpty().lowercase()
+    val ext = item.name.substringAfterLast('.', "").lowercase()
+    val marker = "${item.bucketName.orEmpty()} ${item.name} ${item.path}".lowercase()
+    return when {
+        "status" in marker || "statuses" in marker -> "Statuses"
+        "sticker" in marker || "stickers" in marker || (ext == "webp" && ("whatsapp" in marker || "sticker" in marker)) -> "Stickers"
+        mime.startsWith("image/") -> "Photos"
+        mime.startsWith("video/") -> "Videos"
+        mime.startsWith("audio/") -> "Audio"
+        ext in setOf("pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt", "csv", "zip", "rar", "7z", "apk") -> "Documents"
+        mime.contains("pdf") || mime.contains("msword") || mime.contains("spreadsheet") || mime.contains("presentation") || mime.startsWith("text/") || mime.contains("zip") || mime.contains("rar") -> "Documents"
+        else -> "Other"
     }
 }
 
