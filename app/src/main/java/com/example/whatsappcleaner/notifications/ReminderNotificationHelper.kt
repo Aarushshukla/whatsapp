@@ -44,7 +44,7 @@ class ReminderNotificationHelper(
 
         val (title, body) = if (hasCachedSummary && potentialCleanupBytes > 0) {
             "Review up to ${com.example.whatsappcleaner.data.local.formatSize(potentialCleanupBytes)} from chat media" to
-                "Duplicates, large videos, and old statuses may be taking space. Review safely."
+                "Large videos, duplicates, and old files may be taking space. Review safely."
         } else {
             "Chat storage check" to "Run a quick scan to see what can be reviewed safely."
         }
