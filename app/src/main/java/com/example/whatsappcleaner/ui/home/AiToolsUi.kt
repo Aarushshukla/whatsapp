@@ -67,6 +67,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import com.example.whatsappcleaner.data.local.CategoryFilters
 import com.example.whatsappcleaner.data.local.formatSize
 import com.example.whatsappcleaner.ui.components.LegitButton
 import kotlinx.coroutines.Dispatchers
