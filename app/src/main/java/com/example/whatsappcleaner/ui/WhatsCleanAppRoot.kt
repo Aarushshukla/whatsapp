@@ -76,7 +76,6 @@ import com.example.whatsappcleaner.ui.components.FriendlyState
 import com.example.whatsappcleaner.ui.home.AiFeature
 import com.example.whatsappcleaner.ui.home.AnalyticsScreen
 import com.example.whatsappcleaner.ui.home.BlurryPhotosFeatureScreen
-import com.example.whatsappcleaner.ui.home.CategorySummaryUi
 import com.example.whatsappcleaner.ui.home.DuplicateDetectorFeatureScreen
 import com.example.whatsappcleaner.ui.home.FeaturesScreen
 import com.example.whatsappcleaner.ui.home.LargeFilesFinderFeatureScreen
@@ -97,7 +96,6 @@ import com.example.whatsappcleaner.ui.home.ScanUiState
 import com.example.whatsappcleaner.ui.home.SimpleHomeScreen
 import com.example.whatsappcleaner.ui.home.MediaOverviewScreen
 import com.example.whatsappcleaner.ui.home.DashboardMediaBucket
-import com.example.whatsappcleaner.ui.home.CategorySummaryUi
 import com.example.whatsappcleaner.ui.home.DashboardSubScreen
 import com.example.whatsappcleaner.ui.home.SimpleStatRow
 import com.example.whatsappcleaner.ui.home.PermissionIntroScreen
