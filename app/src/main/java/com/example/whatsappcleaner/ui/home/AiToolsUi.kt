@@ -730,12 +730,7 @@ fun DuplicateDetectorFeatureScreen(duplicateCount: Int, onBack: () -> Unit, item
         onBack = onBack,
         onActionClick = {},
         onDeleteItemsRequested = onDeleteItemsRequested,
-        processItems = { source ->
-            source.groupBy { "${it.name.lowercase()}_${it.size}" }
-                .values
-                .filter { group -> group.size > 1 }
-                .flatten()
-        }
+        processItems = { source -> CategoryFilters.duplicateCopies(source) }
     )
 }
 
@@ -751,7 +746,7 @@ fun LargeFilesFinderFeatureScreen(count: Int, totalBytes: Long, onBack: () -> Un
         onBack = onBack,
         onActionClick = {},
         onDeleteItemsRequested = onDeleteItemsRequested,
-        processItems = { source -> source.sortedByDescending { it.size } }
+        processItems = { source -> CategoryFilters.largeFiles(source) }
     )
 }
 
@@ -763,7 +758,8 @@ fun OldMediaCleanerFeatureScreen(count: Int, onBack: () -> Unit, items: List<com
         items = items,
         onBack = onBack,
         onActionClick = {},
-        onDeleteItemsRequested = onDeleteItemsRequested
+        onDeleteItemsRequested = onDeleteItemsRequested,
+        processItems = { source -> CategoryFilters.oldMedia(source) }
     )
 }
 
@@ -786,7 +782,7 @@ fun MemeCleanerFeatureScreen(memeCount: Int, onBack: () -> Unit, items: List<com
 
 @Composable
 fun BlurryPhotosFeatureScreen(imageCount: Int, onBack: () -> Unit, items: List<com.example.whatsappcleaner.data.local.SimpleMediaItem>, onDeleteItemsRequested: (List<com.example.whatsappcleaner.data.local.SimpleMediaItem>) -> Unit) {
-    AiFeatureDetailScreen(feature = AiFeature.BLURRY_PHOTOS, stats = listOf(Triple("Blurry photos", imageCount.toString(), "Low-sharpness images")), items = items, onBack = onBack, onActionClick = {}, onDeleteItemsRequested = onDeleteItemsRequested)
+    AiFeatureDetailScreen(feature = AiFeature.BLURRY_PHOTOS, stats = listOf(Triple("Blurry photos", imageCount.toString(), "Low-quality image candidates")), items = items, onBack = onBack, onActionClick = {}, onDeleteItemsRequested = onDeleteItemsRequested, processItems = { source -> CategoryFilters.blurryImages(source) })
 }
 
 @Composable

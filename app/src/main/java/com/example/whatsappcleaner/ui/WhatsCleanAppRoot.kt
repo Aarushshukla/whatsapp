@@ -67,6 +67,7 @@ import androidx.navigation.compose.rememberNavController
 import com.example.whatsappcleaner.data.ReminderFreq
 import com.example.whatsappcleaner.data.ReminderTime
 import com.example.whatsappcleaner.data.billing.BillingProduct
+import com.example.whatsappcleaner.data.local.CategoryFilters
 import com.example.whatsappcleaner.data.local.SimpleMediaItem
 import com.example.whatsappcleaner.data.local.formatCount
 import com.example.whatsappcleaner.data.local.formatPercent
@@ -75,6 +76,7 @@ import com.example.whatsappcleaner.ui.components.FriendlyState
 import com.example.whatsappcleaner.ui.home.AiFeature
 import com.example.whatsappcleaner.ui.home.AnalyticsScreen
 import com.example.whatsappcleaner.ui.home.BlurryPhotosFeatureScreen
+import com.example.whatsappcleaner.ui.home.CategorySummaryUi
 import com.example.whatsappcleaner.ui.home.DuplicateDetectorFeatureScreen
 import com.example.whatsappcleaner.ui.home.FeaturesScreen
 import com.example.whatsappcleaner.ui.home.LargeFilesFinderFeatureScreen
@@ -168,6 +170,7 @@ private object Routes {
     const val StatusCleaner = "status_cleaner"
     const val MemesStickers = "memes_stickers"
     const val BlurryImages = "blurry_images"
+    const val BlurryImagesReview = "blurry_images_review"
     const val ScanHistory = "scan_history"
     const val LastCleanupReceipt = "last_cleanup_receipt"
     const val StorageOverview = "storage_overview"
@@ -734,6 +737,8 @@ fun WhatsCleanAppRoot(
         composable(Routes.StatusCleaner) { reviewGridScreen("Statuses", state.sentFileItems, onBack = { navController.popBackStack() }, onDeleteSelected = { onDeleteMediaRequest(it, "statuses") }, onOpenPreview = onOpenInSystem) }
         composable(Routes.Stickers) { reviewGridScreen("Stickers", state.memeItems, onBack = { navController.popBackStack() }, onDeleteSelected = { onDeleteMediaRequest(it, "stickers") }, onOpenPreview = onOpenInSystem) }
         composable(Routes.DuplicateFinder) {
+            val cached = state.cachedCategorySummary("Duplicates")
+            val hasFiles = state.allItems.isNotEmpty()
             standardSummaryScreen(
                 title = "Duplicate Finder",
                 subtitle = if (state.duplicateItems.isEmpty()) "No duplicates found" else "Duplicate candidates from current scan",
@@ -742,54 +747,85 @@ fun WhatsCleanAppRoot(
                     "Duplicate files" to formatCount(state.duplicateItems.size),
                     "Cleanup potential" to formatSize(state.duplicateItems.sumOf { it.size })
                 ),
+                cachedLines = cached?.let { listOf("Cached duplicate files" to formatCount(it.count), "Cached cleanup potential" to formatSize(it.sizeBytes)) }.orEmpty(),
                 hasData = state.duplicateItems.isNotEmpty(),
+                hasFileList = hasFiles,
                 emptyTitle = "No duplicates found",
                 emptySubtitle = "Run a scan to find duplicate chat media.",
                 actionLabel = "REVIEW DUPLICATES",
                 onBack = { navController.popBackStack() },
-                onAction = { navController.navigateSingleTop(Routes.DuplicateReview) }
+                onAction = { if (hasFiles) navController.navigateSingleTop(Routes.DuplicateReview) else onRefreshClick() }
             )
         }
         composable(Routes.DuplicateReview) { reviewGridScreen("Review Duplicates", state.duplicateItems, onBack = { navController.popBackStack() }, onDeleteSelected = { onDeleteMediaRequest(it, "duplicates") }, onOpenPreview = onOpenInSystem) }
         composable(Routes.LargeFiles) {
+            val cached = state.cachedCategorySummary("Large Files")
+            val hasFiles = state.allItems.isNotEmpty()
             standardSummaryScreen(
                 title = "Large Files",
                 subtitle = "Files over 20 MB, sorted largest first",
                 lines = listOf(
                     "Large file count" to formatCount(state.largeFileItems.size),
-                    "Total size" to formatSize(state.largeFileItems.sumOf { it.size }),
-                    "Sort" to "Largest • Newest • Oldest"
+                    "Total large files size" to formatSize(state.largeFileItems.sumOf { it.size }),
+                    "Sort chips" to "Largest • Newest • Oldest"
                 ),
+                cachedLines = cached?.let { listOf("Cached large file count" to formatCount(it.count), "Cached large files size" to formatSize(it.sizeBytes)) }.orEmpty(),
                 hasData = state.largeFileItems.isNotEmpty(),
+                hasFileList = hasFiles,
                 emptyTitle = "No large files found",
                 emptySubtitle = "Run a scan to find large media.",
                 actionLabel = "REVIEW LARGE FILES",
                 onBack = { navController.popBackStack() },
-                onAction = { navController.navigateSingleTop(Routes.LargeFilesReview) }
+                onAction = { if (hasFiles) navController.navigateSingleTop(Routes.LargeFilesReview) else onRefreshClick() }
             )
         }
         composable(Routes.LargeFilesReview) { reviewGridScreen("Review Large Files", state.largeFileItems.sortedByDescending { it.size }, onBack = { navController.popBackStack() }, onDeleteSelected = { onDeleteMediaRequest(it, "large_files") }, onOpenPreview = onOpenInSystem) }
         composable(Routes.OldMedia) {
+            val cached = state.cachedCategorySummary("Old Media")
+            val hasFiles = state.allItems.isNotEmpty()
             standardSummaryScreen(
                 title = "Old Media",
                 subtitle = "Older than 30 days by modified or added date",
                 lines = listOf(
-                    "30+ days" to formatCount(state.oldFileItems.size),
+                    "Old media count" to formatCount(state.oldFileItems.size),
+                    "Old media size" to formatSize(state.oldFileItems.sumOf { it.size }),
+                    "30+ days" to formatCount(state.oldFileItems.count { ageDays(it) >= 30L }),
                     "90+ days" to formatCount(state.oldFileItems.count { ageDays(it) >= 90L }),
-                    "180+ days" to formatCount(state.oldFileItems.count { ageDays(it) >= 180L }),
-                    "Total size" to formatSize(state.oldFileItems.sumOf { it.size })
+                    "180+ days" to formatCount(state.oldFileItems.count { ageDays(it) >= 180L })
                 ),
+                cachedLines = cached?.let { listOf("Cached old media count" to formatCount(it.count), "Cached old media size" to formatSize(it.sizeBytes)) }.orEmpty(),
                 hasData = state.oldFileItems.isNotEmpty(),
+                hasFileList = hasFiles,
                 emptyTitle = "No old media found",
                 emptySubtitle = "Files without dates are kept for careful review instead.",
                 actionLabel = "REVIEW OLD MEDIA",
                 onBack = { navController.popBackStack() },
-                onAction = { navController.navigateSingleTop(Routes.OldMediaReview) }
+                onAction = { if (hasFiles) navController.navigateSingleTop(Routes.OldMediaReview) else onRefreshClick() }
             )
         }
         composable(Routes.OldMediaReview) { reviewGridScreen("Review Old Media", state.oldFileItems, onBack = { navController.popBackStack() }, onDeleteSelected = { onDeleteMediaRequest(it, "old_media") }, onOpenPreview = onOpenInSystem) }
         composable(Routes.MemesStickers) { reviewGridScreen("Memes & Stickers", state.memeItems, onBack = { navController.popBackStack() }, onDeleteSelected = { onDeleteMediaRequest(it, "memes_stickers") }, onOpenPreview = onOpenInSystem) }
-        composable(Routes.BlurryImages) { reviewGridScreen("Blurry Images", state.blurryImageItems, onBack = { navController.popBackStack() }, onDeleteSelected = { onDeleteMediaRequest(it, "blurry_images") }, onOpenPreview = onOpenInSystem) }
+        composable(Routes.BlurryImages) {
+            val cached = state.cachedCategorySummary("Blurry / Low-quality Images") ?: state.cachedCategorySummary("Blurry Images")
+            val hasFiles = state.allItems.isNotEmpty()
+            standardSummaryScreen(
+                title = "Blurry Images",
+                subtitle = if (state.blurryImageItems.isEmpty()) "No blurry images found" else "Low-quality image candidates from current scan",
+                lines = listOf(
+                    "Blurry image count" to formatCount(state.blurryImageItems.size),
+                    "Total blurry size" to formatSize(state.blurryImageItems.sumOf { it.size })
+                ),
+                cachedLines = cached?.let { listOf("Cached blurry image count" to formatCount(it.count), "Cached blurry image size" to formatSize(it.sizeBytes)) }.orEmpty(),
+                hasData = state.blurryImageItems.isNotEmpty(),
+                hasFileList = hasFiles,
+                emptyTitle = "No blurry images found",
+                emptySubtitle = "Run a scan to find blurry or low-quality images.",
+                actionLabel = "REVIEW BLURRY IMAGES",
+                onBack = { navController.popBackStack() },
+                onAction = { if (hasFiles) navController.navigateSingleTop(Routes.BlurryImagesReview) else onRefreshClick() }
+            )
+        }
+        composable(Routes.BlurryImagesReview) { reviewGridScreen("Review Blurry Images", state.blurryImageItems, onBack = { navController.popBackStack() }, onDeleteSelected = { onDeleteMediaRequest(it, "blurry_images") }, onOpenPreview = onOpenInSystem) }
         composable(Routes.ScanHistory) {
             DashboardSubScreen("Scan History", "Previous scans and trends", { navController.popBackStack() }) {
                 if (state.totalSize > 0L) {
@@ -944,8 +980,12 @@ private fun reviewGridScreen(title: String, items: List<SimpleMediaItem>, onBack
                 OutlinedButton(onClick = { selectedUris.clear() }, modifier = Modifier.weight(1f)) { Text("DESELECT") }
             }
             Spacer(Modifier.height(10.dp))
-            LazyVerticalGrid(columns = GridCells.Adaptive(150.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(items, key = { it.uri.toString() }) { item ->
+            if (items.isEmpty()) {
+                Text("No files found", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Run Scan Again to review individual files.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            } else {
+                LazyVerticalGrid(columns = GridCells.Adaptive(150.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(items, key = { it.uri.toString() }) { item ->
                     val sel = selectedUris.contains(item.uri.toString())
                     Column(Modifier.clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surfaceVariant).clickable { onOpenPreview(item) }.padding(8.dp)) {
                         if (item.mimeType?.startsWith("image") == true || item.mimeType?.startsWith("video") == true) {
@@ -959,6 +999,7 @@ private fun reviewGridScreen(title: String, items: List<SimpleMediaItem>, onBack
             }
         }
     }
+}
 }
 
 private fun SimpleMediaItem.reviewSafetyLabel(): String = if (isProtectedForAutoSelection()) "PROTECTED" else if (path.contains("status", true) || path.contains("sticker", true) || name.contains("meme", true)) "SAFE" else "REVIEW"
@@ -1035,14 +1076,7 @@ private fun NavHostController.navigateSingleTop(route: String) {
 
 
 
-private fun ageDays(item: SimpleMediaItem): Long {
-    val date = when {
-        item.modifiedMillis > 0L -> item.modifiedMillis
-        item.addedMillis > 0L -> item.addedMillis
-        else -> return 0L
-    }
-    return ((System.currentTimeMillis() - date).coerceAtLeast(0L)) / (24L * 60L * 60L * 1000L)
-}
+private fun ageDays(item: SimpleMediaItem): Long = CategoryFilters.oldMediaAgeDays(item)
 
 private fun buildMediaBuckets(items: List<SimpleMediaItem>, cachedSummaries: List<CategorySummaryUi>, totalSize: Long): List<DashboardMediaBucket> {
     if (items.isEmpty()) {
@@ -1129,15 +1163,37 @@ private fun PermissionGate(
 
 
 @Composable
-private fun standardSummaryScreen(title:String, subtitle:String, lines:List<Pair<String,String>>, hasData:Boolean, emptyTitle:String, emptySubtitle:String, actionLabel:String, onBack:()->Unit, onAction:()->Unit){
-    DashboardSubScreen(title, subtitle, onBack){
-        if (hasData){
-            lines.forEach { (k,v) -> SimpleStatRow(k,v) }
-        } else {
-            Text(emptyTitle, color = MaterialTheme.colorScheme.onSurface)
-            Text(emptySubtitle, color = MaterialTheme.colorScheme.onSurfaceVariant)
+private fun HomeUiState.cachedCategorySummary(vararg titles: String): CategorySummaryUi? =
+    categorySummaries.firstOrNull { category -> titles.any { title -> category.title.equals(title, ignoreCase = true) } }
+
+@Composable
+private fun standardSummaryScreen(
+    title: String,
+    subtitle: String,
+    lines: List<Pair<String, String>>,
+    cachedLines: List<Pair<String, String>> = emptyList(),
+    hasData: Boolean,
+    hasFileList: Boolean = true,
+    emptyTitle: String,
+    emptySubtitle: String,
+    actionLabel: String,
+    onBack: () -> Unit,
+    onAction: () -> Unit
+) {
+    DashboardSubScreen(title, subtitle, onBack) {
+        when {
+            hasData -> lines.forEach { (key, value) -> SimpleStatRow(key, value) }
+            !hasFileList && cachedLines.isNotEmpty() -> {
+                cachedLines.forEach { (key, value) -> SimpleStatRow(key, value) }
+                Spacer(Modifier.height(8.dp))
+                Text("Run Scan Again to review individual files.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            else -> {
+                Text(emptyTitle, color = MaterialTheme.colorScheme.onSurface)
+                Text(emptySubtitle, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
         Spacer(Modifier.height(8.dp))
-        Button(onClick=onAction, modifier=Modifier.fillMaxWidth()){ Text(actionLabel) }
+        Button(onClick = onAction, modifier = Modifier.fillMaxWidth()) { Text(if (!hasFileList && cachedLines.isNotEmpty()) "SCAN AGAIN" else actionLabel) }
     }
 }

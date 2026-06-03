@@ -19,6 +19,7 @@ import com.example.whatsappcleaner.data.analytics.AppAnalytics
 import com.example.whatsappcleaner.data.analytics.trackEvent
 import com.example.whatsappcleaner.data.billing.SubscriptionRepository
 import com.example.whatsappcleaner.data.billing.SubscriptionState
+import com.example.whatsappcleaner.data.local.CategoryFilters
 import com.example.whatsappcleaner.data.local.MediaLoader
 import com.example.whatsappcleaner.data.local.SimpleMediaItem
 import com.example.whatsappcleaner.data.local.UserPrefs
@@ -164,7 +165,6 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         private const val TAG = "HomeViewModel"
         private const val INITIAL_LOAD_LIMIT = 100
         private const val LARGE_FILE_THRESHOLD_BYTES = 20L * 1024L * 1024L
-        private const val OLD_FILE_AGE_DAYS = 30L
     }
 
     private val mediaLoader = MediaLoader(application)
@@ -210,8 +210,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         val report: StorageReport,
         val duplicateGroups: List<List<SimpleMediaItem>>,
         val oldFileItems: List<SimpleMediaItem>,
-        val whatsappJunkItems: List<SimpleMediaItem>
-        ,
+        val whatsappJunkItems: List<SimpleMediaItem>,
+        val blurryImageItems: List<SimpleMediaItem>,
         val categorySummaries: List<CategorySummaryUi>
     )
 
@@ -423,26 +423,11 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             val baseReport = phoneRealityAnalyzer.generateReport(allItems)
             val totalSize = allItems.sumOf { mediaItem -> mediaItem.size }
             val now = System.currentTimeMillis()
-            val oldFileCutoff = now - (OLD_FILE_AGE_DAYS * 24L * 60L * 60L * 1000L)
             val oldStatusCutoff = now - (24L * 60L * 60L * 1000L)
-            val duplicateGroups = findDuplicateGroups(allItems)
-            val duplicateSuggestedItems = duplicateGroups.flatMap { group -> group.drop(1) }
-            val largeOverThreshold = allItems
-                .filter { mediaItem -> mediaItem.size > LARGE_FILE_THRESHOLD_BYTES }
-                .sortedByDescending { mediaItem -> mediaItem.size }
-            val largeSuggestedItems = if (largeOverThreshold.size >= 10) {
-                largeOverThreshold
-            } else {
-                allItems.sortedByDescending { mediaItem -> mediaItem.size }.take(50)
-            }
-            val oldSuggestedItems = allItems.filter { mediaItem ->
-                val fileDate = when {
-                    mediaItem.modifiedMillis > 0L -> mediaItem.modifiedMillis
-                    mediaItem.addedMillis > 0L -> mediaItem.addedMillis
-                    else -> 0L
-                }
-                fileDate in 1 until oldFileCutoff
-            }
+            val duplicateGroups = CategoryFilters.duplicateGroups(allItems)
+            val duplicateSuggestedItems = CategoryFilters.duplicateCopies(allItems)
+            val largeSuggestedItems = CategoryFilters.largeFiles(allItems)
+            val oldSuggestedItems = CategoryFilters.oldMedia(allItems, now)
             val statusItems = allItems.filter { item ->
                 val marker = "${item.name} ${item.path} ${item.bucketName.orEmpty()}".lowercase()
                 marker.contains(".statuses") || marker.contains("statuses") || marker.contains("status")
@@ -452,19 +437,16 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 val isAnimatedGif = item.mimeType?.contains("gif", ignoreCase = true) == true
                 listOf("sticker", "stickers", "meme", "funny", "gif", "animated", "forwarded", "status").any { marker.contains(it) } || isAnimatedGif
             }
-            val lowQualityItems = allItems.filter { item ->
-                item.mimeType?.startsWith("image") == true &&
-                    ((item.width ?: Int.MAX_VALUE) < 720 || (item.height ?: Int.MAX_VALUE) < 720 || item.size < 80L * 1024L)
-            }
-            val duplicatesKeySet = duplicateGroups.flatten().map { "${it.name.lowercase()}_${it.size}" }.toSet()
+            val lowQualityItems = CategoryFilters.blurryImages(allItems)
+            val duplicatesKeySet = duplicateSuggestedItems.map { it.uri.toString() }.toSet()
             val uniquePersonal = { item: SimpleMediaItem ->
-                !duplicatesKeySet.contains("${item.name.lowercase()}_${item.size}") &&
+                !duplicatesKeySet.contains(item.uri.toString()) &&
                     !(item.name.lowercase().contains("status") || item.name.lowercase().contains("sticker") || item.name.lowercase().contains("meme"))
             }
             val largeFiles = largeSuggestedItems
 
             val categorySummaries = listOf(
-                CategorySummaryUi("Large Files", "Files larger than 20 MB, or top largest files when fewer than 10 match.", largeFiles.size, largeFiles.sumOf { it.size }, "REVIEW_CAREFULLY", largeFiles),
+                CategorySummaryUi("Large Files", "Files larger than 20 MB.", largeFiles.size, largeFiles.sumOf { it.size }, "REVIEW_CAREFULLY", largeFiles),
                 CategorySummaryUi("Old Media", "Media modified more than 30 days ago.", oldSuggestedItems.size, oldSuggestedItems.sumOf { it.size }, "REVIEW_CAREFULLY", oldSuggestedItems),
                 CategorySummaryUi("Status Files", "Statuses folder/bucket files. Older than 24h is likely junk.", statusItems.size, statusItems.sumOf { it.size }, "PROBABLY_JUNK", statusItems),
                 CategorySummaryUi("Memes & Stickers", "Sticker/meme/funny/gif/forwarded/status-like media.", memeStickerItems.size, memeStickerItems.sumOf { it.size }, "PROBABLY_JUNK", memeStickerItems),
@@ -475,7 +457,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     category.title == "Memes & Stickers" && category.items.any { it.modifiedMillis < oldStatusCutoff } -> "PROBABLY_JUNK"
                     category.title == "Blurry / Low-quality Images" && category.items.any(uniquePersonal) -> "REVIEW_CAREFULLY"
                     category.items.any { it.mimeType?.startsWith("image") == true || it.mimeType?.startsWith("video") == true } && category.items.any(uniquePersonal) -> "REVIEW_CAREFULLY"
-                    category.items.any { duplicatesKeySet.contains("${it.name.lowercase()}_${it.size}") } -> "SAFE_TO_DELETE"
+                    category.items.any { duplicatesKeySet.contains(it.uri.toString()) } -> "SAFE_TO_DELETE"
                     else -> category.safetyBadge
                 }
                 category.copy(safetyBadge = risk)
@@ -548,9 +530,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     spamCount = spamItems.size
                 ),
                 duplicateGroups = duplicateGroups,
-                oldFileItems = oldSuggestedItems.sortedBy { mediaItem -> mediaItem.addedMillis },
-                whatsappJunkItems = whatsappJunkItems
-                ,
+                oldFileItems = oldSuggestedItems,
+                whatsappJunkItems = whatsappJunkItems,
+                blurryImageItems = lowQualityItems,
                 categorySummaries = categorySummaries
             )
         }
@@ -588,8 +570,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     report = computed.report,
                     duplicateGroups = computed.duplicateGroups,
                     oldFileItems = computed.oldFileItems,
-                    whatsappJunkItems = computed.whatsappJunkItems
-                    ,
+                    whatsappJunkItems = computed.whatsappJunkItems,
+                    blurryImageItems = computed.blurryImageItems,
                     categorySummaries = computed.categorySummaries
                 )
             }
@@ -639,18 +621,14 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         Log.d("SCAN", "AI scan started. deepClean=$isDeepClean")
         viewModelScope.launch(Dispatchers.IO) {
             _uiState.update { it.copy(aiScanSummary = AiScanSummary(isRunning = true, progress = 0.1f, status = "Checking duplicates...")) }
-            val duplicateItems = allItems
-                .groupBy { "${it.name.lowercase()}_${it.size}" }
-                .values
-                .filter { it.size > 1 }
-                .flatten()
+            val duplicateGroups = CategoryFilters.duplicateGroups(allItems)
+            val duplicateItems = duplicateGroups.flatMap { group -> group.drop(1) }
 
             _uiState.update { it.copy(aiScanSummary = it.aiScanSummary.copy(progress = 0.35f, status = "Finding large files...")) }
-            val largeItems = allItems.filter { it.size > LARGE_FILE_THRESHOLD_BYTES }.sortedByDescending { it.size }
+            val largeItems = CategoryFilters.largeFiles(allItems)
 
             _uiState.update { it.copy(aiScanSummary = it.aiScanSummary.copy(progress = 0.55f, status = "Checking old media...")) }
-            val oldCutoff = System.currentTimeMillis() - (OLD_FILE_AGE_DAYS * 24L * 60L * 60L * 1000L)
-            val oldItems = allItems.filter { it.addedMillis < oldCutoff }
+            val oldItems = CategoryFilters.oldMedia(allItems)
 
             _uiState.update { it.copy(aiScanSummary = it.aiScanSummary.copy(progress = 0.75f, status = "Detecting blurry and junk images...")) }
             val junkItems = allItems.filter { mediaItem ->
@@ -658,14 +636,14 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     mediaItem.size < 200L * 1024L &&
                     mediaItem.uri.toString().contains("whatsapp", ignoreCase = true)
             }
-            val blurryItems = detectBlurryImages(allItems, if (isDeepClean) 200 else 80)
+            val blurryItems = CategoryFilters.blurryImages(allItems)
 
             val union = (duplicateItems + largeItems + oldItems + junkItems + blurryItems).distinctBy { it.uri.toString() }
             _uiState.update {
                 it.copy(
-                    duplicateGroups = duplicateItems.groupBy { item -> "${item.name.lowercase()}_${item.size}" }.values.toList(),
+                    duplicateGroups = duplicateGroups,
                     largeFileItems = largeItems,
-                    oldFileItems = oldItems.sortedBy { item -> item.addedMillis },
+                    oldFileItems = oldItems,
                     whatsappJunkItems = junkItems,
                     blurryImageItems = blurryItems,
                     aiScanSummary = AiScanSummary(
@@ -757,26 +735,19 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             MediaFilter.MEMES -> items.filter { mediaItem ->
                 mediaItem.name.contains("meme", ignoreCase = true) || mediaItem.path.contains("meme", ignoreCase = true)
             }
-            MediaFilter.DUPLICATES -> items
-                .groupBy { mediaItem -> "${mediaItem.name.lowercase()}_${mediaItem.sizeKb}" }
-                .values
-                .filter { groupedItems -> groupedItems.size > 1 }
-                .flatten()
+            MediaFilter.DUPLICATES -> CategoryFilters.duplicateCopies(items)
             MediaFilter.OTHER -> items.filter { mediaItem ->
                 mediaItem.mimeType?.startsWith("image") != true && mediaItem.mimeType?.startsWith("video") != true
             }
             MediaFilter.ALL -> items
         }
-        val duplicateKeys = items
-            .groupBy { mediaItem -> "${mediaItem.name.lowercase()}_${mediaItem.sizeKb}" }
-            .filterValues { groupedItems -> groupedItems.size > 1 }
-            .keys
+        val duplicateUris = CategoryFilters.duplicateCopies(items).map { it.uri.toString() }.toSet()
 
         result = result.filter { item ->
             val passesSize = item.sizeKb >= settings.fileSizeFilterMb * 1024 || !settings.showOnlyLargeFiles
             val passesScreenshots = settings.includeScreenshots || !item.name.startsWith("Screenshot", true)
             val passesMemes = settings.includeMemes || !(item.name.contains("meme", ignoreCase = true) || item.path.contains("meme", ignoreCase = true))
-            val isDuplicateCandidate = duplicateKeys.contains("${item.name.lowercase()}_${item.sizeKb}")
+            val isDuplicateCandidate = duplicateUris.contains(item.uri.toString())
             val passesDuplicates = settings.includeDuplicates || !isDuplicateCandidate
             passesSize && passesScreenshots && passesMemes && passesDuplicates
         }
