@@ -178,7 +178,10 @@ class UserPrefs private constructor(context: Context) {
         val potentialCleanupBytes: Long,
         val fileCount: Int,
         val lastScanCompletedAt: Long,
-        val categories: List<CachedCategorySummary>
+        val categories: List<CachedCategorySummary>,
+        val mediaTypes: List<CachedCategorySummary> = emptyList(),
+        val files: List<CachedMediaItem> = emptyList(),
+        val lastCleanupBytes: Long = 0L
     )
 
     data class CachedCategorySummary(
@@ -186,6 +189,23 @@ class UserPrefs private constructor(context: Context) {
         val count: Int,
         val sizeBytes: Long,
         val percent: Float = 0f
+    )
+
+    data class CachedMediaItem(
+        val id: Long,
+        val uri: String,
+        val path: String? = null,
+        val name: String,
+        val sizeBytes: Long,
+        val mimeType: String? = null,
+        val dateModified: Long = 0L,
+        val dateAdded: Long = 0L,
+        val width: Int? = null,
+        val height: Int? = null,
+        val duration: Long? = null,
+        val bucketName: String? = null,
+        val mediaType: String = "file",
+        val relativePath: String? = null
     )
 
     fun setLastScanCompletedAt(timestamp: Long) = prefs.edit().putLong(KEY_LAST_SCAN_COMPLETED_AT, timestamp).apply()
@@ -197,13 +217,26 @@ class UserPrefs private constructor(context: Context) {
             put("potentialCleanupBytes", summary.potentialCleanupBytes)
             put("fileCount", summary.fileCount)
             put("lastScanCompletedAt", summary.lastScanCompletedAt)
-            put("categories", JSONArray().apply {
-                summary.categories.forEach { category ->
+            put("lastCleanupBytes", summary.lastCleanupBytes)
+            put("categories", cachedCategoriesToJson(summary.categories))
+            put("mediaTypes", cachedCategoriesToJson(summary.mediaTypes))
+            put("files", JSONArray().apply {
+                summary.files.forEach { file ->
                     put(JSONObject().apply {
-                        put("title", category.title)
-                        put("count", category.count)
-                        put("sizeBytes", category.sizeBytes)
-                        put("percent", category.percent)
+                        put("id", file.id)
+                        put("uri", file.uri)
+                        put("path", file.path)
+                        put("name", file.name)
+                        put("sizeBytes", file.sizeBytes)
+                        put("mimeType", file.mimeType)
+                        put("dateModified", file.dateModified)
+                        put("dateAdded", file.dateAdded)
+                        put("width", file.width)
+                        put("height", file.height)
+                        put("duration", file.duration)
+                        put("bucketName", file.bucketName)
+                        put("mediaType", file.mediaType)
+                        put("relativePath", file.relativePath)
                     })
                 }
             })
@@ -211,20 +244,46 @@ class UserPrefs private constructor(context: Context) {
         prefs.edit().putString(KEY_CACHED_SCAN_SUMMARY, root.toString()).apply()
     }
 
+    private fun cachedCategoriesToJson(categories: List<CachedCategorySummary>): JSONArray = JSONArray().apply {
+        categories.forEach { category ->
+            put(JSONObject().apply {
+                put("title", category.title)
+                put("count", category.count)
+                put("sizeBytes", category.sizeBytes)
+                put("percent", category.percent)
+            })
+        }
+    }
+
     fun getCachedScanSummary(): CachedScanSummary? {
         val raw = prefs.getString(KEY_CACHED_SCAN_SUMMARY, null) ?: return null
         return runCatching {
             val root = JSONObject(raw)
-            val categoriesJson = root.optJSONArray("categories") ?: JSONArray()
-            val categories = buildList {
-                for (i in 0 until categoriesJson.length()) {
-                    val item = categoriesJson.optJSONObject(i) ?: continue
+            val categories = parseCachedCategories(root.optJSONArray("categories") ?: JSONArray())
+            val mediaTypes = parseCachedCategories(root.optJSONArray("mediaTypes") ?: JSONArray())
+            val filesJson = root.optJSONArray("files") ?: JSONArray()
+            val files = buildList {
+                for (i in 0 until filesJson.length()) {
+                    val item = filesJson.optJSONObject(i) ?: continue
+                    val uri = item.optString("uri")
+                    val name = item.optString("name")
+                    if (uri.isBlank() || name.isBlank()) continue
                     add(
-                        CachedCategorySummary(
-                            title = item.optString("title"),
-                            count = item.optInt("count"),
+                        CachedMediaItem(
+                            id = item.optLong("id"),
+                            uri = uri,
+                            path = item.optString("path").takeIf { it.isNotBlank() && it != "null" },
+                            name = name,
                             sizeBytes = item.optLong("sizeBytes"),
-                            percent = item.optDouble("percent", 0.0).toFloat()
+                            mimeType = item.optString("mimeType").takeIf { it.isNotBlank() && it != "null" },
+                            dateModified = item.optLong("dateModified"),
+                            dateAdded = item.optLong("dateAdded"),
+                            width = item.optInt("width").takeIf { item.has("width") && it > 0 },
+                            height = item.optInt("height").takeIf { item.has("height") && it > 0 },
+                            duration = item.optLong("duration").takeIf { item.has("duration") && it > 0L },
+                            bucketName = item.optString("bucketName").takeIf { it.isNotBlank() && it != "null" },
+                            mediaType = item.optString("mediaType", "file"),
+                            relativePath = item.optString("relativePath").takeIf { it.isNotBlank() && it != "null" }
                         )
                     )
                 }
@@ -234,8 +293,28 @@ class UserPrefs private constructor(context: Context) {
                 potentialCleanupBytes = root.optLong("potentialCleanupBytes"),
                 fileCount = root.optInt("fileCount"),
                 lastScanCompletedAt = root.optLong("lastScanCompletedAt"),
-                categories = categories
+                categories = categories,
+                mediaTypes = mediaTypes,
+                files = files,
+                lastCleanupBytes = root.optLong("lastCleanupBytes", 0L)
             )
-        }.getOrNull()
+        }.getOrElse {
+            prefs.edit().remove(KEY_CACHED_SCAN_SUMMARY).apply()
+            null
+        }
+    }
+
+    private fun parseCachedCategories(categoriesJson: JSONArray): List<CachedCategorySummary> = buildList {
+        for (i in 0 until categoriesJson.length()) {
+            val item = categoriesJson.optJSONObject(i) ?: continue
+            add(
+                CachedCategorySummary(
+                    title = item.optString("title"),
+                    count = item.optInt("count"),
+                    sizeBytes = item.optLong("sizeBytes"),
+                    percent = item.optDouble("percent", 0.0).toFloat()
+                )
+            )
+        }
     }
 }

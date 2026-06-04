@@ -20,14 +20,16 @@ data class SimpleMediaItem(
     val width: Int? = null,
     val height: Int? = null,
     val bucketName: String? = null,
-    val modifiedMillis: Long = addedMillis
+    val modifiedMillis: Long = addedMillis,
+    val relativePath: String? = null,
+    val physicalPath: String? = null
 ) {
     val sizeKb: Int
         get() = (size / 1024L).toInt()
 
     // Kept for compatibility with existing analyzers. This is no longer file-path based.
     val path: String
-        get() = uri.toString()
+        get() = physicalPath ?: uri.toString()
 }
 
 class MediaLoader(private val context: Context) {
@@ -73,10 +75,17 @@ class MediaLoader(private val context: Context) {
             MediaStore.MediaColumns.MIME_TYPE,
             MediaStore.MediaColumns.WIDTH,
             MediaStore.MediaColumns.HEIGHT,
-            MediaStore.MediaColumns.BUCKET_DISPLAY_NAME
+            MediaStore.MediaColumns.BUCKET_DISPLAY_NAME,
+            MediaStore.MediaColumns.RELATIVE_PATH,
+            MediaStore.MediaColumns.DATA
         )
 
-        val selection = "${MediaStore.MediaColumns.SIZE} > 0 AND ${MediaStore.MediaColumns.DATE_ADDED} BETWEEN ? AND ?"
+        val baseSelection = "${MediaStore.MediaColumns.SIZE} > 0 AND ${MediaStore.MediaColumns.DATE_ADDED} BETWEEN ? AND ?"
+        val selection = if (mediaType == "file") {
+            "$baseSelection AND (${MediaStore.MediaColumns.MIME_TYPE} IS NULL OR (${MediaStore.MediaColumns.MIME_TYPE} NOT LIKE 'image/%' AND ${MediaStore.MediaColumns.MIME_TYPE} NOT LIKE 'video/%' AND ${MediaStore.MediaColumns.MIME_TYPE} NOT LIKE 'audio/%'))"
+        } else {
+            baseSelection
+        }
         val selectionArgs = arrayOf((minDate / 1000).toString(), (maxDate / 1000).toString())
         val sortOrder = "${MediaStore.MediaColumns.DATE_ADDED} DESC"
 
@@ -99,6 +108,8 @@ class MediaLoader(private val context: Context) {
                 val widthCol = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.WIDTH)
                 val heightCol = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.HEIGHT)
                 val bucketCol = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.BUCKET_DISPLAY_NAME)
+                val relativePathCol = cursor.getColumnIndex(MediaStore.MediaColumns.RELATIVE_PATH)
+                val dataCol = cursor.getColumnIndex(MediaStore.MediaColumns.DATA)
 
                 while (cursor.moveToNext()) {
                     val id = cursor.getLong(idCol)
@@ -114,6 +125,8 @@ class MediaLoader(private val context: Context) {
                     val width = cursor.getInt(widthCol).takeIf { it > 0 }
                     val height = cursor.getInt(heightCol).takeIf { it > 0 }
                     val bucketName = cursor.getString(bucketCol)
+                    val relativePath = if (relativePathCol >= 0) cursor.getString(relativePathCol) else null
+                    val physicalPath = if (dataCol >= 0) cursor.getString(dataCol) else null
                     val uri = ContentUris.withAppendedId(collectionUri, id)
                     if (!uri.toString().startsWith("content://media/")) {
                         Log.w(TAG, "Skipping non-MediaStore URI built from _ID=$id: $uri")
@@ -132,7 +145,9 @@ class MediaLoader(private val context: Context) {
                             width = width,
                             height = height,
                             bucketName = bucketName,
-                            modifiedMillis = modifiedSec * 1000
+                            modifiedMillis = modifiedSec * 1000,
+                            relativePath = relativePath,
+                            physicalPath = physicalPath
                         )
                     )
                 }
