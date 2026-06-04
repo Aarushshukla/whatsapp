@@ -432,7 +432,7 @@ class MainActivity : ComponentActivity() {
                 onRefreshClick = {
                     AnalyticsHelper.logScanStarted()
                     trackEvent(this@MainActivity, "scan_started")
-                    viewModel.refreshMedia()
+                    viewModel.refreshMedia(forceRefresh = true)
                 },
                 onAiScanClick = {
                     AnalyticsHelper.logScanStarted()

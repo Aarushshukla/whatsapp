@@ -287,7 +287,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     val videos = mediaLoader.loadAllDeviceMedia("video", limit = INITIAL_LOAD_LIMIT)
                     val audio = mediaLoader.loadAllDeviceMedia("audio", limit = INITIAL_LOAD_LIMIT)
                     val files = mediaLoader.loadAllDeviceMedia("file", limit = INITIAL_LOAD_LIMIT)
-                    val initialItems = (images + videos + audio + files).distinctBy { it.uri.toString() }.sortedByDescending { mediaItem -> mediaItem.addedMillis }
+                    val initialItems = mergeDistinctMediaRows(images, videos, audio, files)
                     _scanUiState.value = ScanUiState.Loading("Finding duplicates", 0.3f)
                     if (showLoading) {
                         ensureMinimumLoadingDuration(loadStartedAt)
@@ -300,7 +300,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     val fullAudio = mediaLoader.loadAllDeviceMedia("audio")
                     val fullFiles = mediaLoader.loadAllDeviceMedia("file")
                     _scanUiState.value = ScanUiState.Loading("Checking large videos", 0.5f)
-                    val loadedItems = (fullImages + fullVideos + fullAudio + fullFiles).distinctBy { it.uri.toString() }.sortedByDescending { mediaItem -> mediaItem.addedMillis }
+                    val loadedItems = mergeDistinctMediaRows(fullImages, fullVideos, fullAudio, fullFiles)
                     Log.d("FILES", "Files found: ${loadedItems.size}")
                     _scanUiState.value = ScanUiState.Loading("Detecting old media", 0.7f)
 
@@ -337,7 +337,10 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                                     sizeBytes = it.sizeBytes,
                                     percent = if (totalSizeBytes > 0L) ((it.sizeBytes * 100.0) / totalSizeBytes).toFloat() else 0f
                                 )
-                            }
+                            },
+                            mediaTypes = buildMediaTypeSummaries(allItems),
+                            files = allItems.map { it.toCachedMediaItem() },
+                            lastCleanupBytes = _uiState.value.lastCleanupBytes
                         )
                     )
                     prefs.appendScanHistory(
@@ -373,15 +376,129 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+
+    private fun mergeDistinctMediaRows(vararg rowGroups: List<SimpleMediaItem>): List<SimpleMediaItem> {
+        val rawRows = rowGroups.sumOf { it.size }
+        val seenKeys = linkedSetOf<String>()
+        val distinctItems = mutableListOf<SimpleMediaItem>()
+        rowGroups.flatten().forEach { item ->
+            val key = item.stableScanKey()
+            if (seenKeys.add(key)) {
+                distinctItems.add(item)
+            }
+        }
+        val sortedItems = distinctItems.sortedByDescending { mediaItem -> mediaItem.addedMillis }
+        val duplicateRowsRemoved = rawRows - sortedItems.size
+        Log.d(TAG, "Raw media rows: $rawRows")
+        Log.d(TAG, "Distinct media items: ${sortedItems.size}")
+        Log.d(TAG, "Duplicate rows removed: $duplicateRowsRemoved")
+        return sortedItems
+    }
+
+    private fun SimpleMediaItem.stableScanKey(): String {
+        val normalizedUri = normalizeKeyPart(uri.toString())
+        val collectionName = normalizedUri.substringBeforeLast("/", missingDelimiterValue = normalizedUri)
+        if (id > 0L && collectionName.isNotBlank()) {
+            return "mediastore:$collectionName:$id"
+        }
+        if (normalizedUri.isNotBlank()) {
+            return "uri:$normalizedUri"
+        }
+        val normalizedPath = normalizeKeyPart(physicalPath ?: path)
+        if (normalizedPath.isNotBlank()) {
+            return "path:$normalizedPath"
+        }
+        return "meta:${normalizeKeyPart(name)}:$size:$modifiedMillis:${normalizeKeyPart(mimeType.orEmpty())}"
+    }
+
+    private fun normalizeKeyPart(value: String): String = value
+        .trim()
+        .removePrefix("file://")
+        .lowercase()
+
+    private fun buildMediaTypeSummaries(items: List<SimpleMediaItem>): List<UserPrefs.CachedCategorySummary> {
+        val totalBytes = items.sumOf { it.size }
+        val typedItems = mapOf(
+            "photos" to items.filter { it.mimeType?.startsWith("image/") == true && !isStatusItem(it) && !isStickerItem(it) },
+            "videos" to items.filter { it.mimeType?.startsWith("video/") == true && !isStatusItem(it) },
+            "audio" to items.filter { it.mimeType?.startsWith("audio/") == true },
+            "documents" to items.filter { item ->
+                val mime = item.mimeType.orEmpty()
+                item.mediaType == "file" || (mime.isNotBlank() && !mime.startsWith("image/") && !mime.startsWith("video/") && !mime.startsWith("audio/"))
+            },
+            "statuses" to items.filter(::isStatusItem),
+            "stickers" to items.filter(::isStickerItem),
+            "other" to items.filter { it.mimeType.isNullOrBlank() }
+        )
+        return typedItems.map { (title, mediaItems) ->
+            val sizeBytes = mediaItems.sumOf { it.size }
+            UserPrefs.CachedCategorySummary(
+                title = title,
+                count = mediaItems.size,
+                sizeBytes = sizeBytes,
+                percent = if (totalBytes > 0L) ((sizeBytes * 100.0) / totalBytes).toFloat() else 0f
+            )
+        }
+    }
+
+    private fun isStatusItem(item: SimpleMediaItem): Boolean {
+        val marker = "${item.name} ${item.path} ${item.bucketName.orEmpty()} ${item.relativePath.orEmpty()}".lowercase()
+        return marker.contains(".statuses") || marker.contains("statuses") || marker.contains("status")
+    }
+
+    private fun isStickerItem(item: SimpleMediaItem): Boolean {
+        val marker = "${item.name} ${item.path} ${item.bucketName.orEmpty()} ${item.relativePath.orEmpty()}".lowercase()
+        val isAnimatedGif = item.mimeType?.contains("gif", ignoreCase = true) == true
+        return marker.contains("sticker") || marker.contains("stickers") || isAnimatedGif
+    }
+
+    private fun SimpleMediaItem.toCachedMediaItem(): UserPrefs.CachedMediaItem = UserPrefs.CachedMediaItem(
+        id = id,
+        uri = uri.toString(),
+        path = physicalPath,
+        name = name,
+        sizeBytes = size,
+        mimeType = mimeType,
+        dateModified = modifiedMillis,
+        dateAdded = addedMillis,
+        width = width,
+        height = height,
+        bucketName = bucketName,
+        mediaType = mediaType,
+        relativePath = relativePath
+    )
+
     private fun loadCachedSummary() {
         val cached = prefs.getCachedScanSummary() ?: return
+        val cachedItems = mergeDistinctMediaRows(cached.files.mapNotNull { cachedItem ->
+            runCatching {
+                SimpleMediaItem(
+                    uri = Uri.parse(cachedItem.uri),
+                    id = cachedItem.id,
+                    name = cachedItem.name,
+                    size = cachedItem.sizeBytes,
+                    addedMillis = cachedItem.dateAdded,
+                    mimeType = cachedItem.mimeType,
+                    mediaType = cachedItem.mediaType,
+                    width = cachedItem.width,
+                    height = cachedItem.height,
+                    bucketName = cachedItem.bucketName,
+                    modifiedMillis = cachedItem.dateModified,
+                    relativePath = cachedItem.relativePath,
+                    physicalPath = cachedItem.path
+                )
+            }.getOrNull()
+        })
         _uiState.update {
             it.copy(
+                allItems = cachedItems,
+                filteredItems = filterList(cachedItems, it.currentFilter, it.activeSuggestion, it.settings),
                 totalSize = cached.totalSizeBytes,
                 totalFiles = cached.fileCount,
                 summaryInfo = if (cached.fileCount > 0) "Found ${cached.fileCount} files (${formatSize(cached.totalSizeBytes)})" else "Ready to scan",
                 isLoading = false,
                 smartSuggestionSummary = it.smartSuggestionSummary.copy(totalSpaceToFree = cached.potentialCleanupBytes),
+                lastCleanupBytes = cached.lastCleanupBytes,
                 categorySummaries = cached.categories.map { category ->
                     CategorySummaryUi(
                         category.title,
@@ -394,6 +511,14 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 }
             )
         }
+        _items.value = cachedItems
+        hasLoadedInitialCache = cached.fileCount > 0
+        _scanUiState.value = if (cached.fileCount > 0) {
+            ScanUiState.Success("Loaded cached scan results")
+        } else {
+            ScanUiState.Idle
+        }
+        Log.d(TAG, "Loaded cached scan summary: files=${cached.fileCount}, cachedItems=${cachedItems.size}, completedAt=${cached.lastScanCompletedAt}")
     }
 
     private suspend fun ensureMinimumLoadingDuration(startedAtMillis: Long) {

@@ -242,14 +242,15 @@ fun WhatsCleanAppRoot(
     var appScreenState by remember { mutableStateOf<AppScreenState>(AppScreenState.Resolving) }
     var scanLaunchInFlight by rememberSaveable { mutableStateOf(false) }
 
-    LaunchedEffect(state.permissionGranted, permissionJustGranted, hasSeenPermissionSuccess, hasCompletedFirstScan, hasCompletedOnboarding, scanUiState, firstScanFinishedShown) {
+    LaunchedEffect(state.permissionGranted, permissionJustGranted, hasSeenPermissionSuccess, hasCompletedFirstScan, hasCompletedOnboarding, scanUiState, firstScanFinishedShown, state.totalFiles, state.allItems.size) {
         appScreenState = when {
             !state.permissionGranted -> AppScreenState.PermissionIntro
             permissionJustGranted -> AppScreenState.PermissionGreat
             scanLaunchInFlight || scanUiState is ScanUiState.Loading -> AppScreenState.ScanProgress
             scanUiState is ScanUiState.Error -> AppScreenState.Error
             scanUiState is ScanUiState.Empty && !hasCompletedOnboarding -> AppScreenState.Empty
-            scanUiState is ScanUiState.Success && !hasCompletedFirstScan && !hasCompletedOnboarding && !firstScanFinishedShown -> AppScreenState.ScanFinished
+            scanUiState is ScanUiState.Success && state.totalFiles > 0 && !hasCompletedFirstScan && !hasCompletedOnboarding && state.allItems.isNotEmpty() && !firstScanFinishedShown -> AppScreenState.ScanFinished
+            state.totalFiles > 0 -> AppScreenState.Dashboard
             !hasCompletedFirstScan && !hasCompletedOnboarding -> AppScreenState.FirstScanIntro
             state.filteredItems.isEmpty() -> AppScreenState.Empty
             else -> AppScreenState.Dashboard
