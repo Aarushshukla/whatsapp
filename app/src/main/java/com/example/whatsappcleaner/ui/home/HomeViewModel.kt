@@ -381,7 +381,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         val rawRows = rowGroups.sumOf { it.size }
         val seenKeys = linkedSetOf<String>()
         val distinctItems = mutableListOf<SimpleMediaItem>()
-        rowGroups.flatten().forEach { item ->
+        rowGroups.flatMap { it }.forEach { item ->
             val key = item.stableScanKey()
             if (seenKeys.add(key)) {
                 distinctItems.add(item)
